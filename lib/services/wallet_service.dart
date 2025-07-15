@@ -1,0 +1,218 @@
+import 'package:bip39_plus/bip39_plus.dart' as bip39;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:convert';
+import 'dart:math';
+
+class WalletService {
+  static const _storage = FlutterSecureStorage();
+  static const String _mnemonicKey = 'wallet_mnemonic';
+  static const String _walletsKey = 'wallets';
+
+  String? _currentMnemonic;
+  List<Wallet> _wallets = [];
+
+  List<Wallet> get wallets => List.from(_wallets);
+  bool get hasWallet => _currentMnemonic != null;
+  bool get isWalletLoaded => _currentMnemonic != null && _wallets.isNotEmpty;
+  String? get walletName => _wallets.isNotEmpty ? _wallets.first.name : null;
+
+  Future<void> initialize() async {
+    await _loadMnemonic();
+    await _loadWallets();
+  }
+
+  Future<void> _loadMnemonic() async {
+    _currentMnemonic = await _storage.read(key: _mnemonicKey);
+  }
+
+  Future<void> _loadWallets() async {
+    try {
+      final walletsJson = await _storage.read(key: _walletsKey);
+      if (walletsJson != null) {
+        final walletsList = json.decode(walletsJson) as List;
+        _wallets = walletsList.map((w) => Wallet.fromJson(w)).toList();
+      }
+    } catch (e) {
+      print('Error loading wallets: $e');
+    }
+  }
+
+  Future<String> createWallet() async {
+    try {
+      // Generate a new mnemonic using bip39 package
+      final mnemonic = bip39.generateMnemonic(strength: 256);
+
+      await _storage.write(key: _mnemonicKey, value: mnemonic);
+      _currentMnemonic = mnemonic;
+
+      // Create default wallet
+      final wallet = Wallet(
+        id: 'wallet_${DateTime.now().millisecondsSinceEpoch}',
+        name: 'Main Wallet',
+        address: _generateAddress(),
+        balance: 0.0,
+        createdAt: DateTime.now(),
+      );
+
+      _wallets.add(wallet);
+      await _saveWallets();
+
+      return mnemonic;
+    } catch (e) {
+      throw Exception('Failed to create wallet: $e');
+    }
+  }
+
+  Future<bool> restoreWallet(String mnemonic) async {
+    try {
+      // Validate mnemonic using bip39 package
+      if (!bip39.validateMnemonic(mnemonic)) {
+        throw Exception('Invalid mnemonic phrase');
+      }
+
+      await _storage.write(key: _mnemonicKey, value: mnemonic);
+      _currentMnemonic = mnemonic;
+
+      // Create restored wallet
+      final wallet = Wallet(
+        id: 'wallet_${DateTime.now().millisecondsSinceEpoch}',
+        name: 'Restored Wallet',
+        address: _generateAddress(),
+        balance: 0.0,
+        createdAt: DateTime.now(),
+      );
+
+      _wallets.clear();
+      _wallets.add(wallet);
+      await _saveWallets();
+
+      return true;
+    } catch (e) {
+      throw Exception('Failed to restore wallet: $e');
+    }
+  }
+
+  Future<void> _saveWallets() async {
+    try {
+      final walletsJson = json.encode(_wallets.map((w) => w.toJson()).toList());
+      await _storage.write(key: _walletsKey, value: walletsJson);
+    } catch (e) {
+      print('Error saving wallets: $e');
+    }
+  }
+
+  String _generateAddress() {
+    // Generate a mock Cardano address for demo purposes
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    const addressLength = 59; // Typical Cardano address length
+
+    String address = 'addr1';
+    for (int i = 0; i < addressLength - 5; i++) {
+      address += chars[random.nextInt(chars.length)];
+    }
+
+    return address;
+  }
+
+  Future<String> getReceiveAddress() async {
+    if (_wallets.isEmpty) {
+      throw Exception('No wallet available');
+    }
+    return _wallets.first.address;
+  }
+
+  bool validateAddress(String address) {
+    // Basic validation for Cardano addresses
+    if (address.isEmpty) return false;
+
+    // Shelley addresses (current era)
+    if (address.startsWith('addr1') || address.startsWith('addr_test1')) {
+      return address.length >= 50 && address.length <= 120;
+    }
+
+    // Byron addresses (legacy)
+    if (address.startsWith('Ddz') || address.startsWith('Ae2')) {
+      return address.length >= 50;
+    }
+
+    return false;
+  }
+
+  Future<void> deleteWallet() async {
+    await _storage.delete(key: _mnemonicKey);
+    await _storage.delete(key: _walletsKey);
+    _currentMnemonic = null;
+    _wallets.clear();
+  }
+
+  String? getMnemonic() {
+    return _currentMnemonic;
+  }
+
+  List<String> getMnemonicWords() {
+    return _currentMnemonic?.split(' ') ?? [];
+  }
+
+  // Mock balance update for demo
+  Future<void> updateBalance(String walletId, double newBalance) async {
+    final walletIndex = _wallets.indexWhere((w) => w.id == walletId);
+    if (walletIndex != -1) {
+      _wallets[walletIndex] =
+          _wallets[walletIndex].copyWith(balance: newBalance);
+      await _saveWallets();
+    }
+  }
+}
+
+class Wallet {
+  final String id;
+  final String name;
+  final String address;
+  final double balance;
+  final DateTime createdAt;
+
+  Wallet({
+    required this.id,
+    required this.name,
+    required this.address,
+    required this.balance,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'balance': balance,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory Wallet.fromJson(Map<String, dynamic> json) {
+    return Wallet(
+      id: json['id'],
+      name: json['name'],
+      address: json['address'],
+      balance: json['balance'].toDouble(),
+      createdAt: DateTime.parse(json['createdAt']),
+    );
+  }
+
+  Wallet copyWith({
+    String? id,
+    String? name,
+    String? address,
+    double? balance,
+    DateTime? createdAt,
+  }) {
+    return Wallet(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      address: address ?? this.address,
+      balance: balance ?? this.balance,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+}

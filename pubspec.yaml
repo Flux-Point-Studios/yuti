@@ -1,0 +1,48 @@
+name: bluelight
+description: A conversational Cardano wallet with Agent T AI assistant
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  http: ^1.1.0
+  flutter_secure_storage: ^9.0.0
+  shared_preferences: ^2.2.2
+  crypto: ^3.0.3
+  uuid: ^4.1.0
+  supabase_flutter: ^2.3.4
+  provider: ^6.1.1
+  flutter_markdown: ^0.6.18
+  qr_flutter: ^4.1.0
+  speech_to_text: ^7.1.0
+  permission_handler: ^11.1.0
+  mobile_scanner: ^3.5.2
+  path_provider: ^2.1.1
+  intl: ^0.17.0
+  url_launcher: ^6.2.2
+  # VESPR SDK for Cardano wallet functionality (same as working project)
+  cardano_flutter_sdk: ^2.5.3
+  cardano_dart_types: ^2.9.3
+  hex: ^0.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  mockito: ^5.4.2
+  build_runner: ^2.4.7
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+    - assets/agent_t_pfp.png
+    - assets/Tlogo1.1.png
+    - assets/bluelight.png
