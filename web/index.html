@@ -56,43 +56,36 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('flutter-first-frame', function() {
-        // Force cache clear and register new service worker with version
-        const swVersion = 'v2.1-bluelight-' + Date.now();
-        
-        // Clear existing caches first
-        if ('caches' in window) {
-          caches.keys().then(function(cacheNames) {
-            return Promise.all(
-              cacheNames.map(function(cacheName) {
-                return caches.delete(cacheName);
-              })
-            );
-          });
-        }
-        
-        // Register service worker with cache-busting version
-        navigator.serviceWorker.register('/flutter_service_worker.js?v=' + swVersion)
+        // Register service worker normally without dynamic versioning
+        navigator.serviceWorker.register('/flutter_service_worker.js')
           .then(function(registration) {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
             
-            // Handle service worker updates
-            registration.onupdatefound = function() {
-              const installingWorker = registration.installing;
-              installingWorker.onstatechange = function() {
-                if (installingWorker.state === 'installed') {
-                  if (navigator.serviceWorker.controller) {
-                    // New update available, notify user to refresh
-                    console.log('New content is available; please refresh.');
-                    if (confirm('A new version of BlueLight is available. Reload now?')) {
-                      window.location.reload(true); // Force reload from server
-                    }
-                  } else {
-                    // Content is cached for the first time
-                    console.log('Content is cached for offline use.');
+            // Handle service worker updates only when there's an actual update
+            registration.addEventListener('updatefound', function() {
+              const newWorker = registration.installing;
+              
+              newWorker.addEventListener('statechange', function() {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Only show update prompt if there's actually a new version
+                  console.log('New content is available and ready to be displayed.');
+                  
+                  // Show update notification with option to update later
+                  const updateNow = confirm('A new version of BlueLight is available. Update now?');
+                  
+                  if (updateNow) {
+                    // Tell the new service worker to skip waiting and take control
+                    newWorker.postMessage({ action: 'skipWaiting' });
+                    
+                    // Listen for the new service worker to take control
+                    navigator.serviceWorker.addEventListener('controllerchange', function() {
+                      // Reload the page to get the latest content
+                      window.location.reload();
+                    });
                   }
                 }
-              };
-            };
+              });
+            });
           })
           .catch(function(error) {
             console.log('ServiceWorker registration failed: ', error);
