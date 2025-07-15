@@ -31,6 +31,7 @@ migrate_working_dir/
 **/android/app/debug
 **/android/app/profile
 **/android/app/release
+.dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
@@ -42,7 +43,6 @@ migrate_working_dir/
 !/build/web/
 
 # Web related
-lib/generated_plugin_registrant.dart
 
 # Symbolication related
 app.*.symbols
