@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Cardevia Mobile Wallet
 
 A conversational Cardano wallet built with Flutter, following the mobile transformation documentation.
@@ -114,3 +115,7 @@ The app features a stunning glass morphism design with:
 - Validate all user inputs
 - Implement confirmation dialogs for large transactions
 - Regular security audits recommended
+=======
+# bluelight
+mobile crypto hub
+>>>>>>> 1b1bfd3f12f964af04bac961bbfa7adb8d2d75a1
