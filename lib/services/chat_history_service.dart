@@ -67,7 +67,7 @@ class ChatHistoryService {
   Future<void> _syncWithServer() async {
     try {
       final user = _authService.currentUser;
-      if (user == null || user.id.startsWith('guest_')) return;
+      if (user == null) return;
 
       // Fetch chats from server
       final chatsResponse = await _supabase
@@ -138,7 +138,7 @@ class ChatHistoryService {
   Future<void> _createSessionOnServer(ChatSession session) async {
     try {
       final user = _authService.currentUser;
-      if (user == null || user.id.startsWith('guest_')) return;
+      if (user == null) return;
 
       await _supabase.from('chats').insert({
         'id': session.id,
@@ -188,20 +188,27 @@ class ChatHistoryService {
   // Backward compatibility methods for chat_screen.dart
   Future<void> addMessageToSession(
       String sessionId, ChatMessage message) async {
+    // Find session in memory
     final sessionIndex = _sessions.indexWhere((s) => s.id == sessionId);
-    if (sessionIndex == -1) return;
+    if (sessionIndex != -1) {
+      _sessions[sessionIndex].messages.add(message);
+      await _saveToStorage();
+    }
 
-    final updatedMessages =
-        List<ChatMessage>.from(_sessions[sessionIndex].messages);
-    updatedMessages.add(message);
+    // Save to Supabase
+    final user = _authService.currentUser;
+    if (user == null) return;
 
-    _sessions[sessionIndex] = _sessions[sessionIndex].copyWith(
-      messages: updatedMessages,
-      updatedAt: DateTime.now(),
-    );
-
-    await _saveToStorage();
-    await _saveMessageToServer(message);
+    try {
+      await _supabase.from('messages').insert({
+        'chat_id': sessionId,
+        'content': message.text,
+        'role': message.isUser ? 'user' : 'assistant',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      print('Error saving message to Supabase: $e');
+    }
   }
 
   String generateSmartTitle(List<ChatMessage> messages) {
@@ -234,11 +241,7 @@ class ChatHistoryService {
   Future<void> _saveMessageToServer(ChatMessage message) async {
     try {
       final user = _authService.currentUser;
-      if (user == null ||
-          user.id.startsWith('guest_') ||
-          _currentSessionId == null) {
-        return;
-      }
+      if (user == null) return;
 
       await _supabase.from('messages').insert({
         'id': message.id,
@@ -256,7 +259,7 @@ class ChatHistoryService {
       String sessionId, String title) async {
     try {
       final user = _authService.currentUser;
-      if (user == null || user.id.startsWith('guest_')) return;
+      if (user == null) return;
 
       await _supabase.from('chats').update({
         'title': title,
@@ -286,7 +289,7 @@ class ChatHistoryService {
   Future<void> _deleteSessionFromServer(String sessionId) async {
     try {
       final user = _authService.currentUser;
-      if (user == null || user.id.startsWith('guest_')) return;
+      if (user == null) return;
 
       // Delete messages first
       await _supabase.from('messages').delete().eq('chat_id', sessionId);

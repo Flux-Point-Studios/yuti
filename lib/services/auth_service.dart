@@ -127,25 +127,32 @@ class AuthService {
     }
   }
 
-  Future<AuthResult> signUp({
+  Future<User> signUp({
     required String email,
     required String password,
+    required String firstName,
+    required String lastName,
   }) async {
     try {
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
+        data: {
+          'first_name': firstName,
+          'last_name': lastName,
+        },
       );
 
       if (response.user != null) {
-        // Create user record in users table
+        // Create user record in our users table
         await _supabase.from('users').insert({
           'id': response.user!.id,
           'email': email,
+          'customer_id': null, // Will be set when they subscribe
           'created_at': DateTime.now().toIso8601String(),
         });
 
-        // Create default subscription record
+        // Create FREE subscription record
         await _supabase.from('subscriptions').insert({
           'user_id': response.user!.id,
           'tier': 'FREE',
@@ -153,21 +160,14 @@ class AuthService {
           'created_at': DateTime.now().toIso8601String(),
         });
 
-        if (response.session != null) {
-          _currentSession = response.session;
-          await _fetchUserData();
-          return AuthResult.success(_currentUser,
-              message: 'Account created successfully');
-        } else {
-          return AuthResult.success(null,
-              message: 'Please check your email to verify your account');
-        }
+        await _fetchUserData();
+        return _currentUser!;
+      } else {
+        throw Exception('Failed to create user account');
       }
-
-      return AuthResult.error('Failed to create account');
     } catch (e) {
       print('Signup error: $e');
-      return AuthResult.error('Failed to create account: ${e.toString()}');
+      throw Exception('Signup failed: ${e.toString()}');
     }
   }
 
@@ -192,19 +192,6 @@ class AuthService {
       print('Signin error: $e');
       return AuthResult.error('Failed to sign in: ${e.toString()}');
     }
-  }
-
-  Future<User> signInAsGuest() async {
-    // For guest mode, create a temporary user without authentication
-    _currentUser = User(
-      id: 'guest_${DateTime.now().millisecondsSinceEpoch}',
-      email: 'guest@demo.com',
-      tier: 'FREE',
-      createdAt: DateTime.now(),
-    );
-
-    await _saveUserSession();
-    return _currentUser!;
   }
 
   Future<void> signOut() async {
