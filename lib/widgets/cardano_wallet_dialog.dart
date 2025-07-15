@@ -75,13 +75,13 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.account_balance_wallet,
                 color: AppColors.primaryBlue,
                 size: 32,
               ),
               const SizedBox(width: 12),
-              Expanded(
+              const Expanded(
                 child: Text(
                   'Connect Cardano Wallet',
                   style: TextStyle(
@@ -161,7 +161,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.primaryBlue),
+              borderSide: const BorderSide(color: AppColors.primaryBlue),
             ),
           ),
         ),
@@ -202,7 +202,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.primaryBlue),
+              borderSide: const BorderSide(color: AppColors.primaryBlue),
             ),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
@@ -244,14 +244,14 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(
                 Icons.info,
                 color: Colors.blue,
                 size: 20,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 'Premium Access Requirements',
                 style: TextStyle(
@@ -290,7 +290,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.error,
             color: Colors.red,
             size: 20,
@@ -299,7 +299,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.red,
                 fontSize: 14,
               ),

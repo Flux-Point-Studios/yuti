@@ -72,7 +72,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
           // Overlay with scanning frame
           Container(
-            decoration: ShapeDecoration(
+            decoration: const ShapeDecoration(
               shape: QrScannerOverlayShape(
                 borderColor: AppColors.primaryBlue,
                 borderRadius: 10,

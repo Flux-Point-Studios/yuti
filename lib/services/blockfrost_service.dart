@@ -266,7 +266,7 @@ class BlockfrostService {
       final poolId = stakeInfo['pool_id'];
 
       // Check for stake pool delegation (highest priority after special access)
-      final requiredPoolId =
+      const requiredPoolId =
           'pool1p00qq8zftf8m2ll0r9d24fx6tq7yzxzy5teltpswl7zew5m7nqp';
       final minStakeLovelace =
           BigInt.from(1000) * BigInt.from(1000000); // 1000 ADA in lovelace
@@ -298,7 +298,7 @@ class BlockfrostService {
       final assets = await getAssets(addressInfo);
 
       // Check for T1 ADAM Launch Pass NFT
-      final adamNftPolicy =
+      const adamNftPolicy =
           'b46891456b77dbc77c16090fd92a37f087f9a68e953c56b00a20332f';
       final adamNft = assets
           .where((asset) => asset['unit'].toString().startsWith(adamNftPolicy))
@@ -316,7 +316,7 @@ class BlockfrostService {
       }
 
       // Check for $SHARDS tokens (6 decimals, requires 3,500 tokens = 3,500,000,000 base units)
-      final shardsPolicy =
+      const shardsPolicy =
           'ea153b5d4864af15a1079a94a0e2486d6376fa28aafad272d15b243a';
       final shardsTokens = assets
           .where((asset) => asset['unit'].toString().startsWith(shardsPolicy))
@@ -344,7 +344,7 @@ class BlockfrostService {
       }
 
       // Check for $AGENT tokens (0 decimals, requires 100,000 tokens)
-      final agentPolicy =
+      const agentPolicy =
           '97bbb7db0baef89caefce61b8107ac74c7a7340166b39d906f174bec';
       final agentTokens = assets
           .where((asset) => asset['unit'].toString().startsWith(agentPolicy))

@@ -12,7 +12,6 @@ import 'package:bluelight/screens/splash_screen.dart' as splash;
 import 'package:bluelight/screens/onboarding_screen.dart';
 import 'package:bluelight/screens/chat_screen.dart';
 import 'package:bluelight/services/wallet_service.dart';
-import 'package:bluelight/utils/app_colors.dart';
 
 void main() {
   group('App Initialization Tests', () {

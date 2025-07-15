@@ -64,15 +64,15 @@ class MyApp extends StatelessWidget {
           fillColor: AppColors.backgroundLight,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.glassBorder),
+            borderSide: const BorderSide(color: AppColors.glassBorder),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.glassBorder),
+            borderSide: const BorderSide(color: AppColors.glassBorder),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.primaryBlue, width: 2),
+            borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
           ),
           labelStyle: const TextStyle(color: AppColors.textSecondary),
           hintStyle: const TextStyle(color: AppColors.textTertiary),
@@ -83,7 +83,7 @@ class MyApp extends StatelessWidget {
           shadowColor: AppColors.shadowColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppColors.glassBorder, width: 0.5),
+            side: const BorderSide(color: AppColors.glassBorder, width: 0.5),
           ),
         ),
         textTheme: const TextTheme(
@@ -109,12 +109,10 @@ class MyApp extends StatelessWidget {
         colorScheme: const ColorScheme.dark(
           primary: AppColors.primaryBlue,
           secondary: AppColors.lightBlue,
-          background: AppColors.backgroundDark,
           surface: AppColors.backgroundCard,
           error: AppColors.error,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
-          onBackground: AppColors.textPrimary,
           onSurface: AppColors.textPrimary,
           onError: Colors.white,
         ),
@@ -183,7 +181,7 @@ class _AppInitializerState extends State<AppInitializer> {
               Container(
                 width: 120,
                 height: 120,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: AppColors.curvedBlueGradient,
                   boxShadow: [
@@ -213,7 +211,7 @@ class _AppInitializerState extends State<AppInitializer> {
                     color: AppColors.primaryBlue.withOpacity(0.3),
                     width: 1,
                   ),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: AppColors.glowColor,
                       blurRadius: 20,
@@ -250,7 +248,7 @@ class _AppInitializerState extends State<AppInitializer> {
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
