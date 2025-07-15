@@ -1,121 +1,93 @@
-<<<<<<< HEAD
-# Cardevia Mobile Wallet
+# BlueLight - Natural Language Crypto Hub 🚀
 
-A conversational Cardano wallet built with Flutter, following the mobile transformation documentation.
+**Your Intelligent Crypto Companion** 
 
-## Features Implemented
+BlueLight is a revolutionary natural language crypto hub that transforms how you interact with blockchain technology. Using advanced AI and conversational interfaces, BlueLight makes complex crypto operations as simple as having a conversation.
 
-### Core Wallet Functionality ✅
-- **HD Wallet Creation & Restoration**: Generate new 24-word mnemonic or restore existing wallet
-- **Secure Storage**: Uses Flutter Secure Storage for encrypted key management
-- **Address Management**: Generate payment and stake addresses
-- **Balance Queries**: Check ADA balance and token holdings via Blockfrost
-- **Transaction Support**: Framework for sending ADA (transaction building needs SDK updates)
+## 🌟 **What is BlueLight?**
 
-### Conversational UI ✅
-- **Glass Morphism Design**: Beautiful translucent UI with blue color theme from T logo
-- **Chat Interface**: Natural language interaction for all wallet operations
-- **Typing Indicators**: Shows when assistant is processing
-- **Rich Message Types**: Support for text, QR codes, transactions, and swaps
-- **Markdown Support**: Formatted responses with code blocks and emphasis
+BlueLight is more than just a wallet - it's your **intelligent crypto companion** that understands natural language and helps you navigate the entire Web3 ecosystem:
 
-### Intent Detection & Processing ✅
-- **Balance Inquiries**: "What's my balance?", "How much ADA do I have?"
-- **Send Commands**: "Send 10 ADA to addr1..."
-- **Receive Address**: "Show my address", "QR code"
-- **Swap Commands**: "Swap 2 ETH for ADA"
-- **Transaction History**: "Show my transactions"
-- **General Queries**: Falls back to T-Backend AI for other questions
+- **🗣️ Natural Language Interface** - Talk to your crypto like you would to a friend
+- **🤖 Agent T AI Assistant** - Intelligent guidance for all crypto operations  
+- **🌐 Multi-Blockchain Support** - Starting with Cardano, expanding to all major chains
+- **💱 DeFi Integration** - Decentralized finance made simple through conversation
+- **📊 Trading Intelligence** - AI-powered market insights and trading assistance
+- **🔐 Enterprise Security** - Bank-grade security with conversational simplicity
 
-### Integration Services ✅
-- **Blockfrost API**: Query blockchain data (balances, UTXOs, transactions)
-- **T-Backend Integration**: AI responses for general queries
-- **UEX Swap Integration**: Multi-turn conversations for token swaps
+## 💡 **Core Features**
 
-### Security Features ✅
-- **Encrypted Storage**: Mnemonics stored securely using platform keychains
-- **Address Validation**: Validates Cardano addresses before transactions
-- **Warning Messages**: Clear security warnings during wallet creation
+### **Natural Language Crypto Operations**
+- "Send 100 ADA to Alice"
+- "What's my portfolio worth?"  
+- "Find the best staking pool"
+- "Swap 50 ADA for USDC"
+- "Show me DeFi opportunities"
 
-## Project Structure
+### **Intelligent AI Assistant**
+- **Agent T**: Your personal crypto guide
+- Real-time market analysis
+- Portfolio optimization suggestions
+- Risk assessment and warnings
+- Educational explanations for beginners
 
-```
-mobile/
-├── lib/
-│   ├── config/
-│   │   └── app_config.dart         # Configuration and API keys
-│   ├── models/
-│   │   └── chat_message.dart       # Message data models
-│   ├── screens/
-│   │   ├── splash_screen.dart      # Initial loading screen
-│   │   ├── onboarding_screen.dart  # Wallet setup flow
-│   │   └── chat_screen.dart        # Main chat interface
-│   ├── services/
-│   │   ├── wallet_service.dart     # Cardano wallet operations
-│   │   ├── blockfrost_service.dart # Blockchain queries
-│   │   ├── transaction_service.dart # Transaction building
-│   │   └── chat_service.dart       # Message processing & intents
-│   ├── utils/
-│   │   └── app_colors.dart         # Theme colors
-│   └── main.dart                   # App entry point
-├── assets/
-│   ├── Tlogo1.1.png               # Main logo
-│   └── agent_t_pfp.png            # Assistant avatar
-├── pubspec.yaml                    # Dependencies
-└── README.md                       # This file
-```
+### **Multi-Chain Hub** 
+- **Cardano** (Primary) - Full ecosystem support
+- **Ethereum** (Coming Soon) - DeFi and NFTs
+- **Bitcoin** (Planned) - Store of value operations  
+- **Solana** (Planned) - High-speed transactions
+- **Polygon** (Planned) - Low-cost operations
 
-## Running the App
+### **DeFi & Trading**
+- Automated yield farming
+- Liquidity pool management
+- Cross-chain swaps
+- Options and futures (coming soon)
+- Portfolio rebalancing
 
-1. Ensure Flutter is installed and configured
-2. Set up environment variables or update `app_config.dart`:
-   - `BLOCKFROST_API_KEY`: Your Blockfrost project ID
-   - `T_BACKEND_URL`: T-Backend API URL
-   - `T_BACKEND_API_KEY`: T-Backend API key
-   
-3. Install dependencies:
-   ```bash
-   flutter pub get
-   ```
+## 🎯 **Vision: The Future of Crypto Interaction**
 
-4. Run the app:
-   ```bash
-   flutter run
-   ```
+We're building the **Siri for crypto** - where blockchain complexity disappears behind intelligent conversation. BlueLight will become the primary interface between humans and the decentralized economy.
 
-## Current Limitations
+## 🚀 **Getting Started**
 
-1. **Transaction Building**: The Cardano SDK transaction builder implementation needs updates for full transaction support
-2. **UEX Integration**: Currently simulated - needs backend proxy implementation
-3. **Hardware Wallet**: Ledger support not yet implemented
-4. **Voice Input**: Speech-to-text placeholder in UI but not connected
+### **Web App (Live Now)**
+Visit: [bluelight.vercel.app](https://bluelight.vercel.app)
 
-## Next Steps
+### **Mobile Installation**
+1. Open BlueLight in your mobile browser
+2. Tap "Add to Home Screen"  
+3. Install as PWA for native app experience
 
-1. Complete transaction building with proper SDK integration
-2. Implement T-Backend proxy endpoints for UEX swaps
-3. Add voice input using speech_to_text package
-4. Implement staking delegation features
-5. Add NFT display and management
-6. Integrate hardware wallet support
+### **Desktop Usage**
+1. Visit the web app
+2. Bookmark for quick access
+3. Works seamlessly across all devices
 
-## Design Highlights
+## 🛠️ **For Developers**
 
-The app features a stunning glass morphism design with:
-- Translucent message bubbles with backdrop blur
-- Blue gradient theme matching the T logo (#39A5F1)
-- Dark background for contrast
-- Smooth animations and transitions
-- Conversational onboarding flow
+BlueLight is built with:
+- **Flutter** - Cross-platform framework
+- **Supabase** - Backend infrastructure  
+- **Cardano SDK** - Blockchain integration
+- **Agent T AI** - Conversational intelligence
+- **Progressive Web App** - Universal compatibility
 
-## Security Considerations
+## 🤝 **Join the Revolution**
 
-- Never expose API keys in the app
-- Use secure storage for all sensitive data
-- Validate all user inputs
-- Implement confirmation dialogs for large transactions
-- Regular security audits recommended
-=======
-# bluelight
-mobile crypto hub
->>>>>>> 1b1bfd3f12f964af04bac961bbfa7adb8d2d75a1
+Help us build the future of human-crypto interaction:
+
+- **Feedback**: Share your experience and suggestions
+- **Beta Testing**: Try new features before release  
+- **Integration**: Connect your DeFi protocol
+- **Investment**: Join our growth journey
+
+## 📞 **Contact & Support**
+
+- **Website**: [fluxpointstudios.com](https://fluxpointstudios.com)
+- **Support**: support@fluxpointstudios.com
+- **Partnership**: partners@fluxpointstudios.com
+
+---
+
+**BlueLight** - *Making crypto conversational* 💙
