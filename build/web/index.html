@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A conversational Cardano wallet with Agent T AI assistant">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- PWA Manifest and Theme Color -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0175C2">
+
+  <!-- Apple Touch Icons (for iOS home screen icon) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-512.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/Icon-512.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="icons/Icon-512.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- iOS specific meta tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cardevia">
+
+  <!-- Additional PWA meta tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Cardevia">
+  <meta name="msapplication-TileColor" content="#0175C2">
+  <meta name="msapplication-TileImage" content="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="shortcut icon" type="image/png" href="favicon.png"/>
+
+  <title>Cardevia - Cardano Wallet with AI Assistant</title>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('flutter-first-frame', function() {
+        // Register service worker after the first frame
+        navigator.serviceWorker.register('/flutter_service_worker.js?v=' + Date.now())
+          .then(function(registration) {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            
+            // Handle service worker updates
+            registration.onupdatefound = function() {
+              const installingWorker = registration.installing;
+              installingWorker.onstatechange = function() {
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    // New update available, notify user to refresh
+                    console.log('New content is available; please refresh.');
+                    if (confirm('A new version of Cardevia is available. Reload now?')) {
+                      window.location.reload();
+                    }
+                  } else {
+                    // Content is cached for the first time
+                    console.log('Content is cached for offline use.');
+                  }
+                }
+              };
+            };
+          })
+          .catch(function(error) {
+            console.log('ServiceWorker registration failed: ', error);
+          });
+      });
+      
+      // Handle installation prompt for Android
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        console.log('PWA install prompt available');
+        
+        // Optional: Show your own install promotion UI here
+        // You could show a custom banner or button to prompt installation
+      });
+      
+      // Handle successful installation
+      window.addEventListener('appinstalled', function(e) {
+        console.log('PWA installed successfully');
+        deferredPrompt = null;
+      });
+    }
+    
+    // Detect if running as PWA (standalone mode)
+    function isPWA() {
+      return window.matchMedia('(display-mode: standalone)').matches || 
+             window.navigator.standalone === true;
+    }
+    
+    // Optional: Show install instructions for iOS Safari users
+    function showIOSInstallInstructions() {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isInStandaloneMode = window.navigator.standalone;
+      
+      if (isIOS && !isInStandaloneMode) {
+        // You could show a banner here explaining how to install on iOS
+        console.log('iOS user detected - can show install instructions');
+      }
+    }
+    
+    window.addEventListener('load', function() {
+      showIOSInstallInstructions();
+    });
+  </script>
+</body>
+</html>
