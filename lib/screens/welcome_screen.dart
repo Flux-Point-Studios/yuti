@@ -471,7 +471,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             children: [
               GestureDetector(
                 onTap: () => _launchUrl(AppConfig().privacyPolicyUrl),
-                child: Text(
+                child: const Text(
                   'Privacy Policy',
                   style: TextStyle(
                     color: AppColors.primaryBlue,
@@ -489,7 +489,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               ),
               GestureDetector(
                 onTap: () => _launchUrl(AppConfig().termsOfServiceUrl),
-                child: Text(
+                child: const Text(
                   'Terms of Service',
                   style: TextStyle(
                     color: AppColors.primaryBlue,

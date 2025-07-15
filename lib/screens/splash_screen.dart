@@ -86,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen>
                 Container(
                   width: 120,
                   height: 120,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: AppColors.curvedBlueGradient,
                     boxShadow: [
@@ -116,7 +116,7 @@ class _SplashScreenState extends State<SplashScreen>
                       color: AppColors.primaryBlue.withOpacity(0.3),
                       width: 1,
                     ),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
                         color: AppColors.glowColor,
                         blurRadius: 20,
@@ -153,7 +153,7 @@ class _SplashScreenState extends State<SplashScreen>
                 Container(
                   width: 40,
                   height: 40,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
