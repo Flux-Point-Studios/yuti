@@ -256,12 +256,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           Icons.person_add,
           () => _navigateToSignup(),
         ),
-        const SizedBox(height: 16),
-        _buildGuestButton(
-          'Continue as Guest',
-          Icons.visibility,
-          () => _handleGuestLogin(),
-        ),
       ],
     );
   }
@@ -318,31 +312,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         ),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: AppColors.primaryBlue, width: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGuestButton(String text, IconData icon, VoidCallback onPressed) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, color: Colors.green),
-        label: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.green,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.green, width: 2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
           ),
@@ -561,18 +530,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
-  Future<void> _handleGuestLogin() async {
-    setState(() => _isLoading = true);
 
-    try {
-      await _authService.signInAsGuest();
-      _navigateToChat();
-    } catch (e) {
-      _showError('Failed to continue as guest');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
 
   void _navigateToChat() {
     Navigator.pushReplacement(
