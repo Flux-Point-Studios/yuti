@@ -1,7 +1,7 @@
 {
-  "name": "cardevia-pwa",
+  "name": "bluelight-crypto-hub",
   "version": "1.0.0",
-  "description": "Cardevia - Conversational Cardano Wallet PWA",
+  "description": "BlueLight - Natural Language Crypto Hub with AI Assistant",
   "main": "index.js",
   "scripts": {
     "build": "echo 'Build handled by GitHub Actions - serving pre-built files'",
@@ -12,12 +12,16 @@
     "node": ">=16.0.0"
   },
   "keywords": [
-    "cardano",
-    "wallet",
-    "pwa",
-    "flutter",
-    "ai",
-    "conversation"
+    "bluelight",
+    "crypto",
+    "blockchain", 
+    "AI",
+    "DeFi",
+    "trading",
+    "Web3",
+    "natural-language",
+    "conversation",
+    "agent-t"
   ],
   "author": "Flux Point Studios",
   "license": "MIT",
