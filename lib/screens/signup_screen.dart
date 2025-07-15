@@ -18,9 +18,12 @@ class _SignupScreenState extends State<SignupScreen>
   // Company contact information
   static const String _companyEmail = 'contact@fluxpointstudios.com';
   static const String _companyWebsite = 'https://fluxpointstudios.com';
-  static const String _privacyPolicyUrl = 'https://fluxpointstudios.com/privacy';
+  static const String _privacyPolicyUrl =
+      'https://fluxpointstudios.com/privacy';
   static const String _termsOfServiceUrl = 'https://fluxpointstudios.com/terms';
   final _formKey = GlobalKey<FormState>();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -59,6 +62,8 @@ class _SignupScreenState extends State<SignupScreen>
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -197,6 +202,14 @@ class _SignupScreenState extends State<SignupScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Row(
+                  children: [
+                    Expanded(child: _buildFirstNameField()),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildLastNameField()),
+                  ],
+                ),
+                const SizedBox(height: 20),
                 _buildEmailField(),
                 const SizedBox(height: 20),
                 _buildPasswordField(),
@@ -211,6 +224,98 @@ class _SignupScreenState extends State<SignupScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFirstNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'First Name',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _firstNameController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'First name',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+            prefixIcon: Icon(
+              Icons.person_outline,
+              color: Colors.white.withOpacity(0.7),
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.1),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppColors.primaryBlue, width: 2),
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'First name is required';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLastNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Last Name',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _lastNameController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Last name',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+            prefixIcon: Icon(
+              Icons.person_outline,
+              color: Colors.white.withOpacity(0.7),
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.1),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppColors.primaryBlue, width: 2),
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Last name is required';
+            }
+            return null;
+          },
+        ),
+      ],
     );
   }
 
@@ -514,21 +619,19 @@ class _SignupScreenState extends State<SignupScreen>
     setState(() => _isLoading = true);
 
     try {
-      final result = await _authService.signUp(
+      final user = await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
       );
 
-      if (result.isSuccess) {
-        _showSuccess('Account created successfully!');
+      _showSuccess('Account created successfully!');
 
-        // Navigate to pricing for new FREE users
-        _navigateToPricing();
-      } else {
-        _showError(result.error ?? 'Signup failed');
-      }
+      // Navigate to pricing for new FREE users
+      _navigateToPricing();
     } catch (e) {
-      _showError('An error occurred during signup');
+      _showError('An error occurred during signup: ${e.toString()}');
     } finally {
       setState(() => _isLoading = false);
     }
