@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A conversational Cardano wallet with Agent T AI assistant">
+  <meta name="description" content="BlueLight - Natural language crypto hub. Intelligent AI assistant for blockchain, DeFi, trading, and Web3 interactions.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- PWA Manifest and Theme Color -->
@@ -35,11 +35,11 @@
   <!-- iOS specific meta tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Cardevia">
+  <meta name="apple-mobile-web-app-title" content="BlueLight">
 
   <!-- Additional PWA meta tags -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="application-name" content="Cardevia">
+  <meta name="application-name" content="BlueLight">
   <meta name="msapplication-TileColor" content="#0175C2">
   <meta name="msapplication-TileImage" content="icons/Icon-192.png">
 
@@ -47,7 +47,7 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
   <link rel="shortcut icon" type="image/png" href="favicon.png"/>
 
-  <title>Cardevia - Cardano Wallet with AI Assistant</title>
+  <title>BlueLight - Natural Language Crypto Hub</title>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
@@ -56,8 +56,22 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('flutter-first-frame', function() {
-        // Register service worker after the first frame
-        navigator.serviceWorker.register('/flutter_service_worker.js?v=' + Date.now())
+        // Force cache clear and register new service worker with version
+        const swVersion = 'v2.1-bluelight-' + Date.now();
+        
+        // Clear existing caches first
+        if ('caches' in window) {
+          caches.keys().then(function(cacheNames) {
+            return Promise.all(
+              cacheNames.map(function(cacheName) {
+                return caches.delete(cacheName);
+              })
+            );
+          });
+        }
+        
+        // Register service worker with cache-busting version
+        navigator.serviceWorker.register('/flutter_service_worker.js?v=' + swVersion)
           .then(function(registration) {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
             
@@ -69,8 +83,8 @@
                   if (navigator.serviceWorker.controller) {
                     // New update available, notify user to refresh
                     console.log('New content is available; please refresh.');
-                    if (confirm('A new version of Cardevia is available. Reload now?')) {
-                      window.location.reload();
+                    if (confirm('A new version of BlueLight is available. Reload now?')) {
+                      window.location.reload(true); // Force reload from server
                     }
                   } else {
                     // Content is cached for the first time
@@ -102,6 +116,16 @@
       window.addEventListener('appinstalled', function(e) {
         console.log('PWA installed successfully');
         deferredPrompt = null;
+      });
+    }
+    
+    // Force clear all caches on page load for immediate fix
+    if ('caches' in window) {
+      caches.keys().then(function(cacheNames) {
+        cacheNames.forEach(function(cacheName) {
+          caches.delete(cacheName);
+          console.log('Cleared cache:', cacheName);
+        });
       });
     }
     

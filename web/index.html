@@ -56,8 +56,22 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('flutter-first-frame', function() {
-        // Register service worker after the first frame
-        navigator.serviceWorker.register('/flutter_service_worker.js?v=' + Date.now())
+        // Force cache clear and register new service worker with version
+        const swVersion = 'v2.1-bluelight-' + Date.now();
+        
+        // Clear existing caches first
+        if ('caches' in window) {
+          caches.keys().then(function(cacheNames) {
+            return Promise.all(
+              cacheNames.map(function(cacheName) {
+                return caches.delete(cacheName);
+              })
+            );
+          });
+        }
+        
+        // Register service worker with cache-busting version
+        navigator.serviceWorker.register('/flutter_service_worker.js?v=' + swVersion)
           .then(function(registration) {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
             
@@ -70,7 +84,7 @@
                     // New update available, notify user to refresh
                     console.log('New content is available; please refresh.');
                     if (confirm('A new version of BlueLight is available. Reload now?')) {
-                      window.location.reload();
+                      window.location.reload(true); // Force reload from server
                     }
                   } else {
                     // Content is cached for the first time
@@ -102,6 +116,16 @@
       window.addEventListener('appinstalled', function(e) {
         console.log('PWA installed successfully');
         deferredPrompt = null;
+      });
+    }
+    
+    // Force clear all caches on page load for immediate fix
+    if ('caches' in window) {
+      caches.keys().then(function(cacheNames) {
+        cacheNames.forEach(function(cacheName) {
+          caches.delete(cacheName);
+          console.log('Cleared cache:', cacheName);
+        });
       });
     }
     
