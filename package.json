@@ -1,45 +1,26 @@
 {
   "name": "cardevia-pwa",
   "version": "1.0.0",
-  "description": "Cardevia PWA - A conversational Cardano wallet with Agent T AI assistant",
+  "description": "Cardevia - Conversational Cardano Wallet PWA",
+  "main": "index.js",
   "scripts": {
-    "build": "flutter build web --release --pwa-strategy offline-first",
-    "build:wasm": "flutter build web --release --wasm --pwa-strategy offline-first",
-    "clean": "flutter clean",
-    "deps": "flutter pub get",
-    "deploy:firebase": "firebase deploy",
-    "deploy:vercel": "vercel --prod",
-    "deploy:netlify": "netlify deploy --prod --dir=build/web",
-    "serve": "flutter run -d web-server --web-port 3000",
-    "test:lighthouse": "lighthouse http://localhost:3000 --view",
-    "test:pwa": "lighthouse http://localhost:3000 --only-categories=pwa --view"
-  },
-  "keywords": [
-    "pwa",
-    "flutter",
-    "cardano",
-    "wallet",
-    "ai",
-    "progressive-web-app",
-    "cardevia"
-  ],
-  "author": "Flux Point Studios",
-  "license": "MIT",
-  "devDependencies": {
-    "firebase-tools": "^13.0.0",
-    "vercel": "^32.0.0",
-    "netlify-cli": "^17.0.0",
-    "lighthouse": "^11.0.0"
+    "build": "echo 'Build handled by GitHub Actions - serving pre-built files'",
+    "start": "echo 'Static files ready'",
+    "test": "echo 'No tests configured'"
   },
   "engines": {
     "node": ">=16.0.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-org/cardevia-v2.git"
-  },
-  "homepage": "https://cardevia.com",
-  "bugs": {
-    "url": "https://github.com/your-org/cardevia-v2/issues"
-  }
+  "keywords": [
+    "cardano",
+    "wallet",
+    "pwa",
+    "flutter",
+    "ai",
+    "conversation"
+  ],
+  "author": "Flux Point Studios",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
 } 
