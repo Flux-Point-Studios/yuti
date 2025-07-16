@@ -14,35 +14,40 @@
     "dir": "ltr",
     "icons": [
         {
-            "src": "icons/Icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/Icon-512.png",
+            "src": "bluelight.png",
             "sizes": "512x512",
             "type": "image/png"
         },
         {
-            "src": "icons/Icon-maskable-192.png",
+            "src": "icons/bluelight-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/bluelight-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/bluelight-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "icons/Icon-maskable-512.png",
+            "src": "icons/bluelight-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "icons/Icon-192.png",
+            "src": "icons/bluelight-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icons/Icon-512.png",
+            "src": "icons/bluelight-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
@@ -50,7 +55,7 @@
     ],
     "screenshots": [
         {
-            "src": "icons/Icon-512.png",
+            "src": "icons/bluelight-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "form_factor": "narrow"
