@@ -194,10 +194,19 @@ class GameChangerService {
 
       print('🔍 DEBUG: Launching flutter_web_auth...');
 
-      // Use flutter_web_auth to handle the OAuth-style flow
-      final callbackUrlScheme = kIsWeb ? Uri.base.origin : _callbackScheme;
-      print('🔍 DEBUG: Using callback URL scheme: $callbackUrlScheme');
-
+                  // Use flutter_web_auth to handle the OAuth-style flow
+      String callbackUrlScheme;
+      
+      if (kIsWeb) {
+        // For web, flutter_web_auth expects the web protocol (https)
+        callbackUrlScheme = 'https';
+        print('🔍 DEBUG: Web environment - using HTTPS as callback scheme');
+      } else {
+        // For native apps, use custom scheme
+        callbackUrlScheme = _callbackScheme;
+        print('🔍 DEBUG: Native environment - using custom scheme: $callbackUrlScheme');
+      }
+      
       final resultUrl = await FlutterWebAuth.authenticate(
         url: connectionUrl,
         callbackUrlScheme: callbackUrlScheme,
