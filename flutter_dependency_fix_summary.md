@@ -15,13 +15,12 @@ So, because bluelight depends on cardano_flutter_sdk ^2.5.3, version solving fai
 ## Solution Applied
 
 ### 1. Updated CI Flutter Versions
-**File: `.github/workflows/deploy-web.yml`**
-- Changed from: `flutter-version: '3.24.5'`
-- Changed to: `flutter-version: '3.27.0'` (includes Dart SDK 3.6.0)
-
 **File: `.github/workflows/deploy.yml`**
 - Changed from: `flutter-version: '3.32.6'` (potentially invalid version)
 - Changed to: `flutter-version: '3.32.0'` (confirmed stable version with Dart SDK 3.8.0)
+
+**Removed deprecated workflow:**
+- Deleted `.github/workflows/deploy-web.yml` (was using Flutter 3.24.5 with incompatible Dart SDK)
 
 ### 2. Updated Dart SDK Constraint
 **File: `pubspec.yaml`**
@@ -43,9 +42,16 @@ This makes the constraint explicit and prevents future compatibility issues.
 3. **Local development**: Run `flutter upgrade` to use a compatible Flutter version locally
 
 ## Verification
-Your CI should now successfully run:
+Your CI should now successfully run with the single remaining workflow (`.github/workflows/deploy.yml`):
 - `flutter pub get` ✅
 - `flutter build web` ✅  
+- Git commit and push of build files ✅
 - Deployment process ✅
+
+## Benefits of This Fix
+- ✅ **Resolved dependency conflicts** - Compatible Dart SDK versions
+- ✅ **Simplified CI setup** - Removed redundant deprecated workflow
+- ✅ **Future-proofed** - Explicit SDK constraint prevents similar issues
+- ✅ **Uses latest stable Flutter** - Better performance and features
 
 The error was specifically in the dependency resolution phase, so fixing the Dart SDK version compatibility resolves the entire build pipeline.
