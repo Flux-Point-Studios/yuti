@@ -98,23 +98,44 @@ class CardanoWalletService {
     }
   }
 
-  /// Restore wallet from stored mnemonic
+  /// Restore wallet from stored mnemonic or external wallet data
   Future<bool> _restoreWallet() async {
     try {
-      final mnemonic = await _storage.read(key: _mnemonicKey);
       final walletName = await _storage.read(key: _walletNameKey);
-
-      if (mnemonic == null || walletName == null) {
+      if (walletName == null) {
         return false;
       }
 
       _connectionStatus = WalletConnectionStatus.connecting;
 
-      // Restore wallet from stored data
-      _mnemonic = mnemonic;
-      _walletName = walletName;
-      _currentAddress = _generateDummyAddress();
-      _stakeAddress = _generateDummyStakeAddress();
+      // Check if this is an external wallet (no mnemonic stored)
+      final externalAddress =
+          await _storage.read(key: 'external_wallet_address');
+      final externalStakeAddress =
+          await _storage.read(key: 'external_wallet_stake_address');
+
+      if (externalAddress != null && externalStakeAddress != null) {
+        // Restore external wallet
+        _walletName = walletName;
+        _currentAddress = externalAddress;
+        _stakeAddress = externalStakeAddress;
+        _mnemonic = null; // External wallet - no mnemonic
+
+        print('Restored external wallet: $walletName');
+      } else {
+        // Restore mnemonic-based wallet
+        final mnemonic = await _storage.read(key: _mnemonicKey);
+        if (mnemonic == null) {
+          return false;
+        }
+
+        _mnemonic = mnemonic;
+        _walletName = walletName;
+        _currentAddress = _generateDummyAddress();
+        _stakeAddress = _generateDummyStakeAddress();
+
+        print('Restored mnemonic-based wallet: $walletName');
+      }
 
       _connectionStatus = WalletConnectionStatus.connected;
 
@@ -134,13 +155,61 @@ class CardanoWalletService {
     return await createWallet(walletName, mnemonic: mnemonic);
   }
 
+  /// Connect external wallet (e.g., from GameChanger) without storing mnemonic
+  Future<bool> connectExternalWallet(
+      String walletName, String address, String stakeAddress) async {
+    try {
+      _connectionStatus = WalletConnectionStatus.connecting;
+
+      // Validate inputs
+      if (walletName.isEmpty || address.isEmpty || stakeAddress.isEmpty) {
+        throw Exception('Invalid wallet data provided');
+      }
+
+      // Validate address formats (basic check)
+      if (!_validateAddress(address) || !_validateStakeAddress(stakeAddress)) {
+        throw Exception('Invalid address format');
+      }
+
+      // Set wallet data without storing mnemonic
+      _walletName = walletName;
+      _currentAddress = address;
+      _stakeAddress = stakeAddress;
+      _mnemonic = null; // External wallet - no mnemonic stored
+
+      // Store wallet connection info (but not mnemonic)
+      await _storage.write(key: _walletNameKey, value: walletName);
+      await _storage.write(key: _isConnectedKey, value: 'true');
+      await _storage.write(key: 'external_wallet_address', value: address);
+      await _storage.write(
+          key: 'external_wallet_stake_address', value: stakeAddress);
+
+      _connectionStatus = WalletConnectionStatus.connected;
+
+      // Check premium access
+      await _checkPremiumAccess();
+
+      print('External wallet connected successfully: $walletName');
+      print('Address: $address');
+      print('Stake Address: $stakeAddress');
+
+      return true;
+    } catch (e) {
+      print('Error connecting external wallet: $e');
+      _connectionStatus = WalletConnectionStatus.error;
+      return false;
+    }
+  }
+
   /// Disconnect wallet
   Future<void> disconnectWallet() async {
     try {
-      // Clear stored data
+      // Clear stored data (both mnemonic and external wallet data)
       await _storage.delete(key: _mnemonicKey);
       await _storage.delete(key: _walletNameKey);
       await _storage.delete(key: _isConnectedKey);
+      await _storage.delete(key: 'external_wallet_address');
+      await _storage.delete(key: 'external_wallet_stake_address');
 
       // Reset state
       _mnemonic = null;
@@ -361,5 +430,34 @@ class CardanoWalletService {
 
     // Create a dummy stake address format
     return 'stake1${hex.substring(0, 56)}';
+  }
+
+  /// Validate Cardano address format (basic validation)
+  bool _validateAddress(String address) {
+    if (address.isEmpty) return false;
+
+    // Basic Cardano address validation
+    // Mainnet addresses start with 'addr1' and testnet with 'addr_test1'
+    if (address.startsWith('addr1') || address.startsWith('addr_test1')) {
+      // Check minimum length (Cardano addresses are typically ~100 characters)
+      return address.length >= 50 && address.length <= 130;
+    }
+
+    return false;
+  }
+
+  /// Validate Cardano stake address format (basic validation)
+  bool _validateStakeAddress(String stakeAddress) {
+    if (stakeAddress.isEmpty) return false;
+
+    // Basic stake address validation
+    // Mainnet stake addresses start with 'stake1' and testnet with 'stake_test1'
+    if (stakeAddress.startsWith('stake1') ||
+        stakeAddress.startsWith('stake_test1')) {
+      // Check minimum length (stake addresses are typically ~60 characters)
+      return stakeAddress.length >= 50 && stakeAddress.length <= 80;
+    }
+
+    return false;
   }
 }

@@ -65,5 +65,18 @@
 	<!-- Photo library permission (if needed for future features) -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app may access your photo library to share QR codes</string>
+	
+	<!-- URL Types for GameChanger deep link callback -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>bluelight.gamechanger</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bluelight</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
