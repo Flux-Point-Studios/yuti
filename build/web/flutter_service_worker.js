@@ -16,7 +16,7 @@ const RESOURCES = {"apple-touch-icon-120x120.png": "c15f0a70a483109d9cbb938ac1a8
 "assets/assets/bluelight.png": "c15f0a70a483109d9cbb938ac1a8349c",
 "assets/assets/Tlogo1.1.png": "e7e03ca67b9f215e0808d545a45481da",
 "assets/FontManifest.json": "dc3d03800ccca4601324923c0b1d6d57",
-"assets/fonts/MaterialIcons-Regular.otf": "92f96eb64cb55958fbb52951bd946aa7",
+"assets/fonts/MaterialIcons-Regular.otf": "c8c07f6c1889ff02c5185d47ada2fc0e",
 "assets/NOTICES": "51d70f18bfb4a30189018e368a1351a2",
 "assets/packages/cardano_flutter_sdk/workers/wallet_tasks.web.g.dart.js": "ce23c44b59ab864c0dee31ff2df19283",
 "assets/packages/cardano_flutter_sdk/workers/wallet_tasks.web.g.dart.mjs": "3b31a1c4b1f7a7b5e201f8890ca07ae2",
@@ -36,7 +36,7 @@ const RESOURCES = {"apple-touch-icon-120x120.png": "c15f0a70a483109d9cbb938ac1a8
 "favicon.ico": "c15f0a70a483109d9cbb938ac1a8349c",
 "favicon.png": "5dcef449791fa27946b3d35ad8803796",
 "flutter.js": "83d881c1dbb6d6bcd6b42e274605b69c",
-"flutter_bootstrap.js": "e869e42d3d8f4189abe15f78da9621ea",
+"flutter_bootstrap.js": "3943c3b00262961f734bc1163b7c2029",
 "icon-256.png": "c15f0a70a483109d9cbb938ac1a8349c",
 "icons/bluelight-144.png": "c15f0a70a483109d9cbb938ac1a8349c",
 "icons/bluelight-192.png": "554be9855b25d09948aa7cd3cbeb582d",
@@ -44,7 +44,7 @@ const RESOURCES = {"apple-touch-icon-120x120.png": "c15f0a70a483109d9cbb938ac1a8
 "icons/bluelight-72.png": "c15f0a70a483109d9cbb938ac1a8349c",
 "index.html": "ec497df239ccd7bff7e8f7c02975c5fb",
 "/": "ec497df239ccd7bff7e8f7c02975c5fb",
-"main.dart.js": "33fa912a6a748e897e90b429cd8056d8",
+"main.dart.js": "8e74e83e4d065805ca717b53c2c3ca68",
 "manifest.json": "e6caee3495c2ee10db899519d2eca1f7",
 "version.json": "322a2acfc84799993e860b5b5abb3c90"};
 // The application shell files that are downloaded before a service worker can
