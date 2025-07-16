@@ -103,8 +103,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void _addWelcomeMessage() {
     final welcomeMessage = ChatMessage.text(
       text:
-          "Hello! I'm Agent T, your Cardano AI assistant. I can help you manage your crypto. "
-          "You can ask me to check your balance, send ADA, swap tokens, or anything else!",
+          "Hello! I'm Agent T, your crypto concierge. I can help you manage your digital assets, answer questions, and more. "
+          "I'm at your service. How can I help?",
       isUser: false,
     );
 
@@ -208,7 +208,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Your Cardano AI Assistant',
+                  'Your Crypto Concierge',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.6),
                     fontSize: 12,
