@@ -1,0 +1,67 @@
+{
+    "name": "BlueLight - Natural Language Crypto Hub",
+    "short_name": "BlueLight",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#5be1f8",
+    "description": "BlueLight - Your intelligent crypto companion. Natural language interface for blockchain interactions, DeFi, trading, and Web3 services.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "scope": "/",
+    "categories": ["finance", "productivity", "utilities", "business"],
+    "lang": "en-US",
+    "dir": "ltr",
+    "icons": [
+        {
+            "src": "/icons/bluelight-72.png?v=3",
+            "sizes": "72x72",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/bluelight-144.png?v=3",
+            "sizes": "144x144",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/bluelight-192.png?v=3",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/bluelight-512.png?v=3",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/apple-touch-icon-180x180.png?v=3",
+            "sizes": "180x180",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/bluelight-192.png?v=3",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/icons/bluelight-512.png?v=3",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/icons/bluelight-512.png?v=3",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "narrow"
+        }
+    ]
+}
