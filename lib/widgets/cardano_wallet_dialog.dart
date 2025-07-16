@@ -203,7 +203,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Mnemonic Phrase (12 or 24 words)',
+          'Mnemonic Phrase (12, 15, 18, 21, or 24 words)',
           style: TextStyle(
             color: Colors.white.withOpacity(0.9),
             fontSize: 14,
@@ -222,7 +222,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             print('🔍 DEBUG: Controller text: "${_mnemonicController.text}"');
           },
           decoration: InputDecoration(
-            hintText: 'Enter your 12 or 24 word mnemonic phrase',
+            hintText: 'Enter your mnemonic phrase (12-24 words)',
             hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
             filled: true,
             fillColor: Colors.white.withOpacity(0.1),
@@ -296,7 +296,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
               child: _buildModeOption(
                 mode: ConnectionMode.mnemonic,
                 title: 'Recovery Phrase',
-                subtitle: 'Import with 12/24 words',
+                subtitle: 'Import with 12-24 words',
                 icon: Icons.vpn_key,
                 isSelected: _connectionMode == ConnectionMode.mnemonic,
               ),
@@ -806,10 +806,12 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         print('🔍 DEBUG: Word $i: "${words[i]}" (length: ${words[i].length})');
       }
 
-      if (words.length != 12 && words.length != 24) {
+      // Valid BIP39 mnemonic word counts: 12, 15, 18, 21, 24
+      final validWordCounts = [12, 15, 18, 21, 24];
+      if (!validWordCounts.contains(words.length)) {
         print('🔍 DEBUG: Invalid word count - throwing exception');
         throw Exception(
-            'Mnemonic must be 12 or 24 words. Found ${words.length} words.');
+            'Mnemonic must be 12, 15, 18, 21, or 24 words. Found ${words.length} words.');
       }
 
       print(
