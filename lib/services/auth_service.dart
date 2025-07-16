@@ -312,6 +312,50 @@ class AuthService {
     }
   }
 
+  /// Connect external Cardano wallet (e.g., GameChanger) for premium access verification
+  Future<bool> connectCardanoWalletExternal(String walletName, String address, String stakeAddress) async {
+    if (_currentUser == null) {
+      return false;
+    }
+
+    try {
+      // Connect external wallet
+      final success = await _cardanoWalletService.connectExternalWallet(walletName, address, stakeAddress);
+
+      if (!success) {
+        return false;
+      }
+
+      // Check premium access
+      final hasPremiumAccess = _cardanoWalletService.hasPremiumAccess;
+      final premiumDetails = _cardanoWalletService.premiumAccessDetails;
+
+      // Update user with wallet info and premium access
+      _currentUser = User(
+        id: _currentUser!.id,
+        email: _currentUser!.email,
+        customerId: _currentUser!.customerId,
+        tier: hasPremiumAccess ? 'premium' : _currentUser!.tier,
+        createdAt: _currentUser!.createdAt,
+        updatedAt: DateTime.now(),
+        subscriptionId: _currentUser!.subscriptionId,
+        subscriptionStatus:
+            hasPremiumAccess ? 'active' : _currentUser!.subscriptionStatus,
+        endedAt: _currentUser!.endedAt,
+        walletAddress: address,
+        stakeAddress: stakeAddress,
+        premiumAccessDetails: premiumDetails,
+      );
+
+      await _saveUserSession();
+      print('External Cardano wallet connected successfully: $walletName');
+      return true;
+    } catch (e) {
+      print('Error connecting external Cardano wallet: $e');
+      return false;
+    }
+  }
+
   /// Check if current user has premium access via connected Cardano wallet
   Future<bool> refreshCardanoPremiumAccess() async {
     if (_currentUser == null || !_cardanoWalletService.isConnected) {
