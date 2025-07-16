@@ -213,13 +213,14 @@ class GameChangerService {
 
       print('🔍 DEBUG: Launching flutter_web_auth...');
 
-            // Use flutter_web_auth to handle the OAuth-style flow
+      // Use flutter_web_auth to handle the OAuth-style flow
       String callbackUrlScheme;
-      
+
       // Use same web detection logic
       final currentUri = Uri.base;
-      final isRunningOnWeb = currentUri.scheme == 'https' || currentUri.scheme == 'http';
-      
+      final isRunningOnWeb =
+          currentUri.scheme == 'https' || currentUri.scheme == 'http';
+
       if (isRunningOnWeb) {
         // For web, flutter_web_auth expects the web protocol (https)
         callbackUrlScheme = 'https';
@@ -429,6 +430,11 @@ class GameChangerService {
   String generateQrCodeUrl({bool isMainnet = true, bool includeMacro = false}) {
     return generateConnectionUrl(
         isMainnet: isMainnet, includeMacro: includeMacro);
+  }
+
+  /// Parse callback URL from GameChanger (public method for callback screen)
+  GameChangerWalletData parseCallbackUrl(String callbackUrl) {
+    return _parseCallbackResult(callbackUrl);
   }
 
   /// Check if GameChanger is available on the device

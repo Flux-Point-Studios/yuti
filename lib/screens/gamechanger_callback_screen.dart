@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:html' as html;
 import '../utils/app_colors.dart';
+import '../services/auth_service.dart';
+import '../services/gamechanger_service.dart';
+import '../services/supabase_service.dart';
 import 'chat_screen.dart';
 import 'pricing_screen.dart';
+import 'welcome_screen.dart';
 
 class GameChangerCallbackScreen extends StatefulWidget {
   const GameChangerCallbackScreen({Key? key}) : super(key: key);
@@ -16,6 +20,9 @@ class GameChangerCallbackScreen extends StatefulWidget {
 class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
   bool _isProcessing = true;
   String _status = 'Processing wallet connection...';
+
+  final AuthService _authService = AuthService();
+  final GameChangerService _gameChangerService = GameChangerService();
 
   @override
   void initState() {
@@ -34,25 +41,107 @@ class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
 
         final result = uri.queryParameters['result'];
         if (result != null) {
-          print('🔍 DEBUG: Callback screen - Found result parameter');
-
-          // Close this window/tab and let flutter_web_auth handle the result
-          // The flutter_web_auth package will automatically detect this callback
+          print(
+              '🔍 DEBUG: Callback screen - Found result parameter, processing wallet data...');
 
           setState(() {
-            _status = 'Wallet connected successfully! Redirecting...';
+            _status = 'Processing wallet data...';
           });
 
-          // Small delay to show success message
-          await Future.delayed(const Duration(seconds: 2));
+          // Parse the GameChanger result data
+          final gameChangerService = GameChangerService();
+          final walletData = gameChangerService.parseCallbackUrl(currentUrl);
 
-          // Navigate back to chat or pricing depending on user state
-          if (mounted) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/chat',
-              (route) => false,
-            );
+          print('🔍 DEBUG: Parsed wallet data: ${walletData.toString()}');
+
+          setState(() {
+            _status = 'Setting up account...';
+          });
+
+          // Check if user is already authenticated with Supabase
+          final isAuthenticated = _authService.isAuthenticated;
+
+          if (!isAuthenticated) {
+            print(
+                '🔍 DEBUG: User not authenticated, signing up anonymously...');
+
+            // Create anonymous user account or sign in guest user
+            // For now, we'll create a guest account with the wallet address as email
+            final guestEmail =
+                '${walletData.address.substring(0, 10)}@wallet.guest';
+            final guestPassword =
+                'wallet_${walletData.address.substring(0, 16)}';
+
+            try {
+              // Try to sign up a guest account
+              await _authService.signUp(
+                email: guestEmail,
+                password: guestPassword,
+                firstName: 'Wallet',
+                lastName: 'User',
+              );
+            } catch (e) {
+              // If signup fails (user exists), try to sign in
+              print('🔍 DEBUG: Signup failed, trying signin: $e');
+              try {
+                await _authService.signIn(
+                  email: guestEmail,
+                  password: guestPassword,
+                );
+              } catch (signinError) {
+                print('🔍 DEBUG: Both signup and signin failed: $signinError');
+                // Continue anyway - the wallet connection might still work
+              }
+            }
+          }
+
+          setState(() {
+            _status = 'Connecting wallet to account...';
+          });
+
+          // Connect the wallet to the user's account
+          final success = await _authService.connectCardanoWalletExternal(
+            walletData.walletName,
+            walletData.address,
+            walletData.stakeAddress,
+          );
+
+          if (success) {
+            setState(() {
+              _status = 'Wallet connected successfully! Redirecting...';
+            });
+
+            // Small delay to show success message
+            await Future.delayed(const Duration(seconds: 2));
+
+            // Check if user has premium access
+            final hasPremiumAccess = _authService.canAccessPremiumFeatures();
+
+            print('🔍 DEBUG: Has premium access: $hasPremiumAccess');
+
+            // Navigate based on user access level
+            if (mounted) {
+              if (hasPremiumAccess) {
+                print('🔍 DEBUG: Navigating to chat screen');
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/chat',
+                  (route) => false,
+                );
+              } else {
+                print('🔍 DEBUG: Navigating to pricing screen');
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/pricing',
+                  (route) => false,
+                );
+              }
+            }
+          } else {
+            setState(() {
+              _status = 'Failed to connect wallet. Please try again.';
+              _isProcessing = false;
+            });
           }
         } else {
           setState(() {
@@ -70,7 +159,7 @@ class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
     } catch (e) {
       print('🔍 DEBUG: Callback screen error: $e');
       setState(() {
-        _status = 'Error processing wallet connection: $e';
+        _status = 'Error processing wallet connection: ${e.toString()}';
         _isProcessing = false;
       });
     }
