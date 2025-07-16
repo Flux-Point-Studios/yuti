@@ -39,26 +39,35 @@ class GameChangerService {
 
   /// Get the current web app's base URL for callbacks
   String _getWebCallbackUrl() {
+    print('🔍 DEBUG: _getWebCallbackUrl called - kIsWeb: $kIsWeb');
     if (kIsWeb) {
       // In web, use current origin + callback path
       final origin = Uri.base.origin;
-      return '$origin$_webCallbackPath?result={result}';
+      final webCallbackUrl = '$origin$_webCallbackPath?result={result}';
+      print('🔍 DEBUG: Generated web callback URL: $webCallbackUrl');
+      return webCallbackUrl;
     } else {
       // For native apps, use custom scheme
-      return 'bluelight://gamechanger-callback?result={result}';
+      final customSchemeUrl =
+          'bluelight://gamechanger-callback?result={result}';
+      print('🔍 DEBUG: Generated custom scheme URL: $customSchemeUrl');
+      return customSchemeUrl;
     }
   }
 
   /// Generate the GameChanger connect script for requesting wallet information
   /// Default to no macro for better compatibility (matches proven Talos approach)
   Map<String, dynamic> _generateConnectScript({bool includeMacro = false}) {
+    final callbackUrl = _getWebCallbackUrl();
+    print('🔍 DEBUG: Script generation - using callback URL: $callbackUrl');
+
     final script = {
       "type": "script",
       "title": "🚀 Connect with Bluelight?",
       "description":
           "About to share your basic public wallet information with Bluelight app",
       "exportAs": "connect",
-      "returnURLPattern": _getWebCallbackUrl(),
+      "returnURLPattern": callbackUrl,
       "run": {
         "name": {"type": "getName"},
         "address": {"type": "getCurrentAddress"},
@@ -194,9 +203,9 @@ class GameChangerService {
 
       print('🔍 DEBUG: Launching flutter_web_auth...');
 
-                  // Use flutter_web_auth to handle the OAuth-style flow
+      // Use flutter_web_auth to handle the OAuth-style flow
       String callbackUrlScheme;
-      
+
       if (kIsWeb) {
         // For web, flutter_web_auth expects the web protocol (https)
         callbackUrlScheme = 'https';
@@ -204,9 +213,10 @@ class GameChangerService {
       } else {
         // For native apps, use custom scheme
         callbackUrlScheme = _callbackScheme;
-        print('🔍 DEBUG: Native environment - using custom scheme: $callbackUrlScheme');
+        print(
+            '🔍 DEBUG: Native environment - using custom scheme: $callbackUrlScheme');
       }
-      
+
       final resultUrl = await FlutterWebAuth.authenticate(
         url: connectionUrl,
         callbackUrlScheme: callbackUrlScheme,
