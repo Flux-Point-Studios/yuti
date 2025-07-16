@@ -1,0 +1,94 @@
+name: Build iOS App
+
+# MANUAL TRIGGER ONLY - No automatic conflicts with Vercel web deployment
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - release
+        - debug
+      export_method:
+        description: 'Export method'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - ad-hoc
+        - app-store
+        - enterprise
+
+jobs:
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.32.6'
+        channel: 'stable'
+        
+    - name: Install Flutter dependencies
+      run: flutter pub get
+      
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Setup iOS Simulator (for testing)
+      run: |
+        xcrun simctl list devices
+        
+    - name: Build iOS app
+      run: |
+        echo "Building iOS app with type: ${{ github.event.inputs.build_type }}"
+        if [ "${{ github.event.inputs.build_type }}" = "debug" ]; then
+          flutter build ios --debug --no-codesign
+        else
+          flutter build ios --release --no-codesign
+        fi
+        
+    - name: Build IPA (if release)
+      if: github.event.inputs.build_type == 'release'
+      run: |
+        echo "Creating .ipa with export method: ${{ github.event.inputs.export_method }}"
+        flutter build ipa --release --export-method ${{ github.event.inputs.export_method }}
+      continue-on-error: true
+      
+    - name: Upload iOS build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-build-${{ github.event.inputs.build_type }}-${{ github.run_number }}
+        path: |
+          build/ios/iphoneos/Runner.app
+          build/ios/ipa/*.ipa
+        retention-days: 30
+        if-no-files-found: warn
+        
+    - name: Build Summary
+      run: |
+        echo "## 🍎 iOS Build Complete" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Type**: ${{ github.event.inputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Export Method**: ${{ github.event.inputs.export_method }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Flutter Version**: 3.32.6" >> $GITHUB_STEP_SUMMARY
+        echo "- **Bundle ID**: com.bluelight.wallet" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: 1.0.1+2" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          echo "📦 Check the 'Artifacts' section below to download your .ipa file" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🔧 Debug build completed - no .ipa generated" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "⚠️ **Note**: This workflow does NOT interfere with Vercel web deployment" >> $GITHUB_STEP_SUMMARY 
