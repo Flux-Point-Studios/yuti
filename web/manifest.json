@@ -14,8 +14,14 @@
     "dir": "ltr",
     "icons": [
         {
-            "src": "bluelight.png?v=3",
-            "sizes": "429x429",
+            "src": "icons/bluelight-72.png?v=3",
+            "sizes": "72x72",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icons/bluelight-144.png?v=3",
+            "sizes": "144x144",
             "type": "image/png",
             "purpose": "any"
         },
