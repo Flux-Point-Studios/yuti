@@ -32,7 +32,16 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   ConnectionMode _connectionMode = ConnectionMode.mnemonic;
 
   @override
+  void initState() {
+    super.initState();
+    print('🔍 DEBUG: CardanoWalletDialog initState() called');
+    print('🔍 DEBUG: Initial connection mode: $_connectionMode');
+    print('🔍 DEBUG: Initial loading state: $_isLoading');
+  }
+
+  @override
   void dispose() {
+    print('🔍 DEBUG: CardanoWalletDialog dispose() called');
     _mnemonicController.dispose();
     _walletNameController.dispose();
     super.dispose();
@@ -161,6 +170,11 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         TextField(
           controller: _walletNameController,
           style: const TextStyle(color: Colors.white),
+          onChanged: (text) {
+            print('🔍 DEBUG: Wallet name field changed: "${text}"');
+            print(
+                '🔍 DEBUG: Wallet name controller text: "${_walletNameController.text}"');
+          },
           decoration: InputDecoration(
             hintText: 'Enter a name for your wallet',
             hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
@@ -202,6 +216,11 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           style: const TextStyle(color: Colors.white),
           obscureText: _isObscured,
           maxLines: _isObscured ? 1 : 3,
+          onChanged: (text) {
+            print('🔍 DEBUG: Mnemonic field changed: "${text}"');
+            print('🔍 DEBUG: Text length: ${text.length}');
+            print('🔍 DEBUG: Controller text: "${_mnemonicController.text}"');
+          },
           decoration: InputDecoration(
             hintText: 'Enter your 12 or 24 word mnemonic phrase',
             hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
@@ -607,7 +626,18 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           if (_connectionMode == ConnectionMode.mnemonic)
             Expanded(
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _connectWallet,
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        print('🔍 DEBUG: Connect Wallet button pressed');
+                        print('🔍 DEBUG: _isLoading state: $_isLoading');
+                        print('🔍 DEBUG: _connectionMode: $_connectionMode');
+                        print(
+                            '🔍 DEBUG: Mnemonic field text: "${_mnemonicController.text}"');
+                        print(
+                            '🔍 DEBUG: Wallet name field text: "${_walletNameController.text}"');
+                        _connectWallet();
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,
@@ -641,9 +671,21 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   }
 
   Future<void> _pasteFromClipboard() async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    if (clipboardData?.text != null) {
-      _mnemonicController.text = clipboardData!.text!;
+    print('🔍 DEBUG: _pasteFromClipboard() called');
+    try {
+      final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+      print('🔍 DEBUG: Clipboard data: ${clipboardData?.text}');
+      if (clipboardData?.text != null) {
+        print(
+            '🔍 DEBUG: Setting mnemonic controller text to: "${clipboardData!.text!}"');
+        _mnemonicController.text = clipboardData!.text!;
+        print(
+            '🔍 DEBUG: Controller text after paste: "${_mnemonicController.text}"');
+      } else {
+        print('🔍 DEBUG: No clipboard data available');
+      }
+    } catch (e) {
+      print('🔍 DEBUG: Error pasting from clipboard: $e');
     }
   }
 
@@ -709,20 +751,37 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   }
 
   Future<void> _connectWallet() async {
+    print('🔍 DEBUG: _connectWallet() called');
+    print('🔍 DEBUG: Current connection mode: $_connectionMode');
+    print('🔍 DEBUG: _isLoading before: $_isLoading');
+    print('🔍 DEBUG: _errorMessage before: $_errorMessage');
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
+    print('🔍 DEBUG: _isLoading after setState: $_isLoading');
+
     try {
       final mnemonic = _mnemonicController.text.trim();
       final walletName = _walletNameController.text.trim();
 
+      print(
+          '🔍 DEBUG: Raw mnemonic controller text length: ${_mnemonicController.text.length}');
+      print(
+          '🔍 DEBUG: Raw mnemonic controller text: "${_mnemonicController.text}"');
+      print('🔍 DEBUG: Trimmed mnemonic length: ${mnemonic.length}');
+      print('🔍 DEBUG: Trimmed mnemonic: "$mnemonic"');
+      print('🔍 DEBUG: Wallet name: "$walletName"');
+
       if (mnemonic.isEmpty) {
+        print('🔍 DEBUG: Mnemonic is empty - throwing exception');
         throw Exception('Please enter your mnemonic phrase');
       }
 
       if (walletName.isEmpty) {
+        print('🔍 DEBUG: Wallet name is empty - throwing exception');
         throw Exception('Please enter a wallet name');
       }
 
@@ -732,34 +791,57 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           .replaceAll(RegExp(r'\s+'),
               ' '); // Replace multiple whitespace with single space
 
+      print('🔍 DEBUG: Clean mnemonic: "$cleanMnemonic"');
+      print('🔍 DEBUG: Clean mnemonic length: ${cleanMnemonic.length}');
+
       final words = cleanMnemonic
           .split(' ') // Split on single spaces
           .where((word) => word.isNotEmpty) // Remove any empty strings
           .toList();
 
+      print('🔍 DEBUG: Split into ${words.length} words');
+      print('🔍 DEBUG: Words: $words');
+
+      for (int i = 0; i < words.length; i++) {
+        print('🔍 DEBUG: Word $i: "${words[i]}" (length: ${words[i].length})');
+      }
+
       if (words.length != 12 && words.length != 24) {
+        print('🔍 DEBUG: Invalid word count - throwing exception');
         throw Exception(
             'Mnemonic must be 12 or 24 words. Found ${words.length} words.');
       }
+
+      print(
+          '🔍 DEBUG: Mnemonic validation passed - attempting wallet connection');
 
       // Connect the Cardano wallet with cleaned mnemonic
       final success = await widget.authService
           .connectCardanoWallet(cleanMnemonic, walletName);
 
+      print('🔍 DEBUG: Wallet connection result: $success');
+
       if (success) {
+        print('🔍 DEBUG: Wallet connection successful - closing dialog');
         Navigator.of(context).pop(true);
       } else {
+        print('🔍 DEBUG: Wallet connection failed - throwing exception');
         throw Exception(
             'Failed to connect wallet. Please check your mnemonic phrase.');
       }
     } catch (e) {
+      print('🔍 DEBUG: Exception caught: $e');
+      print('🔍 DEBUG: Exception type: ${e.runtimeType}');
       setState(() {
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
+      print('🔍 DEBUG: Error message set to: $_errorMessage');
     } finally {
+      print('🔍 DEBUG: Setting _isLoading to false');
       setState(() {
         _isLoading = false;
       });
+      print('🔍 DEBUG: _isLoading after finally: $_isLoading');
     }
   }
 }
