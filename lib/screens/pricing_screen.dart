@@ -19,11 +19,13 @@ class _PricingScreenState extends State<PricingScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
+  late PageController _pageController;
 
   final AuthService _authService = AuthService();
   bool _isLoading = false;
   String? _selectedPlan;
   String _paymentMethod = 'stripe';
+  int _currentPageIndex = 0;
 
   final List<PricingPlan> _plans = [
     PricingPlan(
@@ -115,12 +117,14 @@ class _PricingScreenState extends State<PricingScreen>
       ),
     );
 
+    _pageController = PageController(viewportFraction: 0.9);
     _animationController.forward();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -236,21 +240,164 @@ class _PricingScreenState extends State<PricingScreen>
             child: SingleChildScrollView(
               child: SizedBox(
                 height: MediaQuery.of(context).size.height * 0.7,
-                child: PageView.builder(
-                  itemCount: _plans.length,
-                  controller: PageController(viewportFraction: 0.9),
-                  itemBuilder: (context, index) {
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
-                      child: _buildPricingCard(_plans[index], index),
-                    );
-                  },
+                child: Stack(
+                  children: [
+                    PageView.builder(
+                      itemCount: _plans.length,
+                      controller: _pageController,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentPageIndex = index;
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          child: _buildPricingCard(_plans[index], index),
+                        );
+                      },
+                    ),
+                    _buildNavigationArrows(),
+                    _buildPageIndicators(),
+                  ],
                 ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildNavigationArrows() {
+    return Positioned.fill(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Left Arrow
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: AnimatedOpacity(
+                opacity: _currentPageIndex > 0 ? 1.0 : 0.3,
+                duration: const Duration(milliseconds: 200),
+                child: GestureDetector(
+                  onTap: _currentPageIndex > 0 ? _previousPage : null,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryBlue.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Right Arrow
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: AnimatedOpacity(
+                opacity: _currentPageIndex < _plans.length - 1 ? 1.0 : 0.3,
+                duration: const Duration(milliseconds: 200),
+                child: GestureDetector(
+                  onTap: _currentPageIndex < _plans.length - 1 ? _nextPage : null,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryBlue.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _previousPage() {
+    if (_currentPageIndex > 0) {
+      _pageController.animateToPage(
+        _currentPageIndex - 1,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _nextPage() {
+    if (_currentPageIndex < _plans.length - 1) {
+      _pageController.animateToPage(
+        _currentPageIndex + 1,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  Widget _buildPageIndicators() {
+    return Positioned(
+      bottom: 20,
+      left: 0,
+      right: 0,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(_plans.length, (index) {
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            width: _currentPageIndex == index ? 24 : 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _currentPageIndex == index 
+                  ? AppColors.primaryBlue 
+                  : Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: _currentPageIndex == index 
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primaryBlue.withOpacity(0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+          );
+        }),
+      ),
     );
   }
 
