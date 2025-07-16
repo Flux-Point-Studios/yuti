@@ -6,12 +6,16 @@ import 'services/supabase_service.dart';
 import 'screens/chat_screen.dart';
 import 'screens/gamechanger_callback_screen.dart';
 import 'utils/app_colors.dart';
+import 'config/secure_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Supabase
   await SupabaseService.initialize();
+
+  // Initialize API keys for Flutter web
+  await _initializeApiKeys();
 
   // Set system UI overlay style for blue light theme
   SystemChrome.setSystemUIOverlayStyle(
@@ -24,6 +28,27 @@ void main() async {
   );
 
   runApp(const MyApp());
+}
+
+/// Initialize API keys for Flutter web since .env files aren't supported
+Future<void> _initializeApiKeys() async {
+  try {
+    final secureConfig = SecureConfig();
+
+    // Initialize with API keys from .env.local values
+    // In production, these should be passed via --dart-define flags
+    await secureConfig.initializeKeys(
+      // Use actual values from your .env.local file
+      tBackendKey:
+          '***REMOVED***',
+      // Add your Blockfrost key here if you have one
+      // blockfrostKey: 'your_blockfrost_key_here',
+    );
+
+    print('🔍 DEBUG: API keys initialized for Flutter web');
+  } catch (e) {
+    print('🔍 DEBUG: Error initializing API keys: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {
