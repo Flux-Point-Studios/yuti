@@ -3,10 +3,16 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter_web_auth/flutter_web_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class GameChangerService {
+  // Web-based callback configuration for Flutter web
+  static const String _webCallbackPath = '/gamechanger-callback';
+
+  // For native apps (if needed in future)
   static const String _callbackScheme = 'bluelight';
   static const String _callbackHost = 'gamechanger-callback';
+
   // GameChanger URL endpoints
   static const String _gameChangerMainnetUrl =
       'https://wallet.gamechanger.finance/api/2/run';
@@ -31,6 +37,18 @@ class GameChangerService {
     print('🔍 DEBUG: GameChanger environment override set to: $environment');
   }
 
+  /// Get the current web app's base URL for callbacks
+  String _getWebCallbackUrl() {
+    if (kIsWeb) {
+      // In web, use current origin + callback path
+      final origin = Uri.base.origin;
+      return '$origin$_webCallbackPath?result={result}';
+    } else {
+      // For native apps, use custom scheme
+      return 'bluelight://gamechanger-callback?result={result}';
+    }
+  }
+
   /// Generate the GameChanger connect script for requesting wallet information
   /// Default to no macro for better compatibility (matches proven Talos approach)
   Map<String, dynamic> _generateConnectScript({bool includeMacro = false}) {
@@ -40,7 +58,7 @@ class GameChangerService {
       "description":
           "About to share your basic public wallet information with Bluelight app",
       "exportAs": "connect",
-      "returnURLPattern": "bluelight://gamechanger-callback?result={result}",
+      "returnURLPattern": _getWebCallbackUrl(),
       "run": {
         "name": {"type": "getName"},
         "address": {"type": "getCurrentAddress"},
@@ -177,9 +195,12 @@ class GameChangerService {
       print('🔍 DEBUG: Launching flutter_web_auth...');
 
       // Use flutter_web_auth to handle the OAuth-style flow
+      final callbackUrlScheme = kIsWeb ? Uri.base.origin : _callbackScheme;
+      print('🔍 DEBUG: Using callback URL scheme: $callbackUrlScheme');
+
       final resultUrl = await FlutterWebAuth.authenticate(
         url: connectionUrl,
-        callbackUrlScheme: _callbackScheme,
+        callbackUrlScheme: callbackUrlScheme,
       );
 
       print('🔍 DEBUG: Received callback URL: $resultUrl');
@@ -220,16 +241,33 @@ class GameChangerService {
   GameChangerWalletData _parseCallbackResult(String callbackUrl) {
     try {
       final uri = Uri.parse(callbackUrl);
+      print('🔍 DEBUG: Parsing callback URL: $callbackUrl');
+      print(
+          '🔍 DEBUG: URI scheme: ${uri.scheme}, host: ${uri.host}, path: ${uri.path}');
 
-      // Validate that this is a legitimate GameChanger callback
-      if (uri.scheme != _callbackScheme) {
-        throw Exception(
-            'Invalid callback URL scheme: expected $_callbackScheme, got ${uri.scheme}');
-      }
+      // Validate callback URL based on platform
+      if (kIsWeb) {
+        // For web: expect HTTPS URL with specific path
+        if (!['https', 'http'].contains(uri.scheme)) {
+          throw Exception(
+              'Invalid web callback URL scheme: expected https/http, got ${uri.scheme}');
+        }
 
-      if (uri.host != _callbackHost) {
-        throw Exception(
-            'Invalid callback URL host: expected $_callbackHost, got ${uri.host}');
+        if (uri.path != _webCallbackPath) {
+          throw Exception(
+              'Invalid web callback URL path: expected $_webCallbackPath, got ${uri.path}');
+        }
+      } else {
+        // For native apps: expect custom scheme
+        if (uri.scheme != _callbackScheme) {
+          throw Exception(
+              'Invalid callback URL scheme: expected $_callbackScheme, got ${uri.scheme}');
+        }
+
+        if (uri.host != _callbackHost) {
+          throw Exception(
+              'Invalid callback URL host: expected $_callbackHost, got ${uri.host}');
+        }
       }
 
       // Extract the result parameter (could be in query or fragment)

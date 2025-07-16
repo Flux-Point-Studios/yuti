@@ -4,6 +4,7 @@ import 'screens/welcome_screen.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
 import 'screens/chat_screen.dart';
+import 'screens/gamechanger_callback_screen.dart';
 import 'utils/app_colors.dart';
 
 void main() async {
@@ -72,7 +73,8 @@ class MyApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
+            borderSide:
+                const BorderSide(color: AppColors.primaryBlue, width: 2),
           ),
           labelStyle: const TextStyle(color: AppColors.textSecondary),
           hintStyle: const TextStyle(color: AppColors.textTertiary),
@@ -121,6 +123,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/chat': (context) => const ChatScreen(),
+        '/gamechanger-callback': (context) => const GameChangerCallbackScreen(),
       },
     );
   }
