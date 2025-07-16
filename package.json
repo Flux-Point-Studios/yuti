@@ -4,7 +4,7 @@
   "description": "BlueLight - Natural Language Crypto Hub with AI Assistant",
   "main": "index.js",
   "scripts": {
-    "build": "echo 'Build handled by GitHub Actions - serving pre-built files'",
+    "build": "echo 'Please build the Flutter web app first: flutter build web'",
     "start": "echo 'Static files ready'",
     "test": "echo 'No tests configured'"
   },
