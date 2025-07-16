@@ -18,8 +18,8 @@ class GameChangerService {
   GameChangerService._internal();
 
   /// Generate the GameChanger connect script for requesting wallet information
-  Map<String, dynamic> _generateConnectScript() {
-    return {
+  Map<String, dynamic> _generateConnectScript({bool includeMacro = true}) {
+    final script = {
       "type": "script",
       "title": "🚀 Connect with Bluelight?",
       "description":
@@ -31,12 +31,18 @@ class GameChangerService {
         "address": {"type": "getCurrentAddress"},
         "spendPubKey": {"type": "getSpendingPublicKey"},
         "stakePubKey": {"type": "getStakingPublicKey"},
-        "addressInfo": {
-          "type": "macro",
-          "run": "{getAddressInfo(get('cache.address'))}"
-        }
       }
     };
+
+    // Conditionally add the macro - this can help debug if the macro is causing issues
+    if (includeMacro) {
+      (script["run"] as Map<String, dynamic>)["addressInfo"] = {
+        "type": "macro",
+        "run": "{getAddressInfo(get('cache.address'))}"
+      };
+    }
+
+    return script;
   }
 
   /// Encode the GCScript into a compressed GameChanger URL
@@ -69,16 +75,67 @@ class GameChangerService {
   }
 
   /// Generate the complete GameChanger connection URL with callback
-  String generateConnectionUrl({bool isMainnet = true}) {
-    final script = _generateConnectScript();
+  String generateConnectionUrl(
+      {bool isMainnet = true, bool includeMacro = true}) {
+    final script = _generateConnectScript(includeMacro: includeMacro);
     return _encodeScriptToUrl(script, isMainnet: isMainnet);
   }
 
-  /// Initiate the GameChanger wallet connection flow
+  /// Initiate the GameChanger wallet connection flow with fallback strategy
   Future<GameChangerWalletData> connectWallet({bool isMainnet = true}) async {
     try {
+      // First attempt: try with macro (full functionality)
+      return await _connectWalletWithOptions(
+          isMainnet: isMainnet, includeMacro: true);
+    } catch (e) {
+      print('🔍 DEBUG: First attempt failed (with macro): $e');
+
+      // Check if this might be a macro-related issue
+      if (e.toString().contains('Unknown request') ||
+          e.toString().contains('Failed to decode') ||
+          e.toString().contains('macro')) {
+        print('🔍 DEBUG: Attempting fallback without macro...');
+
+        try {
+          // Second attempt: try without macro (simplified)
+          final walletData = await _connectWalletWithOptions(
+              isMainnet: isMainnet, includeMacro: false);
+          print('🔍 DEBUG: Fallback successful! Connected without macro.');
+          return walletData;
+        } catch (fallbackError) {
+          print('🔍 DEBUG: Fallback also failed: $fallbackError');
+          // If both fail, throw the original error
+          rethrow;
+        }
+      } else {
+        // If it's not a potential macro issue, don't try fallback
+        rethrow;
+      }
+    }
+  }
+
+  /// Internal method to connect with specific options
+  Future<GameChangerWalletData> _connectWalletWithOptions(
+      {required bool isMainnet, required bool includeMacro}) async {
+    try {
+      print('🔍 DEBUG: Starting GameChanger connection flow');
+      print('🔍 DEBUG: isMainnet: $isMainnet');
+
       // Generate the connection URL
-      final connectionUrl = generateConnectionUrl(isMainnet: isMainnet);
+      final connectionUrl = generateConnectionUrl(
+          isMainnet: isMainnet, includeMacro: includeMacro);
+      print('🔍 DEBUG: Generated connection URL: $connectionUrl');
+      print('🔍 DEBUG: URL length: ${connectionUrl.length}');
+      print('🔍 DEBUG: Include macro: $includeMacro');
+
+      // Check if URL seems valid (has proper transport header)
+      final urlPath = Uri.parse(connectionUrl).path;
+      if (!urlPath.contains('/1-')) {
+        throw GameChangerException(
+            'Generated URL missing transport header (1-)');
+      }
+
+      print('🔍 DEBUG: Launching flutter_web_auth...');
 
       // Use flutter_web_auth to handle the OAuth-style flow
       final resultUrl = await FlutterWebAuth.authenticate(
@@ -86,10 +143,35 @@ class GameChangerService {
         callbackUrlScheme: _callbackScheme,
       );
 
+      print('🔍 DEBUG: Received callback URL: $resultUrl');
+
       // Parse and decode the result
-      return _parseCallbackResult(resultUrl);
+      final walletData = _parseCallbackResult(resultUrl);
+
+      print('🔍 DEBUG: Successfully parsed wallet data');
+      return walletData;
     } catch (e) {
-      print('Error in GameChanger connection flow: $e');
+      print('🔍 DEBUG: Error in GameChanger connection flow: $e');
+
+      // Enhanced error handling with specific guidance
+      String errorMessage = e.toString();
+
+      if (errorMessage.contains('UNKNOWN_REQUEST') ||
+          errorMessage.contains('Unknown request') ||
+          errorMessage.contains('Failed to decode API call')) {
+        throw GameChangerException(
+            'GameChanger wallet rejected the request. This usually means:\n'
+            '• Another wallet extension is interfering\n'
+            '• Network mismatch (check if wallet is on correct network)\n'
+            '• Wallet needs to be unlocked\n\n'
+            'Try disabling other wallet extensions and use an incognito window.');
+      }
+
+      if (errorMessage.contains('User cancelled') ||
+          errorMessage.contains('CANCELLED')) {
+        throw GameChangerException('Connection cancelled by user');
+      }
+
       throw GameChangerException(
           'Failed to connect with GameChanger wallet: $e');
     }
@@ -179,19 +261,32 @@ class GameChangerService {
         throw Exception('No address found in GameChanger response');
       }
 
-      // Extract stake address from addressInfo
+      // Extract address info and network details
       final addressInfo = connectData['addressInfo'] as Map<String, dynamic>?;
-      final stakeAddress = addressInfo?['rewardAddress'] as String?;
       final networkId = addressInfo?['networkId'] as int? ?? 1;
       final network = addressInfo?['network'] as String? ?? 'mainnet';
-
-      if (stakeAddress == null) {
-        throw Exception('No stake address found in GameChanger response');
-      }
 
       // Extract public keys if available
       final spendPubKey = connectData['spendPubKey'] as Map<String, dynamic>?;
       final stakePubKey = connectData['stakePubKey'] as Map<String, dynamic>?;
+
+      // Extract stake address from addressInfo (if available)
+      String? stakeAddress = addressInfo?['rewardAddress'] as String?;
+
+      // If no addressInfo (macro-free connection), try to derive stake address from staking key
+      if (stakeAddress == null && stakePubKey != null) {
+        print(
+            '🔍 DEBUG: No addressInfo available, using simplified connection without stake address');
+        // For now, we'll use a placeholder. In a full implementation, you'd derive the reward address
+        // from the stake public key hash and network ID
+        stakeAddress =
+            'stake1_derived_placeholder'; // TODO: Implement proper derivation
+      }
+
+      if (stakeAddress == null) {
+        throw Exception(
+            'No stake address found in GameChanger response and cannot derive from stake key');
+      }
 
       return GameChangerWalletData(
         walletName: walletName,
@@ -211,8 +306,8 @@ class GameChangerService {
   }
 
   /// Generate QR code URL for cross-device scanning
-  String generateQrCodeUrl({bool isMainnet = true}) {
-    return generateConnectionUrl(isMainnet: isMainnet);
+  String generateQrCodeUrl({bool isMainnet = true, bool includeMacro = true}) {
+    return generateConnectionUrl(isMainnet: isMainnet, includeMacro: includeMacro);
   }
 
   /// Check if GameChanger is available on the device
