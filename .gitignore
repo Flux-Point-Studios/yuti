@@ -64,3 +64,12 @@ windows/flutter/ephemeral/
 
 .vercel
 iphoneos/
+.cursorignore
+bluelight.mobileprovision
+certificate_base64.txt
+dev_cert.p12
+development.cer
+dist_cert.p12
+distribution.cer
+ios-build-release-2.zip
+profile_base64.txt

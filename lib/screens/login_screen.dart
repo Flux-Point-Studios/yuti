@@ -401,6 +401,13 @@ class _LoginScreenState extends State<LoginScreen>
       if (result.isSuccess) {
         final user = result.user!;
 
+        // Admin bypass - skip pricing page for admin email
+        if (_emailController.text.trim().toLowerCase() ==
+            'nathanielminton@fluxpointstudios.com') {
+          _navigateToChat();
+          return;
+        }
+
         // Navigate based on user tier
         if (user.tier == 'FREE') {
           _navigateToPricing();
