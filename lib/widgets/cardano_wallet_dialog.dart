@@ -726,15 +726,25 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         throw Exception('Please enter a wallet name');
       }
 
-      // Validate mnemonic format (basic check)
-      final words = mnemonic.split(' ');
+      // Clean and validate mnemonic format (robust whitespace handling)
+      final cleanMnemonic = mnemonic
+          .trim() // Remove leading/trailing whitespace
+          .replaceAll(RegExp(r'\s+'),
+              ' '); // Replace multiple whitespace with single space
+
+      final words = cleanMnemonic
+          .split(' ') // Split on single spaces
+          .where((word) => word.isNotEmpty) // Remove any empty strings
+          .toList();
+
       if (words.length != 12 && words.length != 24) {
-        throw Exception('Mnemonic must be 12 or 24 words');
+        throw Exception(
+            'Mnemonic must be 12 or 24 words. Found ${words.length} words.');
       }
 
-      // Connect the Cardano wallet
-      final success =
-          await widget.authService.connectCardanoWallet(mnemonic, walletName);
+      // Connect the Cardano wallet with cleaned mnemonic
+      final success = await widget.authService
+          .connectCardanoWallet(cleanMnemonic, walletName);
 
       if (success) {
         Navigator.of(context).pop(true);
