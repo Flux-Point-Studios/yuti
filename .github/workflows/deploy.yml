@@ -1,11 +1,13 @@
 name: Build Flutter Web and Deploy
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'build/**'
-      - '.github/workflows/**'
+  # Disabled: Using Vercel automatic deployment instead
+  # push:
+  #   branches: [ main ]
+  #   paths-ignore:
+  #     - 'build/**'
+  #     - '.github/workflows/**'
+  workflow_dispatch:
 
 jobs:
   build:
