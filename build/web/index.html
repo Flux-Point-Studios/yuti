@@ -67,22 +67,17 @@
               
               newWorker.addEventListener('statechange', function() {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // Only show update prompt if there's actually a new version
-                  console.log('New content is available and ready to be displayed.');
+                  // New content is available - update silently in background
+                  console.log('New content is available and will be applied on next visit.');
                   
-                  // Show update notification with option to update later
-                  const updateNow = confirm('A new version of BlueLight is available. Update now?');
+                  // Tell the new service worker to skip waiting and take control silently
+                  newWorker.postMessage({ action: 'skipWaiting' });
                   
-                  if (updateNow) {
-                    // Tell the new service worker to skip waiting and take control
-                    newWorker.postMessage({ action: 'skipWaiting' });
-                    
-                    // Listen for the new service worker to take control
-                    navigator.serviceWorker.addEventListener('controllerchange', function() {
-                      // Reload the page to get the latest content
-                      window.location.reload();
-                    });
-                  }
+                  // No intrusive popup - just update automatically in background
+                  navigator.serviceWorker.addEventListener('controllerchange', function() {
+                    // Update will be available on next page load
+                    console.log('Service worker updated successfully');
+                  });
                 }
               });
             });
