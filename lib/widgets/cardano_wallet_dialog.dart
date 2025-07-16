@@ -417,17 +417,19 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _showQrCodeForGameChanger,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                      foregroundColor: Colors.white.withOpacity(0.5),
+                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    icon: const Icon(Icons.qr_code, size: 18),
-                    label: const Text(
+                    icon: Icon(Icons.qr_code,
+                        size: 18, color: Colors.white.withOpacity(0.5)),
+                    label: Text(
                       'QR Code',
-                      style: TextStyle(fontSize: 14),
+                      style: TextStyle(
+                          fontSize: 14, color: Colors.white.withOpacity(0.5)),
                     ),
                   ),
                 ],
@@ -460,6 +462,24 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
               fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+            ),
+            child: Text(
+              '⚠️ QR scanning must be done on the same device where this app is running',
+              style: TextStyle(
+                color: Colors.orange.shade700,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
           const SizedBox(height: 16),
           QrImageView(
             data: _qrCodeUrl!,
@@ -469,7 +489,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Open GameChanger wallet and scan this QR code',
+            'Open GameChanger wallet on this device and scan this QR code',
             style: TextStyle(
               color: Colors.black.withOpacity(0.7),
               fontSize: 12,
@@ -635,13 +655,9 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     });
 
     try {
-      print('Starting GameChanger wallet connection...');
-
       // Use GameChanger service to connect wallet
       final walletData =
           await _gameChangerService.connectWallet(isMainnet: true);
-
-      print('GameChanger wallet data received: $walletData');
 
       // Validate network (ensure it's mainnet for production)
       if (!walletData.isMainnet()) {
@@ -660,10 +676,8 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         throw Exception('Failed to connect wallet. Please try again.');
       }
 
-      print('GameChanger wallet connected successfully!');
       Navigator.of(context).pop(true);
     } catch (e) {
-      print('Error connecting GameChanger wallet: $e');
       setState(() {
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
@@ -687,10 +701,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         _qrCodeUrl = qrUrl;
         _showQrCode = true;
       });
-
-      print('QR code generated for GameChanger connection');
     } catch (e) {
-      print('Error generating QR code: $e');
       setState(() {
         _errorMessage = 'Failed to generate QR code: ${e.toString()}';
       });

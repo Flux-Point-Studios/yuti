@@ -8,7 +8,7 @@ class GameChangerService {
   static const String _callbackScheme = 'bluelight';
   static const String _callbackHost = 'gamechanger-callback';
   static const String _gameChangerBaseUrl =
-      'https://wallet.gamechanger.finance/api/2/run';
+      'https://beta-wallet.gamechanger.finance/api/2/run';
   static const String _gameChangerTestnetUrl =
       'https://beta-wallet.gamechanger.finance/api/2/run';
 
@@ -25,6 +25,7 @@ class GameChangerService {
       "description":
           "About to share your basic public wallet information with Bluelight app",
       "exportAs": "connect",
+      "returnURLPattern": "bluelight://gamechanger-callback?result={result}",
       "run": {
         "name": {"type": "getName"},
         "address": {"type": "getCurrentAddress"},
@@ -75,15 +76,11 @@ class GameChangerService {
       // Generate the connection URL
       final connectionUrl = generateConnectionUrl(isMainnet: isMainnet);
 
-      print('Launching GameChanger URL: $connectionUrl');
-
       // Use flutter_web_auth to handle the OAuth-style flow
       final resultUrl = await FlutterWebAuth.authenticate(
         url: connectionUrl,
         callbackUrlScheme: _callbackScheme,
       );
-
-      print('Received callback URL: $resultUrl');
 
       // Parse and decode the result
       return _parseCallbackResult(resultUrl);
@@ -99,9 +96,20 @@ class GameChangerService {
     try {
       final uri = Uri.parse(callbackUrl);
 
-            // Extract the result parameter (could be in query or fragment)
+      // Validate that this is a legitimate GameChanger callback
+      if (uri.scheme != _callbackScheme) {
+        throw Exception(
+            'Invalid callback URL scheme: expected $_callbackScheme, got ${uri.scheme}');
+      }
+
+      if (uri.host != _callbackHost) {
+        throw Exception(
+            'Invalid callback URL host: expected $_callbackHost, got ${uri.host}');
+      }
+
+      // Extract the result parameter (could be in query or fragment)
       String? resultData = uri.queryParameters['result'];
-      
+
       // If not in query params, check fragment
       if (resultData == null && uri.fragment.isNotEmpty) {
         final fragmentParts = uri.fragment.split('result=');
@@ -123,7 +131,6 @@ class GameChangerService {
       // Extract wallet information from the decoded JSON
       return _extractWalletData(decodedData);
     } catch (e) {
-      print('Error parsing callback result: $e');
       throw GameChangerException('Failed to parse GameChanger response: $e');
     }
   }

@@ -70,6 +70,10 @@ class CardanoWalletService {
     try {
       _connectionStatus = WalletConnectionStatus.connecting;
 
+      // Clean up any existing external wallet data
+      await _storage.delete(key: 'external_wallet_address');
+      await _storage.delete(key: 'external_wallet_stake_address');
+
       // For now, we'll store the mnemonic and generate a dummy address
       // In a real implementation, you'd use the proper Cardano SDK
       _mnemonic = mnemonic ?? _generateDummyMnemonic();
@@ -170,6 +174,9 @@ class CardanoWalletService {
       if (!_validateAddress(address) || !_validateStakeAddress(stakeAddress)) {
         throw Exception('Invalid address format');
       }
+
+      // Clean up any existing mnemonic-based wallet data
+      await _storage.delete(key: _mnemonicKey);
 
       // Set wallet data without storing mnemonic
       _walletName = walletName;
