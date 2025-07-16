@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="BlueLight - Natural language crypto hub. Intelligent AI assistant for blockchain, DeFi, trading, and Web3 interactions.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- PWA Manifest and Theme Color -->
+  <link rel="manifest" href="manifest.json?v=3">
+  <meta name="theme-color" content="#0175C2">
+
+  <!-- Apple Touch Icons (for iOS home screen icon) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png?v=3">
+  <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png?v=3">
+  <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png?v=3">
+  <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png?v=3">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+
+  <!-- iOS specific meta tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BlueLight">
+
+  <!-- Additional PWA meta tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="BlueLight">
+  <meta name="msapplication-TileColor" content="#0175C2">
+  <meta name="msapplication-TileImage" content="/icons/bluelight-512.png?v=3">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/bluelight.png?v=3"/>
+  <link rel="shortcut icon" type="image/png" href="/bluelight.png?v=3"/>
+
+  <title>BlueLight - Natural Language Crypto Hub</title>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('flutter-first-frame', function() {
+        // Register service worker normally without dynamic versioning
+        navigator.serviceWorker.register('/flutter_service_worker.js')
+          .then(function(registration) {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            
+            // Handle service worker updates only when there's an actual update
+            registration.addEventListener('updatefound', function() {
+              const newWorker = registration.installing;
+              
+              newWorker.addEventListener('statechange', function() {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Only show update prompt if there's actually a new version
+                  console.log('New content is available and ready to be displayed.');
+                  
+                  // Show update notification with option to update later
+                  const updateNow = confirm('A new version of BlueLight is available. Update now?');
+                  
+                  if (updateNow) {
+                    // Tell the new service worker to skip waiting and take control
+                    newWorker.postMessage({ action: 'skipWaiting' });
+                    
+                    // Listen for the new service worker to take control
+                    navigator.serviceWorker.addEventListener('controllerchange', function() {
+                      // Reload the page to get the latest content
+                      window.location.reload();
+                    });
+                  }
+                }
+              });
+            });
+          })
+          .catch(function(error) {
+            console.log('ServiceWorker registration failed: ', error);
+          });
+      });
+      
+      // Handle installation prompt for Android
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        console.log('PWA install prompt available');
+        
+        // Optional: Show your own install promotion UI here
+        // You could show a custom banner or button to prompt installation
+      });
+      
+      // Handle successful installation
+      window.addEventListener('appinstalled', function(e) {
+        console.log('PWA installed successfully');
+        deferredPrompt = null;
+      });
+    }
+    
+    // Force clear all caches on page load for immediate fix
+    if ('caches' in window) {
+      caches.keys().then(function(cacheNames) {
+        cacheNames.forEach(function(cacheName) {
+          caches.delete(cacheName);
+          console.log('Cleared cache:', cacheName);
+        });
+      });
+    }
+    
+    // Detect if running as PWA (standalone mode)
+    function isPWA() {
+      return window.matchMedia('(display-mode: standalone)').matches || 
+             window.navigator.standalone === true;
+    }
+    
+    // Optional: Show install instructions for iOS Safari users
+    function showIOSInstallInstructions() {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isInStandaloneMode = window.navigator.standalone;
+      
+      if (isIOS && !isInStandaloneMode) {
+        // You could show a banner here explaining how to install on iOS
+        console.log('iOS user detected - can show install instructions');
+      }
+    }
+    
+    window.addEventListener('load', function() {
+      showIOSInstallInstructions();
+    });
+  </script>
+</body>
+</html>
