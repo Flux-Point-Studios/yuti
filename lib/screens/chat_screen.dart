@@ -125,11 +125,20 @@ class _ChatScreenState extends State<ChatScreen> {
               }))
           .toList();
 
+      // Debug the actual message content
+      print('🔍 DEBUG: Raw message data: $messagesResponse');
+      for (var i = 0; i < messages.length; i++) {
+        print(
+            '🔍 DEBUG: Message $i: "${messages[i].text}" isUser: ${messages[i].isUser}');
+      }
+
       setState(() {
         _messages = messages;
       });
 
       print('🔍 DEBUG: Loaded ${_messages.length} messages into UI');
+      print(
+          '🔍 DEBUG: Current _messages length after setState: ${_messages.length}');
 
       // Add welcome message only if no messages were found from server
       if (_messages.isEmpty) {
@@ -144,6 +153,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _addWelcomeMessage() {
+    print(
+        '🔍 DEBUG: Adding welcome message. Current messages count: ${_messages.length}');
+
     final welcomeMessage = ChatMessage.text(
       text:
           "Hello! I'm Agent T, your crypto concierge. I can help you manage your digital assets, answer questions, and more. "
@@ -154,6 +166,9 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add(welcomeMessage);
     });
+
+    print(
+        '🔍 DEBUG: Welcome message added. New messages count: ${_messages.length}');
 
     // Save to current session
     if (_currentSession != null) {
@@ -271,6 +286,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageList() {
+    print('🔍 DEBUG: Building message list with ${_messages.length} messages');
+    for (var i = 0; i < _messages.length; i++) {
+      print(
+          '🔍 DEBUG: Rendering message $i: "${_messages[i].text.substring(0, _messages[i].text.length > 50 ? 50 : _messages[i].text.length)}..."');
+    }
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
