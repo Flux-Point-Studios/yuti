@@ -89,16 +89,12 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadSession(ChatSession session) async {
     setState(() {
       _currentSession = session;
-      _messages = List.from(session.messages);
+      _messages =
+          []; // Start with empty messages, let server reload populate them
     });
 
     // Force reload messages from server for this session
     await _reloadMessagesFromServer(session.id);
-
-    // Add welcome message if session is empty (after server reload)
-    if (_messages.isEmpty) {
-      _addWelcomeMessage();
-    }
 
     // Scroll to bottom
     _scrollToBottom();
@@ -134,8 +130,16 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       print('🔍 DEBUG: Loaded ${_messages.length} messages into UI');
+
+      // Add welcome message only if no messages were found from server
+      if (_messages.isEmpty) {
+        print('🔍 DEBUG: No messages found, adding welcome message');
+        _addWelcomeMessage();
+      }
     } catch (e) {
       print('🔍 DEBUG: Error reloading messages: $e');
+      // On error, add welcome message
+      _addWelcomeMessage();
     }
   }
 
