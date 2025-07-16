@@ -4,9 +4,7 @@
   "description": "BlueLight - Natural Language Crypto Hub with AI Assistant",
   "main": "index.js",
   "scripts": {
-    "build": "echo 'Serving pre-built Flutter web files from build/web directory'",
-    "deploy": "chmod +x build-and-deploy.sh && ./build-and-deploy.sh",
-    "deploy:windows": "build-and-deploy.bat",
+    "build": "flutter build web --release --pwa-strategy offline-first",
     "start": "echo 'Static files ready'",
     "test": "echo 'No tests configured'"
   },

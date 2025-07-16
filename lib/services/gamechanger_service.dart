@@ -40,9 +40,19 @@ class GameChangerService {
   /// Get the current web app's base URL for callbacks
   String _getWebCallbackUrl() {
     print('🔍 DEBUG: _getWebCallbackUrl called - kIsWeb: $kIsWeb');
-    if (kIsWeb) {
+
+    // More reliable web detection - check if we're running on a web domain
+    final currentUri = Uri.base;
+    final isRunningOnWeb =
+        currentUri.scheme == 'https' || currentUri.scheme == 'http';
+
+    print('🔍 DEBUG: Current URI: $currentUri');
+    print('🔍 DEBUG: URI scheme: ${currentUri.scheme}');
+    print('🔍 DEBUG: Detected as web: $isRunningOnWeb');
+
+    if (isRunningOnWeb) {
       // In web, use current origin + callback path
-      final origin = Uri.base.origin;
+      final origin = currentUri.origin;
       final webCallbackUrl = '$origin$_webCallbackPath?result={result}';
       print('🔍 DEBUG: Generated web callback URL: $webCallbackUrl');
       return webCallbackUrl;
@@ -203,10 +213,14 @@ class GameChangerService {
 
       print('🔍 DEBUG: Launching flutter_web_auth...');
 
-      // Use flutter_web_auth to handle the OAuth-style flow
+            // Use flutter_web_auth to handle the OAuth-style flow
       String callbackUrlScheme;
-
-      if (kIsWeb) {
+      
+      // Use same web detection logic
+      final currentUri = Uri.base;
+      final isRunningOnWeb = currentUri.scheme == 'https' || currentUri.scheme == 'http';
+      
+      if (isRunningOnWeb) {
         // For web, flutter_web_auth expects the web protocol (https)
         callbackUrlScheme = 'https';
         print('🔍 DEBUG: Web environment - using HTTPS as callback scheme');
