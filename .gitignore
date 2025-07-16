@@ -63,3 +63,4 @@ windows/flutter/ephemeral/
 .env.local
 
 .vercel
+iphoneos/
