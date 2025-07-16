@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' as html;
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/gamechanger_service.dart';
@@ -34,7 +33,7 @@ class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
     try {
       if (kIsWeb) {
         // Get the current URL and extract the result parameter
-        final currentUrl = html.window.location.href;
+        final currentUrl = Uri.base.toString();
         final uri = Uri.parse(currentUrl);
 
         print('🔍 DEBUG: Callback screen - Current URL: $currentUrl');
