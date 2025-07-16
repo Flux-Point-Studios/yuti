@@ -415,7 +415,15 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _connectWithGameChanger,
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              print(
+                                  '🔍 DEBUG: GameChanger Connect button pressed');
+                              // Test different environments if needed
+                              // GameChangerService.setEnvironment('beta'); // Try this if connection fails
+                              _connectWithGameChanger();
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryBlue,
                         foregroundColor: Colors.white,
