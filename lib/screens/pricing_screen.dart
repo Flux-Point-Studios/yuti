@@ -145,9 +145,8 @@ class _PricingScreenState extends State<PricingScreen>
                 children: [
                   _buildHeader(),
                   Expanded(child: _buildPricingContent()),
-                  const SizedBox(height: 20),
                   _buildFooterLinks(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                 ],
               ),
               if (_isLoading) _buildLoadingOverlay(),
@@ -234,15 +233,20 @@ class _PricingScreenState extends State<PricingScreen>
           offset: Offset(0, _slideAnimation.value),
           child: Opacity(
             opacity: _fadeAnimation.value,
-            child: PageView.builder(
-              itemCount: _plans.length,
-              controller: PageController(viewportFraction: 0.85),
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  child: _buildPricingCard(_plans[index], index),
-                );
-              },
+            child: SingleChildScrollView(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: PageView.builder(
+                  itemCount: _plans.length,
+                  controller: PageController(viewportFraction: 0.9),
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      child: _buildPricingCard(_plans[index], index),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         );
@@ -267,7 +271,7 @@ class _PricingScreenState extends State<PricingScreen>
           child: Opacity(
             opacity: cardAnimation.value,
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 20),
+              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
               child: Stack(
                 children: [
                   ClipRRect(
@@ -288,20 +292,32 @@ class _PricingScreenState extends State<PricingScreen>
                             width: plan.isRecommended ? 2 : 1,
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildPlanHeader(plan),
-                            const SizedBox(height: 24),
-                            _buildPlanPrice(plan),
-                            const SizedBox(height: 24),
-                            _buildPlanFeatures(plan),
-                            const Spacer(),
-                            if (plan.value != 'FREE') _buildPaymentMethod(plan),
-                            if (plan.value != 'FREE')
-                              const SizedBox(height: 16),
-                            _buildSubscribeButton(plan),
-                          ],
+                        child: SingleChildScrollView(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight:
+                                  MediaQuery.of(context).size.height * 0.6,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildPlanHeader(plan),
+                                  const SizedBox(height: 24),
+                                  _buildPlanPrice(plan),
+                                  const SizedBox(height: 24),
+                                  _buildPlanFeatures(plan),
+                                  const SizedBox(height: 24),
+                                  if (plan.value != 'FREE')
+                                    _buildPaymentMethod(plan),
+                                  if (plan.value != 'FREE')
+                                    const SizedBox(height: 16),
+                                  _buildSubscribeButton(plan),
+                                  const SizedBox(height: 16),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -413,27 +429,39 @@ class _PricingScreenState extends State<PricingScreen>
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
-          child: DropdownButton<String>(
-            value: _paymentMethod,
-            dropdownColor: AppColors.backgroundMedium,
-            underline: const SizedBox(),
-            isExpanded: true,
-            style: const TextStyle(color: Colors.white),
-            items: const [
-              DropdownMenuItem(
-                value: 'stripe',
-                child: Text('Credit Card (Stripe)'),
-              ),
-              DropdownMenuItem(
-                value: 'ada',
-                child: Text('Token & NFT Holders'),
-              ),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _paymentMethod = value ?? 'stripe';
-              });
-            },
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              canvasColor: AppColors.backgroundMedium,
+            ),
+            child: DropdownButton<String>(
+              value: _paymentMethod,
+              dropdownColor: AppColors.backgroundMedium,
+              underline: const SizedBox(),
+              isExpanded: true,
+              style: const TextStyle(color: Colors.white),
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+              items: const [
+                DropdownMenuItem(
+                  value: 'stripe',
+                  child: Text(
+                    'Credit Card (Stripe)',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'ada',
+                  child: Text(
+                    'Token & NFT Holders',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _paymentMethod = value ?? 'stripe';
+                });
+              },
+            ),
           ),
         ),
       ],
