@@ -14,37 +14,37 @@
     "dir": "ltr",
     "icons": [
         {
-            "src": "bluelight.png?v=2",
-            "sizes": "512x512",
+            "src": "bluelight.png?v=3",
+            "sizes": "429x429",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icons/icon-192.png?v=2",
+            "src": "icons/bluelight-192.png?v=3",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icons/icon-512.png?v=2",
+            "src": "icons/bluelight-512.png?v=3",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "apple-touch-icon.png?v=2",
+            "src": "apple-touch-icon-180x180.png?v=3",
             "sizes": "180x180",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icons/icon-192.png?v=2",
+            "src": "icons/bluelight-192.png?v=3",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "icons/icon-512.png?v=2",
+            "src": "icons/bluelight-512.png?v=3",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
