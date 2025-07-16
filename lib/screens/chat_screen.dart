@@ -7,6 +7,7 @@ import '../models/chat_session.dart';
 import '../services/chat_service.dart';
 import '../services/speech_service.dart';
 import '../services/chat_history_service.dart';
+import '../services/supabase_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/chat_sidebar.dart';
 
@@ -91,13 +92,51 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages = List.from(session.messages);
     });
 
-    // Add welcome message if session is empty
+    // Force reload messages from server for this session
+    await _reloadMessagesFromServer(session.id);
+
+    // Add welcome message if session is empty (after server reload)
     if (_messages.isEmpty) {
       _addWelcomeMessage();
     }
 
     // Scroll to bottom
     _scrollToBottom();
+  }
+
+  Future<void> _reloadMessagesFromServer(String sessionId) async {
+    try {
+      print('🔍 DEBUG: Reloading messages for session $sessionId');
+
+      // Get fresh messages from Supabase for this session
+      final messagesResponse = await SupabaseService.client
+          .from('messages')
+          .select('*')
+          .eq('chat_id', sessionId)
+          .order('created_at', ascending: true);
+
+      print(
+          '🔍 DEBUG: Found ${messagesResponse.length} messages for session $sessionId');
+
+      final messages = messagesResponse
+          .map((m) => ChatMessage.fromJson({
+                'id': m['id'],
+                'text': m['content'] ?? '',
+                'isUser': m['role'] == 'user',
+                'timestamp': m['created_at'],
+                'type': 'text',
+                'metadata': null,
+              }))
+          .toList();
+
+      setState(() {
+        _messages = messages;
+      });
+
+      print('🔍 DEBUG: Loaded ${_messages.length} messages into UI');
+    } catch (e) {
+      print('🔍 DEBUG: Error reloading messages: $e');
+    }
   }
 
   void _addWelcomeMessage() {
