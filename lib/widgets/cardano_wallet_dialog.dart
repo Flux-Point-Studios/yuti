@@ -690,6 +690,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   }
 
   Future<void> _connectWithGameChanger() async {
+    print('🔍 DEBUG: _connectWithGameChanger() called');
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -697,15 +698,23 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     });
 
     try {
+      print('🔍 DEBUG: Attempting GameChanger connection...');
+
       // Use GameChanger service to connect wallet
       final walletData =
           await _gameChangerService.connectWallet(isMainnet: true);
 
+      print('🔍 DEBUG: GameChanger connection successful');
+      print('🔍 DEBUG: Wallet data: ${walletData.toString()}');
+
       // Validate network (ensure it's mainnet for production)
       if (!walletData.isMainnet()) {
+        print('🔍 DEBUG: Network validation failed - not mainnet');
         throw Exception(
             'Please use a mainnet wallet. Testnet wallets are not supported.');
       }
+
+      print('🔍 DEBUG: Network validation passed');
 
       // Connect external wallet in AuthService
       final success = await widget.authService.connectCardanoWalletExternal(
@@ -714,14 +723,38 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         walletData.stakeAddress,
       );
 
+      print('🔍 DEBUG: AuthService connection result: $success');
+
       if (!success) {
         throw Exception('Failed to connect wallet. Please try again.');
       }
 
+      print('🔍 DEBUG: GameChanger connection flow completed successfully');
       Navigator.of(context).pop(true);
     } catch (e) {
+      print('🔍 DEBUG: GameChanger connection error: $e');
+
+      // Enhanced error message for common issues
+      String errorMessage = e.toString().replaceFirst('Exception: ', '');
+
+      // Check for specific error patterns and provide helpful guidance
+      if (errorMessage.contains('Unknown request') ||
+          errorMessage.contains('Failed to decode') ||
+          errorMessage.contains('GameChangerException')) {
+        errorMessage = '''Connection failed. This might be due to:
+
+• Other wallet extensions interfering (try disabling VeWorld, Eternl, etc.)
+• Network mismatch (ensure wallet is on mainnet)
+• Browser blocking the connection
+
+Try:
+1. Disable other Cardano wallet extensions
+2. Use an incognito window
+3. Ensure GameChanger wallet is unlocked''';
+      }
+
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = errorMessage;
       });
     } finally {
       setState(() {
