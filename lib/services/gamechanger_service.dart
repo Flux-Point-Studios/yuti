@@ -8,9 +8,9 @@ class GameChangerService {
   static const String _callbackScheme = 'bluelight';
   static const String _callbackHost = 'gamechanger-callback';
   static const String _gameChangerBaseUrl =
-      'https://beta-wallet.gamechanger.finance/api/2/run';
+      'https://wallet.gamechanger.finance/api/2/run';
   static const String _gameChangerTestnetUrl =
-      'https://beta-wallet.gamechanger.finance/api/2/run';
+      'https://preprod-wallet.gamechanger.finance/api/2/run';
 
   // Singleton pattern
   static final GameChangerService _instance = GameChangerService._internal();
@@ -50,14 +50,18 @@ class GameChangerService {
       final jsonBytes = utf8.encode(jsonString);
       final compressedBytes = GZipEncoder().encode(jsonBytes);
 
-      // Encode to base64url
-      final encodedData = base64Url.encode(compressedBytes!);
+      // Encode to base64url (remove padding)
+      final encodedData =
+          base64Url.encode(compressedBytes!).replaceAll('=', '');
+
+      // Add transport header: 1- indicates gzip + base64url encoding
+      final payload = '1-$encodedData';
 
       // Choose base URL based on network
       final baseUrl = isMainnet ? _gameChangerBaseUrl : _gameChangerTestnetUrl;
 
-      // Create the GameChanger URL
-      return '$baseUrl/$encodedData';
+      // Create the GameChanger URL with transport header
+      return '$baseUrl/$payload';
     } catch (e) {
       print('Error encoding script to URL: $e');
       throw Exception('Failed to generate GameChanger URL: $e');
