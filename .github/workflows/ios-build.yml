@@ -87,21 +87,23 @@ jobs:
         security find-identity -v -p codesigning build.keychain
         
         # Configure Xcode project for manual signing
-        python3 -c "
+        PROFILE_NAME="$PROFILE_NAME" python3 -c "
         import re
+        import os
         
         # Read project file
         with open('ios/Runner.xcodeproj/project.pbxproj', 'r') as f:
             content = f.read()
         
-        # Determine code sign identity
+        # Get environment variables
         export_method = '${{ github.event.inputs.export_method }}'
+        profile_name = os.environ.get('PROFILE_NAME', '')
         code_sign_identity = 'iPhone Developer' if export_method == 'development' else 'iPhone Distribution'
         
         # Add CODE_SIGN_STYLE = Manual after each DEVELOPMENT_TEAM line
         content = re.sub(
             r'(DEVELOPMENT_TEAM = 5G932XX96M;)',
-            r'\1\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";',
+            rf'\1\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"{profile_name}\";',
             content
         )
         
@@ -115,6 +117,11 @@ jobs:
         # Write back
         with open('ios/Runner.xcodeproj/project.pbxproj', 'w') as f:
             f.write(content)
+        
+        print(f'Configured project with:')
+        print(f'  Profile Name: {profile_name}')
+        print(f'  Code Sign Identity: {code_sign_identity}')
+        print(f'  Export Method: {export_method}')
         "
         
         # Determine signing certificate based on export method
