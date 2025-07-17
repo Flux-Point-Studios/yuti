@@ -246,8 +246,13 @@ class _PricingScreenState extends State<PricingScreen>
                       itemCount: _plans.length,
                       controller: _pageController,
                       onPageChanged: (index) {
-                        setState(() {
-                          _currentPageIndex = index;
+                        // Use post-frame callback to avoid conflicts with AnimatedBuilder
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() {
+                              _currentPageIndex = index;
+                            });
+                          }
                         });
                       },
                       itemBuilder: (context, index) {
@@ -270,6 +275,8 @@ class _PricingScreenState extends State<PricingScreen>
   }
 
   Widget _buildNavigationArrows() {
+    if (!mounted) return const SizedBox.shrink();
+    
     return Positioned.fill(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -348,26 +355,28 @@ class _PricingScreenState extends State<PricingScreen>
   }
 
   void _previousPage() {
-    if (_currentPageIndex > 0) {
-      _pageController.animateToPage(
-        _currentPageIndex - 1,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
+    if (!mounted || _currentPageIndex <= 0) return;
+    
+    _pageController.animateToPage(
+      _currentPageIndex - 1,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _nextPage() {
-    if (_currentPageIndex < _plans.length - 1) {
-      _pageController.animateToPage(
-        _currentPageIndex + 1,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
+    if (!mounted || _currentPageIndex >= _plans.length - 1) return;
+    
+    _pageController.animateToPage(
+      _currentPageIndex + 1,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   Widget _buildPageIndicators() {
+    if (!mounted) return const SizedBox.shrink();
+    
     return Positioned(
       bottom: 20,
       left: 0,
