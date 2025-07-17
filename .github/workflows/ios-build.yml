@@ -71,8 +71,14 @@ jobs:
         
         # Import provisioning profile
         echo "$IOS_PROVISION_PROFILE_BASE64" | base64 --decode > profile.mobileprovision
+        
+        # Extract UUID and Name
+        security cms -D -i profile.mobileprovision > decoded.plist
+        PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' decoded.plist)
+        PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' decoded.plist)
+        
         mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+        cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/"$PROFILE_UUID".mobileprovision
         
         # Allow codesign to access keychain
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
@@ -80,26 +86,48 @@ jobs:
         # Verify certificate is available
         security find-identity -v -p codesigning build.keychain
         
+        # Create ExportOptions.plist for manual signing
+        cat << EOF > ExportOptions.plist
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>compileBitcode</key>
+            <false/>
+            <key>method</key>
+            <string>\${{ github.event.inputs.export_method }}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>teamID</key>
+            <string>5G932XX96M</string>
+            <key>provisioningProfiles</key>
+            <dict>
+                <key>com.bluelight.wallet</key>
+                <string>\$PROFILE_NAME</string>
+            </dict>
+        </dict>
+        </plist>
+        EOF
+        
     - name: Build iOS app
+      if: github.event.inputs.build_type == 'debug'
       run: |
         echo "Building iOS app with type: ${{ github.event.inputs.build_type }}"
-        if [ "${{ github.event.inputs.build_type }}" = "debug" ]; then
-          flutter build ios --debug --no-codesign
-        else
-          flutter build ios --release
-        fi
+        flutter build ios --debug --no-codesign
         
     - name: Build IPA (if release)
       if: github.event.inputs.build_type == 'release'
       run: |
         echo "Creating .ipa with export method: ${{ github.event.inputs.export_method }}"
-        flutter build ipa --release --export-method ${{ github.event.inputs.export_method }}
+        flutter build ipa --release --export-method ${{ github.event.inputs.export_method }} --export-options-plist=ExportOptions.plist
         
     - name: Cleanup Keychain (if release)
       if: always() && github.event.inputs.build_type == 'release'
       run: |
         security delete-keychain build.keychain || true
-        rm -f certificate.p12 profile.mobileprovision || true
+        rm -f certificate.p12 profile.mobileprovision decoded.plist ExportOptions.plist || true
       
     - name: Upload iOS build artifacts
       uses: actions/upload-artifact@v4
