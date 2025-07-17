@@ -78,5 +78,9 @@
 			</array>
 		</dict>
 	</array>
+	
+	<!-- App uses standard encryption only - no custom algorithms -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
