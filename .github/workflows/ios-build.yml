@@ -121,7 +121,7 @@ jobs:
       if: github.event.inputs.build_type == 'release'
       run: |
         echo "Creating .ipa with export method: ${{ github.event.inputs.export_method }}"
-        flutter build ipa --release --export-method ${{ github.event.inputs.export_method }} --export-options-plist=ExportOptions.plist
+        flutter build ipa --release --export-options-plist=ExportOptions.plist
         
     - name: Cleanup Keychain (if release)
       if: always() && github.event.inputs.build_type == 'release'
