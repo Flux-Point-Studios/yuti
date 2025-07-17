@@ -86,6 +86,18 @@ jobs:
         # Verify certificate is available
         security find-identity -v -p codesigning build.keychain
         
+        # Configure Xcode project for manual signing using sed (safer approach)
+        sed -i '' 's/DEVELOPMENT_TEAM = "";/DEVELOPMENT_TEAM = "5G932XX96M";/g' ios/Runner.xcodeproj/project.pbxproj
+        sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
+        sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";/g" ios/Runner.xcodeproj/project.pbxproj
+        
+        # Determine signing certificate based on export method
+        if [ "${{ github.event.inputs.export_method }}" = "development" ]; then
+          SIGNING_CERTIFICATE="Apple Development"
+        else
+          SIGNING_CERTIFICATE="Apple Distribution"
+        fi
+        
         # Create ExportOptions.plist for manual signing
         cat << EOF > ExportOptions.plist
         <?xml version="1.0" encoding="UTF-8"?>
@@ -95,21 +107,34 @@ jobs:
             <key>compileBitcode</key>
             <false/>
             <key>method</key>
-            <string>\${{ github.event.inputs.export_method }}</string>
+            <string>${{ github.event.inputs.export_method }}</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>signingCertificate</key>
-            <string>Apple Distribution</string>
+            <string>$SIGNING_CERTIFICATE</string>
             <key>teamID</key>
             <string>5G932XX96M</string>
             <key>provisioningProfiles</key>
             <dict>
                 <key>com.bluelight.wallet</key>
-                <string>\$PROFILE_NAME</string>
+                <string>$PROFILE_NAME</string>
             </dict>
         </dict>
         </plist>
         EOF
+        
+        echo "Profile Name: $PROFILE_NAME"
+        echo "Profile UUID: $PROFILE_UUID"
+        
+        # Debug: Check installed profiles and certificates
+        echo "=== Installed Provisioning Profiles ==="
+        ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+        
+        echo "=== Available Code Signing Identities ==="
+        security find-identity -v -p codesigning build.keychain
+        
+        echo "=== Xcode Project Configuration Check ==="
+        grep -A 5 -B 5 "DEVELOPMENT_TEAM\|PROVISIONING_PROFILE_SPECIFIER\|ProvisioningStyle" ios/Runner.xcodeproj/project.pbxproj || true
         
     - name: Build iOS app
       if: github.event.inputs.build_type == 'debug'
