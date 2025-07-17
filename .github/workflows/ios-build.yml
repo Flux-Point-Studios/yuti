@@ -86,10 +86,36 @@ jobs:
         # Verify certificate is available
         security find-identity -v -p codesigning build.keychain
         
-        # Configure Xcode project for manual signing using sed (safer approach)
-        sed -i '' 's/DEVELOPMENT_TEAM = "";/DEVELOPMENT_TEAM = "5G932XX96M";/g' ios/Runner.xcodeproj/project.pbxproj
-        sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
-        sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";/g" ios/Runner.xcodeproj/project.pbxproj
+        # Configure Xcode project for manual signing
+        python3 -c "
+        import re
+        
+        # Read project file
+        with open('ios/Runner.xcodeproj/project.pbxproj', 'r') as f:
+            content = f.read()
+        
+        # Determine code sign identity
+        export_method = '${{ github.event.inputs.export_method }}'
+        code_sign_identity = 'iPhone Developer' if export_method == 'development' else 'iPhone Distribution'
+        
+        # Add CODE_SIGN_STYLE = Manual after each DEVELOPMENT_TEAM line
+        content = re.sub(
+            r'(DEVELOPMENT_TEAM = 5G932XX96M;)',
+            r'\1\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";',
+            content
+        )
+        
+        # Update CODE_SIGN_IDENTITY
+        content = re.sub(
+            r'\"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]\" = \"iPhone Developer\";',
+            f'\"CODE_SIGN_IDENTITY[sdk=iphoneos*]\" = \"{code_sign_identity}\";',
+            content
+        )
+        
+        # Write back
+        with open('ios/Runner.xcodeproj/project.pbxproj', 'w') as f:
+            f.write(content)
+        "
         
         # Determine signing certificate based on export method
         if [ "${{ github.event.inputs.export_method }}" = "development" ]; then
