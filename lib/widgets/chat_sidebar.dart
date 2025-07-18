@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
 import '../config/app_config.dart';
 import '../screens/welcome_screen.dart';
+import 'glassmorphism_container.dart';
 
 class ChatSidebar extends StatefulWidget {
   final bool isVisible;
@@ -125,36 +126,24 @@ class _ChatSidebarState extends State<ChatSidebar>
           child: SizedBox(
             width: MediaQuery.of(context).size.width * 0.8,
             height: MediaQuery.of(context).size.height,
-            child: ClipRRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.primaryBlue.withOpacity(0.15),
-                        Colors.black.withOpacity(0.6),
-                      ],
-                    ),
-                    border: Border(
-                      right: BorderSide(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        _buildHeader(),
-                        _buildNewChatButton(),
-                        Expanded(child: _buildSessionList()),
-                        _buildFooter(),
-                      ],
-                    ),
-                  ),
+            child: GlassmorphismContainer(
+              glassType: GlassType.overlay,
+              blur: 20.0,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(0),
+                bottomRight: Radius.circular(0),
+              ),
+              customGradient: AppColors.blueGlowGradient,
+              customBorderColor: AppColors.glassBorder,
+              padding: EdgeInsets.zero,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    _buildNewChatButton(),
+                    Expanded(child: _buildSessionList()),
+                    _buildFooter(),
+                  ],
                 ),
               ),
             ),
