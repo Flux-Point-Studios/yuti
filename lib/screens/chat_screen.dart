@@ -432,7 +432,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   onTapLink: (text, href, title) {
                     // TODO: Handle link taps
                   },
-                )
+                ),
               else if (message.type == MessageType.qrCode)
                 _buildQrCodeMessage(message),
               else if (message.type == MessageType.transaction)
