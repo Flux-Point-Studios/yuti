@@ -67,50 +67,66 @@ class MyApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          iconTheme: IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: AppColors.textPrimary),
           titleTextStyle: TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.w600,
+          ),
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            foregroundColor: Colors.white,
-            backgroundColor: AppColors.primaryBlue,
+            foregroundColor: AppColors.textPrimary,
+            backgroundColor: Colors.transparent,
             elevation: 0,
-            shadowColor: AppColors.shadowColor,
+            shadowColor: AppColors.shadowColorDeep,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            side: const BorderSide(
+              color: AppColors.glassBorder,
+              width: 1,
+            ),
+          ).copyWith(
+            backgroundColor: MaterialStateProperty.resolveWith<Color?>(
+              (Set<MaterialState> states) {
+                if (states.contains(MaterialState.pressed)) {
+                  return AppColors.glassBlue;
+                }
+                return AppColors.glassSurface;
+              },
             ),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: AppColors.backgroundLight,
+          fillColor: AppColors.glassSurface,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(color: AppColors.glassBorder),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(color: AppColors.glassBorder),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primaryBlue, width: 2),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
           ),
           labelStyle: const TextStyle(color: AppColors.textSecondary),
           hintStyle: const TextStyle(color: AppColors.textTertiary),
         ),
         cardTheme: CardThemeData(
-          color: AppColors.backgroundCard,
+          color: Colors.transparent,
           elevation: 0,
-          shadowColor: AppColors.shadowColor,
+          shadowColor: AppColors.shadowColorDeep,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: AppColors.glassBorder, width: 0.5),
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppColors.glassBorder, width: 1),
           ),
         ),
         textTheme: const TextTheme(
