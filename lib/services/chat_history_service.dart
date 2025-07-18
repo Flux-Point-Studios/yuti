@@ -7,6 +7,19 @@ import '../models/chat_message.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
 
+// Exception for when user hits daily message limit
+class MessageLimitExceededException implements Exception {
+  final String message;
+  final int remainingMessages;
+  final String userTier;
+
+  const MessageLimitExceededException(
+      this.message, this.remainingMessages, this.userTier);
+
+  @override
+  String toString() => message;
+}
+
 class ChatHistoryService {
   static const String _storageKey = 'chat_sessions';
   static const String _currentSessionKey = 'current_session_id';
@@ -153,7 +166,61 @@ class ChatHistoryService {
     }
   }
 
+  // Check if user can send messages (enforces daily limits for FREE users)
+  Future<bool> canUserSendMessage() async {
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return false;
+
+      // Check if user can send messages using database function
+      final result = await _supabase
+          .rpc('can_user_send_message', params: {'user_uuid': user.id});
+
+      return result == true;
+    } catch (e) {
+      print('Error checking message limits: $e');
+      return false; // Fail safe - deny if we can't check
+    }
+  }
+
+  // Get user's remaining messages for today
+  Future<int> getUserRemainingMessages() async {
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return 0;
+
+      final result = await _supabase
+          .rpc('get_user_remaining_messages', params: {'user_uuid': user.id});
+
+      return result ?? 0;
+    } catch (e) {
+      print('Error getting remaining messages: $e');
+      return 0;
+    }
+  }
+
   Future<void> addMessageToCurrentSession(ChatMessage message) async {
+    // Check message limits for user messages only
+    if (message.isUser) {
+      final canSend = await canUserSendMessage();
+      if (!canSend) {
+        final remaining = await getUserRemainingMessages();
+        final user = _authService.currentUser;
+        final tier = user?.tier ?? 'FREE';
+
+        throw MessageLimitExceededException(
+            "🚫 **Daily Message Limit Reached**\n\n"
+            "You've reached your daily limit of 20 messages as a FREE user.\n\n"
+            "**Options:**\n"
+            "• Wait until tomorrow for your messages to reset\n"
+            "• Upgrade to PREMIUM for unlimited messages\n"
+            "• Connect a premium Cardano wallet for instant access\n\n"
+            "**Remaining today:** $remaining messages",
+            remaining,
+            tier);
+      }
+    }
+
     if (_currentSessionId == null) {
       await createNewSession();
     }
@@ -188,6 +255,27 @@ class ChatHistoryService {
   // Backward compatibility methods for chat_screen.dart
   Future<void> addMessageToSession(
       String sessionId, ChatMessage message) async {
+    // Check message limits for user messages only
+    if (message.isUser) {
+      final canSend = await canUserSendMessage();
+      if (!canSend) {
+        final remaining = await getUserRemainingMessages();
+        final user = _authService.currentUser;
+        final tier = user?.tier ?? 'FREE';
+
+        throw MessageLimitExceededException(
+            "🚫 **Daily Message Limit Reached**\n\n"
+            "You've reached your daily limit of 20 messages as a FREE user.\n\n"
+            "**Options:**\n"
+            "• Wait until tomorrow for your messages to reset\n"
+            "• Upgrade to PREMIUM for unlimited messages\n"
+            "• Connect a premium Cardano wallet for instant access\n\n"
+            "**Remaining today:** $remaining messages",
+            remaining,
+            tier);
+      }
+    }
+
     // Find session in memory
     final sessionIndex = _sessions.indexWhere((s) => s.id == sessionId);
     if (sessionIndex != -1) {
