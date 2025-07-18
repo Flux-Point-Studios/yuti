@@ -10,6 +10,7 @@ import '../services/chat_history_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/chat_sidebar.dart';
+import '../widgets/glassmorphism_container.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -356,45 +357,32 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildUserBubble(ChatMessage message) {
-    return Container(
+    return GlassmorphismContainer(
+      glassType: GlassType.light,
+      borderRadius: BorderRadius.circular(20).copyWith(bottomRight: const Radius.circular(4)),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.primaryBlue,
-        borderRadius: BorderRadius.circular(
-          20,
-        ).copyWith(bottomRight: const Radius.circular(4)),
-      ),
+      blur: 8.0,
+      showGlow: true,
+      customGradient: AppColors.primaryGradient.scale(0.4),
       child: Text(
         message.text,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
 
   Widget _buildAssistantBubble(ChatMessage message) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(
-        20,
-      ).copyWith(bottomLeft: const Radius.circular(4)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(
-              20,
-            ).copyWith(bottomLeft: const Radius.circular(4)),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primaryBlue.withOpacity(0.15),
-                Colors.black.withOpacity(0.3),
-              ],
-            ),
-            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
-          ),
+    return GlassmorphismContainer(
+      glassType: GlassType.medium,
+      borderRadius: BorderRadius.circular(20).copyWith(bottomLeft: const Radius.circular(4)),
+      padding: const EdgeInsets.all(16),
+      blur: 12.0,
+      showGlow: true,
+      customGradient: AppColors.glassGradient,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
