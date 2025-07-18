@@ -386,64 +386,75 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (message.type == MessageType.text)
-                MarkdownBody(
-                  data: message.text,
-                  styleSheet: MarkdownStyleSheet(
-                    p: const TextStyle(color: Colors.white, fontSize: 16),
-                    strong: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    em: const TextStyle(
-                      color: Colors.white,
-                      fontStyle: FontStyle.italic,
-                    ),
-                    code: TextStyle(
-                      backgroundColor: Colors.white.withOpacity(0.1),
-                      color: AppColors.primaryBlue,
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                    ),
-                    codeblockDecoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 1,
-                      ),
-                    ),
-                    codeblockPadding: const EdgeInsets.all(12),
-                    blockquoteDecoration: BoxDecoration(
-                      color: AppColors.primaryBlue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: const Border(
-                        left: BorderSide(
-                          color: AppColors.primaryBlue,
-                          width: 4,
-                        ),
-                      ),
-                    ),
-                    listBullet: const TextStyle(
-                      color: AppColors.primaryBlue,
-                      fontSize: 16,
-                    ),
-                  ),
-                  onTapLink: (text, href, title) {
-                    // TODO: Handle link taps
-                  },
-                ),
-              else if (message.type == MessageType.qrCode)
-                _buildQrCodeMessage(message),
-              else if (message.type == MessageType.transaction)
-                _buildTransactionMessage(message),
-              else if (message.type == MessageType.swap)
-                _buildSwapMessage(message),
+              _buildMessageContent(message),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildMessageContent(ChatMessage message) {
+    switch (message.type) {
+      case MessageType.text:
+        return MarkdownBody(
+          data: message.text,
+          styleSheet: MarkdownStyleSheet(
+            p: const TextStyle(color: Colors.white, fontSize: 16),
+            strong: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+            em: const TextStyle(
+              color: Colors.white,
+              fontStyle: FontStyle.italic,
+            ),
+            code: TextStyle(
+              backgroundColor: Colors.white.withOpacity(0.1),
+              color: AppColors.primaryBlue,
+              fontFamily: 'monospace',
+              fontSize: 14,
+            ),
+            codeblockDecoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            codeblockPadding: const EdgeInsets.all(12),
+            blockquoteDecoration: BoxDecoration(
+              color: AppColors.primaryBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: const Border(
+                left: BorderSide(
+                  color: AppColors.primaryBlue,
+                  width: 4,
+                ),
+              ),
+            ),
+            listBullet: const TextStyle(
+              color: AppColors.primaryBlue,
+              fontSize: 16,
+            ),
+          ),
+          onTapLink: (text, href, title) {
+            // TODO: Handle link taps
+          },
+        );
+      case MessageType.qrCode:
+        return _buildQrCodeMessage(message);
+      case MessageType.transaction:
+        return _buildTransactionMessage(message);
+      case MessageType.swap:
+        return _buildSwapMessage(message);
+      default:
+        return Text(
+          message.text,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        );
+    }
   }
 
   Widget _buildQrCodeMessage(ChatMessage message) {
