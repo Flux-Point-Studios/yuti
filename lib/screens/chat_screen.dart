@@ -434,9 +434,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   },
                 )
               else if (message.type == MessageType.qrCode)
-                _buildQrCodeMessage(message)
+                _buildQrCodeMessage(message),
               else if (message.type == MessageType.transaction)
-                _buildTransactionMessage(message)
+                _buildTransactionMessage(message),
               else if (message.type == MessageType.swap)
                 _buildSwapMessage(message),
             ],
