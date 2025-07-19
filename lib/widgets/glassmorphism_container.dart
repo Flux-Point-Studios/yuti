@@ -203,7 +203,9 @@ class GlassButton extends StatelessWidget {
         blur: 10.0,
         showGlow: showGlow || isPrimary,
         customGradient: isPrimary ? AppColors.primaryGradient.scale(0.3) : null,
-        child: child,
+        child: Center(
+          child: child,
+        ),
       ),
     );
   }

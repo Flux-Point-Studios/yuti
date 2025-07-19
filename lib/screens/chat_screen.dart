@@ -653,6 +653,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _isTyping = true;
     });
 
+    print('🔍 DEBUG: User message added, _isTyping set to true');
+    print('🔍 DEBUG: Current messages count: ${_messages.length}');
+
     // Save to current session
     if (_currentSession != null) {
       await _chatHistoryService.addMessageToSession(
@@ -678,13 +681,22 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
+      print('🔍 DEBUG: Calling _chatService.processMessage() with text: "$text"');
+      
       // Process message
       final response = await _chatService.processMessage(text);
+
+      print('🔍 DEBUG: Got response from _chatService.processMessage()');
+      print('🔍 DEBUG: Response text: "${response.text}"');
+      print('🔍 DEBUG: Response isUser: ${response.isUser}');
 
       setState(() {
         _messages.add(response);
         _isTyping = false;
       });
+
+      print('🔍 DEBUG: Response added to messages, _isTyping set to false');
+      print('🔍 DEBUG: Final messages count: ${_messages.length}');
 
       // Save assistant response to current session
       if (_currentSession != null) {
@@ -696,8 +708,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
       _scrollToBottom();
     } catch (e) {
+      print('🔍 DEBUG: Error in _sendMessage: $e');
+      print('🔍 DEBUG: Error type: ${e.runtimeType}');
+      print('🔍 DEBUG: Stack trace: ${StackTrace.current}');
+
       final errorMessage = ChatMessage.text(
-        text: "❌ I'm sorry, something went wrong. Please try again.",
+        text: "❌ I'm sorry, something went wrong. Please try again.\n\nError details: ${e.toString()}",
         isUser: false,
       );
 
@@ -705,6 +721,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(errorMessage);
         _isTyping = false;
       });
+
+      print('🔍 DEBUG: Error message added, _isTyping set to false');
 
       // Save error message to current session
       if (_currentSession != null) {
