@@ -440,7 +440,7 @@ class _PricingScreenState extends State<PricingScreen>
                     customGradient: plan.isRecommended 
                         ? AppColors.blueGlowGradient.scale(0.8)
                         : null,
-                        child: SingleChildScrollView(
+                    child: SingleChildScrollView(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
                               minHeight:
@@ -467,6 +467,7 @@ class _PricingScreenState extends State<PricingScreen>
                             ),
                           ),
                         ),
+                  ),
                   if (plan.isRecommended) _buildRecommendedBadge(),
                 ],
               ),
