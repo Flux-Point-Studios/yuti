@@ -765,8 +765,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_currentSession != null &&
         _messages.where((m) => m.isUser).length == 1) {
       final title = text.length > 30 ? '${text.substring(0, 30)}...' : text;
+      await _chatHistoryService.updateSessionTitle(_currentSession!.id, title);
       _currentSession = _currentSession!.copyWith(title: title);
-      await _chatHistoryService.updateSession(_currentSession!);
     }
 
     // Scroll to bottom
