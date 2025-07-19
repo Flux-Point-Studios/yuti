@@ -33,6 +33,8 @@ dependencies:
   cardano_flutter_sdk: ^2.5.3
   cardano_dart_types: ^2.9.3
   hex: ^0.2.0
+  # Video player for splash screen
+  video_player: ^2.8.1
 
 dev_dependencies:
   flutter_test:
@@ -48,3 +50,4 @@ flutter:
     - assets/agent_t_pfp.png
     - assets/Tlogo1.1.png
     - assets/bluelight.png
+    - assets/loading_loop_fast.mp4
