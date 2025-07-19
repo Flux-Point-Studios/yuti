@@ -269,24 +269,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return SizedBox(
       width: double.infinity,
       height: 56,
-      child: ElevatedButton.icon(
+      child: GlassButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: Colors.white),
-        label: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryBlue,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          elevation: 8,
-          shadowColor: AppColors.primaryBlue.withOpacity(0.4),
+        isPrimary: true,
+        showGlow: true,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -300,22 +301,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return SizedBox(
       width: double.infinity,
       height: 56,
-      child: OutlinedButton.icon(
+      child: GlassButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: AppColors.primaryBlue),
-        label: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primaryBlue,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.primaryBlue, width: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
+        isPrimary: false,
+        showGlow: false,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: AppColors.primaryBlue),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryBlue,
+              ),
+            ),
+          ],
         ),
       ),
     );
