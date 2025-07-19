@@ -51,37 +51,50 @@ class ChatService {
     _transactionService = TransactionService(_walletService, _blockfrostService);
   }
   
+  // Main entry point for processing user messages
   Future<ChatMessage> processMessage(String userInput) async {
     try {
-      // Check if we're in the middle of a multi-turn conversation
-      if (_pendingSwapRequest != null && _pendingSwapRequest!.awaitingAddressFor != null) {
-        return _handleSwapAddressInput(userInput);
-      }
+      print('🔍 DEBUG: Starting processMessage with input: "$userInput"');
       
-      // Detect intent
       final intent = _detectIntent(userInput);
+      print('🔍 DEBUG: Detected intent: $intent');
       
       switch (intent) {
         case ChatIntent.balance:
-          return _handleBalanceQuery();
+          return await _handleBalanceQuery();
         case ChatIntent.send:
-          return _handleSendCommand(userInput);
+          return await _handleSendCommand(userInput);
         case ChatIntent.receive:
-          return _handleReceiveAddress();
+          return await _handleReceiveAddress();
         case ChatIntent.swap:
-          return _handleSwapCommand(userInput);
+          return await _handleSwapCommand(userInput);
         case ChatIntent.swapStatus:
-          return _handleSwapStatus(userInput);
+          return await _handleSwapStatus(userInput);
         case ChatIntent.transaction:
-          return _handleTransactionQuery(userInput);
+          return await _handleTransactionQuery(userInput);
         case ChatIntent.general:
-          return _handleGeneralQuery(userInput);
+          return await _handleGeneralQuery(userInput);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('🔍 DEBUG: Error in processMessage: $e');
+      print('🔍 DEBUG: Stack trace: $stackTrace');
       return ChatMessage.text(
-        text: "❌ I encountered an error: ${e.toString()}",
+        text: "❌ I'm sorry, something went wrong. Please try again.\n\nError: $e",
         isUser: false,
       );
+    }
+  }
+
+  // Simplified method for UI - returns just the text
+  Future<String> sendMessage(String userInput) async {
+    try {
+      print('🔍 DEBUG: sendMessage called with: "$userInput"');
+      final chatMessage = await processMessage(userInput);
+      print('🔍 DEBUG: sendMessage returning: "${chatMessage.text}"');
+      return chatMessage.text;
+    } catch (e) {
+      print('🔍 DEBUG: sendMessage error: $e');
+      return "Sorry, I encountered an error. Please try again.";
     }
   }
   

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -31,6 +32,11 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isListening = false;
   bool _isSidebarVisible = false;
   ChatSession? _currentSession;
+  
+  // Debug info for TestFlight debugging
+  String _debugInfo = 'Ready';
+  bool _showDebugPanel = false;
+  int _tapCount = 0;
 
   @override
   void initState() {
@@ -568,71 +574,161 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputArea() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _inputController,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      decoration: InputDecoration(
-                        hintText: 'Ask me anything...',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 16,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
+    return Column(
+      children: [
+        // Debug panel
+        _buildDebugPanel(),
+        
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Debug toggle - tap the handle 5 times to show debug
+              GestureDetector(
+                onTap: () {
+                  _tapCount++;
+                  if (_tapCount >= 5) {
+                    setState(() {
+                      _showDebugPanel = !_showDebugPanel;
+                      _tapCount = 0;
+                    });
+                  }
+                  // Reset counter after 2 seconds
+                  Timer(Duration(seconds: 2), () => _tapCount = 0);
+                },
+                child: Container(
+                  height: 20,
+                  width: double.infinity,
+                  child: Center(
+                    child: Container(
+                      width: 30,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[600],
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
-                      textInputAction: TextInputAction.send,
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      _isListening ? Icons.mic : Icons.mic_none,
-                      color: _isListening
-                          ? AppColors.primaryBlue
-                          : Colors.white.withOpacity(0.6),
+                ),
+              ),
+              
+              SizedBox(height: 8),
+              
+              // Input field
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _inputController,
+                              style: const TextStyle(color: Colors.white, fontSize: 16),
+                              decoration: InputDecoration(
+                                hintText: 'Ask me anything...',
+                                hintStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
+                              textInputAction: TextInputAction.send,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              _isListening ? Icons.mic : Icons.mic_none,
+                              color: _isListening
+                                  ? AppColors.primaryBlue
+                                  : Colors.white.withOpacity(0.6),
+                            ),
+                            onPressed: _toggleVoiceInput,
+                          ),
+                        ],
+                      ),
                     ),
-                    onPressed: _toggleVoiceInput,
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryBlue.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.send, color: Colors.white),
+                      onPressed: _sendMessage,
+                    ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 8),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDebugPanel() {
+    if (!_showDebugPanel) {
+      return Container();
+    }
+    
+    return Container(
+      margin: EdgeInsets.all(8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bug_report, color: Colors.blue, size: 16),
+              SizedBox(width: 8),
+              Text('DEBUG INFO', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+              Spacer(),
+              GestureDetector(
+                onTap: () => setState(() => _showDebugPanel = false),
+                child: Icon(Icons.close, color: Colors.blue, size: 16),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
           Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primaryBlue,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryBlue.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              color: Colors.grey[900],
+              borderRadius: BorderRadius.circular(4),
             ),
-            child: IconButton(
-              icon: const Icon(Icons.send, color: Colors.white),
-              onPressed: _sendMessage,
+            child: Text(
+              _debugInfo,
+              style: TextStyle(color: Colors.green, fontSize: 12, fontFamily: 'monospace'),
             ),
           ),
         ],
@@ -651,6 +747,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.add(userMessage);
       _inputController.clear();
       _isTyping = true;
+      _debugInfo = 'User message sent, calling AI API...';
     });
 
     print('🔍 DEBUG: User message added, _isTyping set to true');
@@ -667,70 +764,65 @@ class _ChatScreenState extends State<ChatScreen> {
     // Update session title if it's the first user message
     if (_currentSession != null &&
         _messages.where((m) => m.isUser).length == 1) {
-      final smartTitle = _chatHistoryService.generateSmartTitle(_messages);
-      await _chatHistoryService.updateSessionTitle(
-        _currentSession!.id,
-        smartTitle,
-      );
-      setState(() {
-        _currentSession = _currentSession!.copyWith(title: smartTitle);
-      });
+      final title = text.length > 30 ? '${text.substring(0, 30)}...' : text;
+      _currentSession = _currentSession!.copyWith(title: title);
+      await _chatHistoryService.updateSession(_currentSession!);
     }
 
     // Scroll to bottom
     _scrollToBottom();
 
     try {
-      print('🔍 DEBUG: Calling _chatService.processMessage() with text: "$text"');
-      
-      // Process message
-      final response = await _chatService.processMessage(text);
-
-      print('🔍 DEBUG: Got response from _chatService.processMessage()');
-      print('🔍 DEBUG: Response text: "${response.text}"');
-      print('🔍 DEBUG: Response isUser: ${response.isUser}');
-
       setState(() {
-        _messages.add(response);
+        _debugInfo = 'Making API call to T Backend...';
+      });
+      
+      final response = await _chatService.sendMessage(text);
+      
+      setState(() {
+        _debugInfo = 'API call successful, processing response...';
+      });
+      
+      final aiMessage = ChatMessage.text(text: response, isUser: false);
+      
+      setState(() {
+        _messages.add(aiMessage);
         _isTyping = false;
+        _debugInfo = 'AI response received and displayed successfully';
       });
 
-      print('🔍 DEBUG: Response added to messages, _isTyping set to false');
-      print('🔍 DEBUG: Final messages count: ${_messages.length}');
-
-      // Save assistant response to current session
+      // Save AI response to session
       if (_currentSession != null) {
         await _chatHistoryService.addMessageToSession(
           _currentSession!.id,
-          response,
+          aiMessage,
         );
       }
 
       _scrollToBottom();
     } catch (e) {
-      print('🔍 DEBUG: Error in _sendMessage: $e');
-      print('🔍 DEBUG: Error type: ${e.runtimeType}');
-      print('🔍 DEBUG: Stack trace: ${StackTrace.current}');
-
+      setState(() {
+        _isTyping = false;
+        _debugInfo = 'ERROR: ${e.toString()}';
+      });
+      
       final errorMessage = ChatMessage.text(
-        text: "❌ I'm sorry, something went wrong. Please try again.\n\nError details: ${e.toString()}",
+        text: 'Sorry, I encountered an error. Please try again.',
         isUser: false,
       );
-
       setState(() {
         _messages.add(errorMessage);
-        _isTyping = false;
       });
 
-      print('🔍 DEBUG: Error message added, _isTyping set to false');
-
-      // Save error message to current session
+      // Save error message to session
       if (_currentSession != null) {
         await _chatHistoryService.addMessageToSession(
           _currentSession!.id,
           errorMessage,
         );
       }
+
+      _scrollToBottom();
     }
   }
 
