@@ -86,9 +86,9 @@ class GlassmorphismContainer extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0x20FFFFFF),
-            Color(0x10FFFFFF),
-            Color(0x08000000),
+            Color(0x30FFFFFF),
+            Color(0x18FFFFFF),
+            Color(0x12000000),
           ],
           stops: [0.0, 0.5, 1.0],
         );
@@ -99,9 +99,9 @@ class GlassmorphismContainer extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0x15FFFFFF),
-            Color(0x08FFFFFF),
-            Color(0x12000000),
+            Color(0x25FFFFFF),
+            Color(0x12FFFFFF),
+            Color(0x20000000),
           ],
           stops: [0.0, 0.3, 1.0],
         );
@@ -112,8 +112,8 @@ class GlassmorphismContainer extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0x25000000),
-            Color(0x40000000),
+            Color(0x35000000),
+            Color(0x50000000),
           ],
         );
     }
@@ -122,15 +122,15 @@ class GlassmorphismContainer extends StatelessWidget {
   Color _getBorderColorForType() {
     switch (glassType) {
       case GlassType.light:
-        return const Color(0x30FFFFFF);
+        return const Color(0x40FFFFFF);
       case GlassType.medium:
         return AppColors.glassBorder;
       case GlassType.dark:
-        return const Color(0x20FFFFFF);
+        return const Color(0x30FFFFFF);
       case GlassType.card:
-        return AppColors.glassBorder.withOpacity(0.6);
+        return AppColors.glassBorder.withOpacity(0.8);
       case GlassType.overlay:
-        return const Color(0x15FFFFFF);
+        return const Color(0x25FFFFFF);
     }
   }
 }
@@ -262,6 +262,129 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+}
+
+// Specialized glassmorphism scaffold for consistent app theming
+class GlassScaffold extends StatelessWidget {
+  final Widget? appBar;
+  final Widget body;
+  final Widget? floatingActionButton;
+  final Widget? drawer;
+  final Widget? endDrawer;
+  final Color? backgroundColor;
+  final bool extendBodyBehindAppBar;
+  final bool resizeToAvoidBottomInset;
+
+  const GlassScaffold({
+    Key? key,
+    this.appBar,
+    required this.body,
+    this.floatingActionButton,
+    this.drawer,
+    this.endDrawer,
+    this.backgroundColor,
+    this.extendBodyBehindAppBar = false,
+    this.resizeToAvoidBottomInset = true,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor ?? AppColors.backgroundDark,
+      appBar: appBar as PreferredSizeWidget?,
+      floatingActionButton: floatingActionButton,
+      drawer: drawer,
+      endDrawer: endDrawer,
+      extendBodyBehindAppBar: extendBodyBehindAppBar,
+      resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: AppColors.blueGlowGradient,
+        ),
+        child: body,
+      ),
+    );
+  }
+}
+
+// Enhanced glass input field widget
+class GlassTextField extends StatelessWidget {
+  final TextEditingController? controller;
+  final String? hintText;
+  final String? labelText;
+  final IconData? prefixIcon;
+  final Widget? suffixIcon;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final void Function(String)? onChanged;
+  final TextStyle? style;
+  final int maxLines;
+
+  const GlassTextField({
+    Key? key,
+    this.controller,
+    this.hintText,
+    this.labelText,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.obscureText = false,
+    this.keyboardType,
+    this.validator,
+    this.onChanged,
+    this.style,
+    this.maxLines = 1,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (labelText != null) ...[
+          Text(
+            labelText!,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          validator: validator,
+          onChanged: onChanged,
+          maxLines: maxLines,
+          style: style ?? const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+            prefixIcon: prefixIcon != null
+                ? Icon(
+                    prefixIcon,
+                    color: Colors.white.withOpacity(0.7),
+                  )
+                : null,
+            suffixIcon: suffixIcon,
+            filled: true,
+            fillColor: AppColors.glassBackground,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // Extension to help with gradient scaling
