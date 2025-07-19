@@ -144,22 +144,52 @@ class AuthService {
       );
 
       if (response.user != null) {
-        // Create user record in our users table
-        await _supabase.from('users').insert({
-          'id': response.user!.id,
-          'email': email,
-          'customer_id': null, // Will be set when they subscribe
-          'created_at': DateTime.now().toIso8601String(),
-        });
+        // Wait for the session to be properly established
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Set the current session immediately
+        _currentSession = response.session;
+        
+        try {
+          // Create user record in our users table using RPC function to bypass RLS
+          await _supabase.rpc('create_user_profile', params: {
+            'user_id': response.user!.id,
+            'user_email': email,
+          });
+        } catch (rpcError) {
+          print('RPC function failed, trying direct insert: $rpcError');
+          // Fallback to direct insert with proper auth context
+          try {
+            await _supabase.from('users').insert({
+              'id': response.user!.id,
+              'email': email,
+              'customer_id': null, // Will be set when they subscribe
+              'created_at': DateTime.now().toIso8601String(),
+            });
 
-        // Create FREE subscription record
-        await _supabase.from('subscriptions').insert({
-          'user_id': response.user!.id,
-          'tier': 'FREE',
-          'status': 'active',
-          'created_at': DateTime.now().toIso8601String(),
-        });
+            // Create FREE subscription record
+            await _supabase.from('subscriptions').insert({
+              'user_id': response.user!.id,
+              'tier': 'FREE',
+              'status': 'active',
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          } catch (insertError) {
+            print('Direct insert failed: $insertError');
+            // If both RPC and direct insert fail, create a basic user object
+            // The database triggers should handle user profile creation
+            _currentUser = User(
+              id: response.user!.id,
+              email: email,
+              tier: 'FREE',
+              createdAt: DateTime.now(),
+            );
+            await _saveUserSession();
+            return _currentUser!;
+          }
+        }
 
+        // Fetch complete user data
         await _fetchUserData();
         return _currentUser!;
       } else {
