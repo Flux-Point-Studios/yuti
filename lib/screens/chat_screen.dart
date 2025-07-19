@@ -383,13 +383,11 @@ class _ChatScreenState extends State<ChatScreen> {
       blur: 12.0,
       showGlow: true,
       customGradient: AppColors.glassGradient,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildMessageContent(message),
-            ],
-          ),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildMessageContent(message),
+        ],
       ),
     );
   }
