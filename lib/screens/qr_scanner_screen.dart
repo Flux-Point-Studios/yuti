@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/app_colors.dart';
+import '../widgets/glassmorphism_container.dart';
 
 class QRScannerScreen extends StatefulWidget {
   final String title;
