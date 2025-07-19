@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/wallet_service.dart';
 import '../utils/app_colors.dart';
+import '../widgets/glassmorphism_container.dart';
 import 'chat_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
