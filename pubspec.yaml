@@ -3,7 +3,7 @@ description: A conversational Cardano wallet with Agent T AI assistant
 
 publish_to: 'none'
 
-version: 1.0.1+6
+version: 1.0.1+7
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
