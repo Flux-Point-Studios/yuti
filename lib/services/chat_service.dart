@@ -474,23 +474,47 @@ class ChatService {
   }
   
   Future<String> _callTBackend(String message) async {
+    print('🔍 DEBUG: _callTBackend called with message: "$message"');
+    
     final url = Uri.parse("${_config.tBackendUrl}/chat");
+    print('🔍 DEBUG: API URL: $url');
+    
     final headers = {
       'Content-Type': 'application/json',
       if (_config.tBackendApiKey.isNotEmpty) 'api-key': _config.tBackendApiKey,
     };
+    print('🔍 DEBUG: Headers: $headers');
+    print('🔍 DEBUG: API Key present: ${_config.tBackendApiKey.isNotEmpty}');
+    print('🔍 DEBUG: API Key value: ${_config.tBackendApiKey.isEmpty ? 'EMPTY' : '${_config.tBackendApiKey.substring(0, 10)}...'}');
+    
     final body = jsonEncode({
       'message': message,
       'session_id': _sessionId,
     });
+    print('🔍 DEBUG: Request body: $body');
     
-    final response = await http.post(url, headers: headers, body: body);
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['reply'] ?? "I'm not sure how to respond to that.";
-    } else {
-      throw Exception('T-Backend error: ${response.statusCode}');
+    try {
+      print('🔍 DEBUG: Making HTTP POST request...');
+      final response = await http.post(url, headers: headers, body: body);
+      
+      print('🔍 DEBUG: HTTP response status: ${response.statusCode}');
+      print('🔍 DEBUG: HTTP response headers: ${response.headers}');
+      print('🔍 DEBUG: HTTP response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('🔍 DEBUG: Parsed response data: $data');
+        final reply = data['reply'] ?? "I'm not sure how to respond to that.";
+        print('🔍 DEBUG: Extracted reply: "$reply"');
+        return reply;
+      } else {
+        print('🔍 DEBUG: Non-200 status code, throwing exception');
+        throw Exception('T-Backend error: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      print('🔍 DEBUG: Exception in _callTBackend: $e');
+      print('🔍 DEBUG: Exception type: ${e.runtimeType}');
+      rethrow;
     }
   }
   
