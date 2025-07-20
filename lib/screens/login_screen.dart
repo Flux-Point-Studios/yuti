@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
+import '../services/wallet_auth_service.dart';
 import '../widgets/glassmorphism_container.dart';
 import 'chat_screen.dart';
 import 'pricing_screen.dart';
@@ -26,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
+  final WalletAuthService _walletAuthService = WalletAuthService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -98,6 +100,8 @@ class _LoginScreenState extends State<LoginScreen>
                             _buildLoginForm(),
                             const SizedBox(height: 24),
                             _buildForgotPassword(),
+                            const SizedBox(height: 32),
+                            _buildWalletLoginSection(),
                             const SizedBox(height: 40),
                             _buildBackButton(),
                             const SizedBox(height: 40),
@@ -365,6 +369,117 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  Widget _buildWalletLoginSection() {
+    return Column(
+      children: [
+        // Divider with "OR" text
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.transparent,
+                      Colors.white.withOpacity(0.3),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'OR',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.white.withOpacity(0.3),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        
+        // Wallet login button
+        GlassmorphismContainer(
+          glassType: GlassType.light,
+          padding: EdgeInsets.zero,
+          borderRadius: BorderRadius.circular(16),
+          blur: 10.0,
+          showGlow: true,
+          customGradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.purple.withOpacity(0.2),
+              Colors.blue.withOpacity(0.1),
+              Colors.transparent,
+            ],
+          ),
+          child: InkWell(
+            onTap: _isLoading ? null : _handleWalletLogin,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet,
+                    color: Colors.white.withOpacity(0.9),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Connect with GameChanger Wallet',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Wallet login description
+        Text(
+          'Login or create account using your Cardano wallet',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.6),
+            fontSize: 12,
+            fontStyle: FontStyle.italic,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
   Widget _buildLoadingOverlay() {
     return Container(
       color: Colors.black.withOpacity(0.5),
@@ -408,6 +523,34 @@ class _LoginScreenState extends State<LoginScreen>
       }
     } catch (e) {
       _showError('An error occurred during login');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleWalletLogin() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await _walletAuthService.authenticateWithWallet(WalletAuthType.login);
+
+      if (result.success) {
+        final user = result.user!;
+        
+        _showSuccess('Wallet connected successfully! Welcome ${user.walletAddress?.substring(0, 10)}...');
+        
+        // Navigate based on user tier
+        await Future.delayed(const Duration(seconds: 1));
+        if (user.tier == 'FREE') {
+          _navigateToPricing();
+        } else {
+          _navigateToChat();
+        }
+      } else {
+        _showError(result.error ?? 'Wallet authentication failed');
+      }
+    } catch (e) {
+      _showError('Failed to connect wallet. Please try again.');
     } finally {
       setState(() => _isLoading = false);
     }

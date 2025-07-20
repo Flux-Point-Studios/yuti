@@ -235,6 +235,13 @@ class AuthService {
     }
   }
 
+  /// Refresh current user data from database
+  Future<void> refreshUser() async {
+    if (_currentSession?.user.id != null) {
+      await _fetchUserData();
+    }
+  }
+
   Future<AuthResult> resetPassword({required String email}) async {
     try {
       await _supabase.auth.resetPasswordForEmail(email);
