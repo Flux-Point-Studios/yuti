@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
+import '../services/wallet_auth_service.dart';
 import '../models/user.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -12,8 +13,10 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
+  final WalletAuthService _walletAuthService = WalletAuthService();
   User? _currentUser;
   bool _isLoading = true;
+  bool _isWalletLoading = false;
 
   @override
   void initState() {
@@ -26,6 +29,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _currentUser = _authService.currentUser;
       _isLoading = false;
     });
+  }
+
+  Future<void> _linkWallet() async {
+    setState(() => _isWalletLoading = true);
+
+    try {
+      final result = await _walletAuthService.authenticateWithWallet(WalletAuthType.link);
+
+      if (result.success) {
+        _showSuccess('Wallet linked successfully!');
+        await _loadUserData(); // Refresh user data
+      } else {
+        _showError(result.error ?? 'Failed to link wallet');
+      }
+    } catch (e) {
+      _showError('Failed to link wallet. Please try again.');
+    } finally {
+      setState(() => _isWalletLoading = false);
+    }
+  }
+
+  Future<void> _unlinkWallet() async {
+    final confirmed = await _showConfirmDialog(
+      'Unlink Wallet',
+      'Are you sure you want to unlink your wallet? This will remove premium access if you have it through your wallet.',
+    );
+
+    if (confirmed == true) {
+      setState(() => _isWalletLoading = true);
+
+      try {
+        final success = await _walletAuthService.unlinkWallet();
+
+        if (success) {
+          _showSuccess('Wallet unlinked successfully');
+          await _loadUserData(); // Refresh user data
+        } else {
+          _showError('Failed to unlink wallet');
+        }
+      } catch (e) {
+        _showError('Failed to unlink wallet. Please try again.');
+      } finally {
+        setState(() => _isWalletLoading = false);
+      }
+    }
   }
 
   @override
@@ -185,6 +233,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 32),
 
+          // Wallet section
+          _buildWalletSection(),
+
+          const SizedBox(height: 32),
+
           // Settings section
           _buildSection(
             title: 'Settings',
@@ -260,6 +313,137 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWalletSection() {
+    final hasWallet = _currentUser?.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty;
+
+    return _buildSection(
+      title: 'Cardano Wallet',
+      children: [
+        if (hasWallet) ...[
+          // Wallet connected info
+          _buildDetailRow('Wallet Address', '${_currentUser!.walletAddress!.substring(0, 10)}...${_currentUser!.walletAddress!.substring(_currentUser!.walletAddress!.length - 6)}'),
+          if (_currentUser!.stakeAddress != null)
+            _buildDetailRow('Stake Address', '${_currentUser!.stakeAddress!.substring(0, 10)}...${_currentUser!.stakeAddress!.substring(_currentUser!.stakeAddress!.length - 6)}'),
+          
+          // Wallet actions
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Wallet Connected',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isWalletLoading ? null : _unlinkWallet,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.withOpacity(0.2),
+                      foregroundColor: Colors.red,
+                      side: BorderSide(color: Colors.red, width: 1),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isWalletLoading 
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                          ),
+                        )
+                      : const Text('Unlink Wallet'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          // No wallet connected
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Colors.white.withOpacity(0.5),
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No Wallet Connected',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Connect your GameChanger wallet to unlock premium features and verify ownership of premium assets.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isWalletLoading ? null : _linkWallet,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isWalletLoading 
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.account_balance_wallet, size: 18),
+                            const SizedBox(width: 8),
+                            Text('Connect GameChanger Wallet'),
+                          ],
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -442,6 +626,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
         content: const Text('Coming soon!'),
         backgroundColor: AppColors.primaryBlue,
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<bool?> _showConfirmDialog(String title, String content) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundDark,
+        title: Text(
+          title,
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          content,
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Confirm',
+              style: TextStyle(color: AppColors.primaryBlue),
+            ),
+          ),
+        ],
       ),
     );
   }
