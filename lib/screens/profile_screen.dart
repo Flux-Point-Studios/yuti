@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
-import '../services/wallet_auth_service.dart';
 import '../models/user.dart';
+import '../widgets/cardano_wallet_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -13,7 +13,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
-  final WalletAuthService _walletAuthService = WalletAuthService();
   User? _currentUser;
   bool _isLoading = true;
   bool _isWalletLoading = false;
@@ -35,13 +34,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isWalletLoading = true);
 
     try {
-      final result = await _walletAuthService.authenticateWithWallet(WalletAuthType.link);
+      // Use the same dialog approach as pricing page to preserve context
+      final walletConnected = await _showCardanoWalletDialog();
 
-      if (result.success) {
+      if (walletConnected == true) {
         _showSuccess('Wallet linked successfully!');
         await _loadUserData(); // Refresh user data
-      } else {
-        _showError(result.error ?? 'Failed to link wallet');
       }
     } catch (e) {
       _showError('Failed to link wallet. Please try again.');
@@ -60,14 +58,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _isWalletLoading = true);
 
       try {
-        final success = await _walletAuthService.unlinkWallet();
-
-        if (success) {
-          _showSuccess('Wallet unlinked successfully');
-          await _loadUserData(); // Refresh user data
-        } else {
-          _showError('Failed to unlink wallet');
-        }
+        await _authService.disconnectCardanoWallet();
+        _showSuccess('Wallet unlinked successfully');
+        await _loadUserData(); // Refresh user data
       } catch (e) {
         _showError('Failed to unlink wallet. Please try again.');
       } finally {
@@ -721,5 +714,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.pushReplacementNamed(context, '/welcome');
       }
     }
+  }
+
+  Future<bool?> _showCardanoWalletDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CardanoWalletDialog(authService: _authService),
+    );
   }
 } 
