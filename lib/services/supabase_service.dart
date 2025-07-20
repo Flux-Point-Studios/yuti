@@ -16,7 +16,7 @@ class SupabaseService {
   // Use local development in debug mode, production otherwise
   static bool get _useLocalDev =>
       kDebugMode &&
-      const bool.fromEnvironment('USE_LOCAL_SUPABASE', defaultValue: true);
+      const bool.fromEnvironment('USE_LOCAL_SUPABASE', defaultValue: false);
 
   static String get _supabaseUrl =>
       _useLocalDev ? _localSupabaseUrl : _prodSupabaseUrl;
