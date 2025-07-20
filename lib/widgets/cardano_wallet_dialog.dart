@@ -17,7 +17,7 @@ class CardanoWalletDialog extends StatefulWidget {
   State<CardanoWalletDialog> createState() => _CardanoWalletDialogState();
 }
 
-enum ConnectionMode { mnemonic, gameChanger }
+enum ConnectionMode { mnemonic, gameChanger, createNew }
 
 class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   final TextEditingController _mnemonicController = TextEditingController();
@@ -64,7 +64,11 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildHeader(),
-            _buildContent(),
+            Flexible(
+              child: SingleChildScrollView(
+                child: _buildContent(),
+              ),
+            ),
             _buildActions(),
           ],
         ),
@@ -140,8 +144,10 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             _buildWalletNameField(),
             const SizedBox(height: 16),
             _buildMnemonicField(),
-          ] else ...[
+          ] else if (_connectionMode == ConnectionMode.gameChanger) ...[
             _buildGameChangerSection(),
+          ] else if (_connectionMode == ConnectionMode.createNew) ...[
+            _buildCreateNewWalletSection(),
           ],
           const SizedBox(height: 16),
           _buildPremiumAccessInfo(),
@@ -280,6 +286,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           ),
         ),
         const SizedBox(height: 12),
+        // First row with GameChanger and Recovery Phrase
         Row(
           children: [
             Expanded(
@@ -303,6 +310,16 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        // Second row with Create New option (full width)
+        _buildModeOption(
+          mode: ConnectionMode.createNew,
+          title: 'Create New Wallet',
+          subtitle: 'Generate a new wallet with recovery phrase',
+          icon: Icons.add_circle_outline,
+          isSelected: _connectionMode == ConnectionMode.createNew,
+          isFullWidth: true,
+        ),
       ],
     );
   }
@@ -313,6 +330,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     required String subtitle,
     required IconData icon,
     required bool isSelected,
+    bool isFullWidth = false,
   }) {
     return GestureDetector(
       onTap: () {
@@ -742,24 +760,8 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     } catch (e) {
       print('🔍 DEBUG: GameChanger connection error: $e');
 
-      // Enhanced error message for common issues
-      String errorMessage = e.toString().replaceFirst('Exception: ', '');
-
-      // Check for specific error patterns and provide helpful guidance
-      if (errorMessage.contains('Unknown request') ||
-          errorMessage.contains('Failed to decode') ||
-          errorMessage.contains('GameChangerException')) {
-        errorMessage = '''Connection failed. This might be due to:
-
-• Other wallet extensions interfering (try disabling VeWorld, Eternl, etc.)
-• Network mismatch (ensure wallet is on mainnet)
-• Browser blocking the connection
-
-Try:
-1. Disable other Cardano wallet extensions
-2. Use an incognito window
-3. Ensure GameChanger wallet is unlocked''';
-      }
+      // Enhanced error handling with specific focus on cancellation
+      String errorMessage = _parseErrorMessage(e);
 
       setState(() {
         _errorMessage = errorMessage;
@@ -887,4 +889,152 @@ Try:
       print('🔍 DEBUG: _isLoading after finally: $_isLoading');
     }
   }
-}
+
+  Widget _buildCreateNewWalletSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryBlue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.primaryBlue.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                Icons.security,
+                color: AppColors.primaryBlue,
+                size: 32,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Generate New Wallet',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Create a brand new Cardano wallet with a secure recovery phrase. You\'ll receive a 24-word recovery phrase that you must keep safe.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _generateNewWallet,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text(
+                        'Generate Wallet',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _generateNewWallet() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Here you would integrate with the Cardano SDK to generate a new wallet
+      // For now, we'll show a placeholder message
+      setState(() {
+        _errorMessage = 'Wallet generation coming soon! Please use GameChanger or Recovery Phrase for now.';
+      });
+      
+      // TODO: Implement actual wallet generation
+      // Example implementation:
+      // final newWallet = await CardanoSDK.generateWallet();
+      // final success = await widget.authService.connectCardanoWallet(
+      //   newWallet.mnemonic, 
+      //   'Generated Wallet'
+      // );
+      // if (success) {
+      //   Navigator.of(context).pop(true);
+      // }
+      
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to generate wallet: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+             });
+     }
+   }
+
+  /// Parse error message to provide user-friendly feedback
+  String _parseErrorMessage(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    
+    // Handle cancellation gracefully (most common case)
+    if (errorString.contains('canceled') || 
+        errorString.contains('cancelled') ||
+        errorString.contains('user canceled') ||
+        errorString.contains('connection cancelled by user')) {
+      return 'Connection cancelled. No worries - you can try connecting again anytime.';
+    }
+
+    // Handle specific GameChanger errors
+    if (errorString.contains('unknown request') ||
+        errorString.contains('failed to decode') ||
+        errorString.contains('gamechangerexception')) {
+      return '''Connection failed. Try these steps:
+
+• Ensure GameChanger wallet is unlocked
+• Disable other wallet extensions (VeWorld, Eternl, etc.)
+• Use an incognito browser window
+• Make sure wallet is on mainnet network''';
+    }
+
+    // Handle network errors
+    if (errorString.contains('network') || errorString.contains('testnet')) {
+      return 'Please ensure your wallet is connected to the Cardano mainnet.';
+    }
+
+    // Handle permission errors
+    if (errorString.contains('permission') || errorString.contains('access')) {
+      return 'Permission denied. Please ensure GameChanger wallet is unlocked and accessible.';
+    }
+
+    // Generic error handling
+    final cleanedError = error.toString()
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('GameChangerException: ', '')
+        .replaceFirst('PlatformException(CANCELED, ', '')
+        .replaceFirst(', null, null)', '');
+
+    return 'Connection failed: $cleanedError';
+  }
+ }
