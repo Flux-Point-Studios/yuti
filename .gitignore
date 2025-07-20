@@ -82,3 +82,5 @@ dist_cert.p12
 distribution.cer
 ios-build-release-2.zip
 profile_base64.txt
+# Build artifacts
+*.ipa
