@@ -12,6 +12,9 @@ import '../services/supabase_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/glassmorphism_container.dart';
+import '../widgets/message_limit_widget.dart';
+import '../screens/profile_screen.dart';
+import '../screens/pricing_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -33,6 +36,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSidebarVisible = false;
   ChatSession? _currentSession;
   
+  // Message limit tracking
+  int _remainingMessages = 20;
+  bool _isLimitReached = false;
+  
   // Debug info for TestFlight debugging
   String _debugInfo = 'Ready';
   bool _showDebugPanel = false;
@@ -48,6 +55,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _initializeChatHistory() async {
     try {
       await _chatHistoryService.initialize();
+      
+      // Load message limits
+      await _updateMessageLimits();
 
       // Check if there's a current session
       final currentSession = _chatHistoryService.getCurrentSession();
@@ -60,6 +70,23 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       print('Error initializing chat history: $e');
       await _createNewSession();
+    }
+  }
+
+  Future<void> _updateMessageLimits() async {
+    try {
+      final remaining = await _chatHistoryService.getUserRemainingMessages();
+      setState(() {
+        _remainingMessages = remaining;
+        _isLimitReached = remaining <= 0;
+      });
+    } catch (e) {
+      print('Error updating message limits: $e');
+      // Default to allowing messages on error
+      setState(() {
+        _remainingMessages = 20;
+        _isLimitReached = false;
+      });
     }
   }
 
@@ -282,10 +309,15 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-          // New chat button
+          // Profile button
           IconButton(
-            icon: Icon(Icons.add, color: Colors.white.withOpacity(0.8)),
-            onPressed: _createNewChatFromHeader,
+            icon: Icon(Icons.person, color: Colors.white.withOpacity(0.8)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -299,16 +331,52 @@ class _ChatScreenState extends State<ChatScreen> {
           '🔍 DEBUG: Rendering message $i: "${_messages[i].text.substring(0, _messages[i].text.length > 50 ? 50 : _messages[i].text.length)}..."');
     }
 
+    // Count Agent T responses
+    final agentResponses = _messages.where((m) => !m.isUser).length;
+    final shouldShowWarning = agentResponses >= 15 && agentResponses < 20 && _remainingMessages <= 5;
+    final shouldShowBlocked = _isLimitReached;
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _messages.length + (_isTyping ? 1 : 0),
+      itemCount: _messages.length + 
+                 (_isTyping ? 1 : 0) + 
+                 (shouldShowWarning ? 1 : 0) + 
+                 (shouldShowBlocked ? 1 : 0),
       itemBuilder: (context, index) {
-        if (_isTyping && index == _messages.length) {
+        // Show warning widget after 15th agent response
+        if (shouldShowWarning && index == _messages.length) {
+          return MessageLimitWidget(
+            type: MessageLimitType.warning,
+            remainingMessages: _remainingMessages,
+            onUpgradePressed: _navigateToPricing,
+          );
+        }
+        
+        // Show blocked widget when limit reached
+        if (shouldShowBlocked && index == _messages.length + (shouldShowWarning ? 1 : 0)) {
+          return MessageLimitWidget(
+            type: MessageLimitType.blocked,
+            remainingMessages: 0,
+            onUpgradePressed: _navigateToPricing,
+          );
+        }
+        
+        // Show typing indicator
+        if (_isTyping && index == _messages.length + (shouldShowWarning ? 1 : 0) + (shouldShowBlocked ? 1 : 0)) {
           return _buildTypingIndicator();
         }
+        
+        // Show regular message
         return _buildMessageBubble(_messages[index]);
       },
+    );
+  }
+
+  void _navigateToPricing() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PricingScreen()),
     );
   }
 
@@ -330,13 +398,13 @@ class _ChatScreenState extends State<ChatScreen> {
               backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
               child: ClipOval(
                 child: Image.asset(
-                  'assets/@bluelight.png',
+                  'assets/agent_t_pfp.png',
                   width: 32,
                   height: 32,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return const Icon(
-                      Icons.account_balance_wallet,
+                      Icons.smart_toy,
                       size: 20,
                       color: AppColors.primaryBlue,
                     );
@@ -514,13 +582,13 @@ class _ChatScreenState extends State<ChatScreen> {
             backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
             child: ClipOval(
               child: Image.asset(
-                'assets/@bluelight.png',
+                'assets/agent_t_pfp.png',
                 width: 32,
                 height: 32,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return const Icon(
-                    Icons.account_balance_wallet,
+                    Icons.smart_toy,
                     size: 20,
                     color: AppColors.primaryBlue,
                   );
@@ -632,11 +700,15 @@ class _ChatScreenState extends State<ChatScreen> {
                           Expanded(
                             child: TextField(
                               controller: _inputController,
-                              style: const TextStyle(color: Colors.white, fontSize: 16),
+                              enabled: !_isLimitReached,
+                              style: TextStyle(
+                                color: _isLimitReached ? Colors.white.withOpacity(0.3) : Colors.white, 
+                                fontSize: 16,
+                              ),
                               decoration: InputDecoration(
-                                hintText: 'Ask me anything...',
+                                hintText: _isLimitReached ? 'Daily limit reached. Upgrade to continue...' : 'Ask me anything...',
                                 hintStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: _isLimitReached ? Colors.white.withOpacity(0.3) : Colors.white.withOpacity(0.5),
                                   fontSize: 16,
                                 ),
                                 border: InputBorder.none,
@@ -645,7 +717,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   vertical: 12,
                                 ),
                               ),
-                              onSubmitted: (_) => _sendMessage(),
+                              onSubmitted: (_) => _isLimitReached ? null : _sendMessage(),
                               textInputAction: TextInputAction.send,
                             ),
                           ),
@@ -665,9 +737,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 8),
                   Container(
                     decoration: BoxDecoration(
-                      color: AppColors.primaryBlue,
+                      color: _isLimitReached 
+                        ? Colors.grey.withOpacity(0.3) 
+                        : AppColors.primaryBlue,
                       shape: BoxShape.circle,
-                      boxShadow: [
+                      boxShadow: _isLimitReached ? [] : [
                         BoxShadow(
                           color: AppColors.primaryBlue.withOpacity(0.3),
                           blurRadius: 8,
@@ -676,8 +750,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       ],
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
+                      icon: Icon(
+                        Icons.send, 
+                        color: _isLimitReached ? Colors.white.withOpacity(0.3) : Colors.white,
+                      ),
+                      onPressed: _isLimitReached ? null : _sendMessage,
                     ),
                   ),
                 ],
@@ -738,7 +815,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendMessage() async {
     final text = _inputController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isLimitReached) return;
 
     final userMessage = ChatMessage.text(text: text, isUser: true);
 
@@ -799,6 +876,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
 
+      // Update message limits after Agent T responds
+      await _updateMessageLimits();
+
       _scrollToBottom();
     } catch (e) {
       setState(() {
@@ -821,6 +901,9 @@ class _ChatScreenState extends State<ChatScreen> {
           errorMessage,
         );
       }
+
+      // Update message limits even after error (error counts as Agent T response)
+      await _updateMessageLimits();
 
       _scrollToBottom();
     }
@@ -858,10 +941,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await _loadSession(session);
   }
 
-  Future<void> _createNewChatFromHeader() async {
-    final newSession = await _chatHistoryService.createNewSession();
-    await _onSessionSelected(newSession);
-  }
+
 
   @override
   void dispose() {
