@@ -32,33 +32,79 @@ class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
   Future<void> _handleCallback() async {
     try {
       if (kIsWeb) {
-        // Get the current URL and extract the result parameter
-        final currentUrl = Uri.base.toString();
-        final uri = Uri.parse(currentUrl);
+        // Web callback handling (existing logic)
+        await _handleWebCallback();
+      } else {
+        // iOS/Android callback handling
+        await _handleNativeCallback();
+      }
+    } catch (e) {
+      print('🔍 DEBUG: Callback screen error: $e');
+      setState(() {
+        _status = 'Error: ${e.toString()}';
+      });
+    }
+  }
 
-        print('🔍 DEBUG: Callback screen - Current URL: $currentUrl');
+  Future<void> _handleWebCallback() async {
+    // Get the current URL and extract the result parameter
+    final currentUrl = Uri.base.toString();
+    final uri = Uri.parse(currentUrl);
 
-        final result = uri.queryParameters['result'];
-        if (result != null) {
-          print(
-              '🔍 DEBUG: Callback screen - Found result parameter, processing wallet data...');
+    print('🔍 DEBUG: Callback screen - Current URL: $currentUrl');
 
-          setState(() {
-            _status = 'Processing wallet data...';
-          });
+    final result = uri.queryParameters['result'];
+    if (result != null) {
+      print(
+          '🔍 DEBUG: Callback screen - Found result parameter, processing wallet data...');
 
-          // Parse the GameChanger result data
-          final gameChangerService = GameChangerService();
-          final walletData = gameChangerService.parseCallbackUrl(currentUrl);
+      setState(() {
+        _status = 'Processing wallet data...';
+      });
 
-          print('🔍 DEBUG: Parsed wallet data: ${walletData.toString()}');
+      // Parse the GameChanger result data
+      final gameChangerService = GameChangerService();
+      final walletData = gameChangerService.parseCallbackUrl(currentUrl);
 
-          setState(() {
-            _status = 'Setting up account...';
-          });
+      await _processWalletData(walletData);
+    } else {
+      setState(() {
+        _status = 'No wallet data found in URL. Please try connecting again.';
+      });
+    }
+  }
 
-          // Check if user is already authenticated with Supabase
-          final isAuthenticated = _authService.isAuthenticated;
+  Future<void> _handleNativeCallback() async {
+    print('🔍 DEBUG: Native callback handling - iOS/Android');
+    
+    setState(() {
+      _status = 'Checking for GameChanger callback data...';
+    });
+
+    // For iOS/Android, we need to check if there's pending callback data
+    // This would typically come from app launch parameters or saved state
+    // For now, we'll show a message for the user to manually retry
+    
+    await Future.delayed(Duration(seconds: 2));
+    
+    setState(() {
+      _status = 'iOS callback screen active.\n\n'
+          'If you were redirected here from GameChanger:\n'
+          '1. The wallet connection should complete automatically\n'
+          '2. If not, please return to the app and try connecting again\n\n'
+          'This callback is primarily for web browser connections.';
+    });
+  }
+
+  Future<void> _processWalletData(GameChangerWalletData walletData) async {
+    print('🔍 DEBUG: Parsed wallet data: ${walletData.toString()}');
+
+    setState(() {
+      _status = 'Setting up account...';
+    });
+
+    // Check if user is already authenticated with Supabase
+    final isAuthenticated = _authService.isAuthenticated;
 
           if (!isAuthenticated) {
             print(
@@ -142,26 +188,6 @@ class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
               _isProcessing = false;
             });
           }
-        } else {
-          setState(() {
-            _status = 'No wallet data received. Please try again.';
-            _isProcessing = false;
-          });
-        }
-      } else {
-        // For native apps, this screen shouldn't be reached
-        setState(() {
-          _status = 'This callback is for web only.';
-          _isProcessing = false;
-        });
-      }
-    } catch (e) {
-      print('🔍 DEBUG: Callback screen error: $e');
-      setState(() {
-        _status = 'Error processing wallet connection: ${e.toString()}';
-        _isProcessing = false;
-      });
-    }
   }
 
   @override
