@@ -200,8 +200,9 @@ class ChatHistoryService {
   }
 
   Future<void> addMessageToCurrentSession(ChatMessage message) async {
-    // Check message limits for user messages only
-    if (message.isUser) {
+    // Check message limits for Agent T responses (not user messages)
+    // Users can always send messages, but Agent T responses are limited
+    if (!message.isUser) {
       final canSend = await canUserSendMessage();
       if (!canSend) {
         final remaining = await getUserRemainingMessages();
@@ -209,13 +210,13 @@ class ChatHistoryService {
         final tier = user?.tier ?? 'FREE';
 
         throw MessageLimitExceededException(
-            "🚫 **Daily Message Limit Reached**\n\n"
-            "You've reached your daily limit of 20 messages as a FREE user.\n\n"
+            "🚫 **Daily Response Limit Reached**\n\n"
+            "You've reached your daily limit of 20 AI responses as a FREE user.\n\n"
             "**Options:**\n"
-            "• Wait until tomorrow for your messages to reset\n"
-            "• Upgrade to PREMIUM for unlimited messages\n"
+            "• Wait until tomorrow for your limit to reset\n"
+            "• Upgrade to PREMIUM for unlimited responses\n"
             "• Connect a premium Cardano wallet for instant access\n\n"
-            "**Remaining today:** $remaining messages",
+            "**Remaining today:** $remaining responses",
             remaining,
             tier);
       }
@@ -255,8 +256,8 @@ class ChatHistoryService {
   // Backward compatibility methods for chat_screen.dart
   Future<void> addMessageToSession(
       String sessionId, ChatMessage message) async {
-    // Check message limits for user messages only
-    if (message.isUser) {
+    // Check message limits for Agent T responses (not user messages)
+    if (!message.isUser) {
       final canSend = await canUserSendMessage();
       if (!canSend) {
         final remaining = await getUserRemainingMessages();
@@ -264,13 +265,13 @@ class ChatHistoryService {
         final tier = user?.tier ?? 'FREE';
 
         throw MessageLimitExceededException(
-            "🚫 **Daily Message Limit Reached**\n\n"
-            "You've reached your daily limit of 20 messages as a FREE user.\n\n"
+            "🚫 **Daily Response Limit Reached**\n\n"
+            "You've reached your daily limit of 20 AI responses as a FREE user.\n\n"
             "**Options:**\n"
-            "• Wait until tomorrow for your messages to reset\n"
-            "• Upgrade to PREMIUM for unlimited messages\n"
+            "• Wait until tomorrow for your limit to reset\n"
+            "• Upgrade to PREMIUM for unlimited responses\n"
             "• Connect a premium Cardano wallet for instant access\n\n"
-            "**Remaining today:** $remaining messages",
+            "**Remaining today:** $remaining responses",
             remaining,
             tier);
       }
