@@ -5,9 +5,11 @@
 *.swp
 .DS_Store
 .atom/
+.build/
 .buildlog/
 .history
 .svn/
+.swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -61,6 +63,13 @@ windows/flutter/ephemeral/
 # Supabase
 .env
 .env.local
+
+# Node.js (for development testing and scripts)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
 
 .vercel
 iphoneos/

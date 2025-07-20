@@ -2,6 +2,7 @@
   "name": "bluelight-crypto-hub",
   "version": "1.0.0",
   "description": "BlueLight - Natural Language Crypto Hub with AI Assistant",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "build": "echo 'Serving pre-built Flutter web files from build/web directory'",
@@ -14,7 +15,7 @@
   "keywords": [
     "bluelight",
     "crypto",
-    "blockchain", 
+    "blockchain",
     "AI",
     "DeFi",
     "trading",
@@ -25,6 +26,10 @@
   ],
   "author": "Flux Point Studios",
   "license": "MIT",
-  "dependencies": {},
-  "devDependencies": {}
-} 
+  "devDependencies": {
+    "supabase": "^2.31.4"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.52.0"
+  }
+}

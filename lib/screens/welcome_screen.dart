@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
 import '../config/app_config.dart';
+import '../widgets/glassmorphism_container.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
 import 'chat_screen.dart';
@@ -268,24 +269,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return SizedBox(
       width: double.infinity,
       height: 56,
-      child: ElevatedButton.icon(
+      child: GlassButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: Colors.white),
-        label: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryBlue,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          elevation: 8,
-          shadowColor: AppColors.primaryBlue.withOpacity(0.4),
+        isPrimary: true,
+        showGlow: true,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -299,22 +301,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return SizedBox(
       width: double.infinity,
       height: 56,
-      child: OutlinedButton.icon(
+      child: GlassButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: AppColors.primaryBlue),
-        label: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primaryBlue,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.primaryBlue, width: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
+        isPrimary: false,
+        showGlow: false,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: AppColors.primaryBlue),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryBlue,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -375,46 +380,46 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Widget _buildFeatureCard(Map<String, dynamic> feature) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+    return GlassCard(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: AppColors.glassGradient,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primaryBlue.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              feature['icon'] as IconData,
+              size: 32,
+              color: AppColors.primaryBlue,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                feature['icon'] as IconData,
-                size: 32,
-                color: AppColors.primaryBlue,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                feature['title'] as String,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                feature['description'] as String,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.8),
-                  height: 1.4,
-                ),
-              ),
-            ],
+          const SizedBox(height: 16),
+          Text(
+            feature['title'] as String,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            feature['description'] as String,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
