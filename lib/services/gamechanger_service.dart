@@ -40,15 +40,17 @@ class GameChangerService {
   /// Get the current web app's base URL for callbacks
   String _getWebCallbackUrl() {
     print('🔍 DEBUG: _getWebCallbackUrl called - kIsWeb: $kIsWeb');
-
-    // More reliable web detection - check if we're running on a web domain
+    
+    // Detect the current environment more precisely
     final currentUri = Uri.base;
-    final isRunningOnWeb =
-        currentUri.scheme == 'https' || currentUri.scheme == 'http';
-
+    final isRunningOnWeb = kIsWeb || 
+        currentUri.scheme == 'https' || 
+        currentUri.scheme == 'http';
+    
     print('🔍 DEBUG: Current URI: $currentUri');
     print('🔍 DEBUG: URI scheme: ${currentUri.scheme}');
-    print('🔍 DEBUG: Detected as web: $isRunningOnWeb');
+    print('🔍 DEBUG: Is running on web: $isRunningOnWeb');
+    print('🔍 DEBUG: kIsWeb: $kIsWeb');
 
     if (isRunningOnWeb) {
       // In web, use current origin + callback path
@@ -60,7 +62,8 @@ class GameChangerService {
       // For native apps, use custom scheme
       final customSchemeUrl =
           'bluelight://gamechanger-callback?result={result}';
-      print('🔍 DEBUG: Generated custom scheme URL: $customSchemeUrl');
+      print('🔍 DEBUG: Generated custom scheme URL for iOS/Android: $customSchemeUrl');
+      print('🔍 DEBUG: This should match the URL scheme configured in Info.plist/AndroidManifest.xml');
       return customSchemeUrl;
     }
   }
@@ -161,32 +164,65 @@ class GameChangerService {
 
   /// Initiate the GameChanger wallet connection flow with fallback strategy
   Future<GameChangerWalletData> connectWallet({bool isMainnet = true}) async {
+    // Try the standard flow first
     try {
-      // First attempt: try simple approach (proven to work like Talos)
       return await _connectWalletWithOptions(
-          isMainnet: isMainnet, includeMacro: false);
+        isMainnet: isMainnet,
+        includeMacro: false,
+      );
     } catch (e) {
-      print('🔍 DEBUG: Simple approach failed: $e');
-
-      // Check if we should try with macro for extended info
-      if (e.toString().contains('stake1_derived_placeholder')) {
-        print('🔍 DEBUG: Attempting with macro for proper stake address...');
-
-        try {
-          // Second attempt: try with macro for full address info
-          final walletData = await _connectWalletWithOptions(
-              isMainnet: isMainnet, includeMacro: true);
-          print('🔍 DEBUG: Macro approach successful! Got full address info.');
-          return walletData;
-        } catch (fallbackError) {
-          print('🔍 DEBUG: Macro approach also failed: $fallbackError');
-          // If both fail, stick with the simpler approach error
-          rethrow;
-        }
-      } else {
-        // If it's not related to address info, don't try macro fallback
-        rethrow;
+      print('🔍 DEBUG: Standard connection failed: $e');
+      
+      // On iOS, if the standard method fails, try with URL launcher as fallback
+      if (!kIsWeb && e.toString().contains('scheme') || e.toString().contains('FlutterWebAuth')) {
+        print('🔍 DEBUG: Attempting iOS fallback connection method...');
+        return await _connectWalletIosFallback(isMainnet: isMainnet);
       }
+      
+      // If not an iOS scheme issue, rethrow the original error
+      rethrow;
+    }
+  }
+  
+  /// iOS-specific fallback connection method using URL launcher
+  Future<GameChangerWalletData> _connectWalletIosFallback({bool isMainnet = true}) async {
+    print('🔍 DEBUG: Starting iOS fallback connection flow');
+    
+    try {
+      // Generate the connection URL without flutter_web_auth
+      final connectionUrl = generateConnectionUrl(
+          isMainnet: isMainnet, includeMacro: false);
+      print('🔍 DEBUG: Generated connection URL for iOS fallback: $connectionUrl');
+      
+      // Launch GameChanger directly using url_launcher
+      final canLaunch = await canLaunchUrl(Uri.parse(connectionUrl));
+      if (!canLaunch) {
+        throw GameChangerException(
+            'Cannot launch GameChanger URL. GameChanger app may not be installed.');
+      }
+      
+      print('🔍 DEBUG: Launching GameChanger app directly...');
+      final launched = await launchUrl(
+        Uri.parse(connectionUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      
+      if (!launched) {
+        throw GameChangerException(
+            'Failed to launch GameChanger app. Please ensure GameChanger is installed.');
+      }
+      
+      // Note: In this fallback mode, the app would need to handle the callback
+      // through the gamechanger_callback_screen when the user returns to the app
+      throw GameChangerException(
+          'iOS Fallback: GameChanger launched successfully.\n\n'
+          'Please complete the wallet connection in GameChanger and return to this app.\n'
+          'If the connection doesn\'t complete automatically, please try again.');
+          
+    } catch (e) {
+      print('🔍 DEBUG: iOS fallback connection failed: $e');
+      throw GameChangerException(
+          'iOS fallback connection failed: $e');
     }
   }
 
@@ -216,20 +252,25 @@ class GameChangerService {
       // Use flutter_web_auth to handle the OAuth-style flow
       String callbackUrlScheme;
 
-      // Use same web detection logic
+      // Enhanced platform detection for better iOS compatibility
       final currentUri = Uri.base;
-      final isRunningOnWeb =
-          currentUri.scheme == 'https' || currentUri.scheme == 'http';
+      final isRunningOnWeb = kIsWeb || 
+          currentUri.scheme == 'https' || 
+          currentUri.scheme == 'http';
+
+      print('🔍 DEBUG: Platform detection - kIsWeb: $kIsWeb, currentUri: $currentUri');
+      print('🔍 DEBUG: isRunningOnWeb: $isRunningOnWeb');
 
       if (isRunningOnWeb) {
         // For web, flutter_web_auth expects the web protocol (https)
         callbackUrlScheme = 'https';
         print('🔍 DEBUG: Web environment - using HTTPS as callback scheme');
       } else {
-        // For native apps, use custom scheme
+        // For native apps (iOS/Android), use custom scheme
         callbackUrlScheme = _callbackScheme;
         print(
-            '🔍 DEBUG: Native environment - using custom scheme: $callbackUrlScheme');
+            '🔍 DEBUG: Native environment (iOS/Android) - using custom scheme: $callbackUrlScheme');
+        print('🔍 DEBUG: Make sure "$callbackUrlScheme" is properly configured in Info.plist/AndroidManifest.xml');
       }
 
       final resultUrl = await FlutterWebAuth.authenticate(
@@ -264,6 +305,24 @@ class GameChangerService {
       if (errorMessage.contains('User cancelled') ||
           errorMessage.contains('CANCELLED')) {
         throw GameChangerException('Connection cancelled by user');
+      }
+
+      // iOS-specific error handling
+      if (errorMessage.contains('scheme does not have a registered handler') ||
+          errorMessage.contains('No app associated with url') ||
+          errorMessage.contains('URL scheme not registered')) {
+        throw GameChangerException(
+            'iOS URL scheme not properly configured. Please contact support.\n\n'
+            'Technical details: The "bluelight://" URL scheme needs to be registered in the iOS app configuration.');
+      }
+
+      if (errorMessage.contains('FlutterWebAuth') && !kIsWeb) {
+        throw GameChangerException(
+            'Native callback failed. This could be due to:\n'
+            '• URL scheme configuration issue\n'
+            '• GameChanger app not installed\n'
+            '• iOS system blocking the callback\n\n'
+            'Please try again or contact support if the issue persists.');
       }
 
       throw GameChangerException(
