@@ -5,6 +5,7 @@ import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
 import '../config/app_config.dart';
 import '../widgets/cardano_wallet_dialog.dart';
+import '../widgets/glassmorphism_container.dart';
 import 'chat_screen.dart';
 
 class PricingScreen extends StatefulWidget {
@@ -430,25 +431,16 @@ class _PricingScreenState extends State<PricingScreen>
               margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
               child: Stack(
                 children: [
-                  ClipRRect(
+                  GlassmorphismContainer(
+                    glassType: plan.isRecommended ? GlassType.medium : GlassType.light,
+                    padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: plan.isRecommended
-                              ? AppColors.primaryBlue.withOpacity(0.15)
-                              : Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: plan.isRecommended
-                                ? AppColors.primaryBlue.withOpacity(0.5)
-                                : Colors.white.withOpacity(0.1),
-                            width: plan.isRecommended ? 2 : 1,
-                          ),
-                        ),
-                        child: SingleChildScrollView(
+                    blur: 15.0,
+                    showGlow: plan.isRecommended,
+                    customGradient: plan.isRecommended 
+                        ? AppColors.blueGlowGradient.scale(0.8)
+                        : null,
+                    child: SingleChildScrollView(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
                               minHeight:
@@ -475,8 +467,6 @@ class _PricingScreenState extends State<PricingScreen>
                             ),
                           ),
                         ),
-                      ),
-                    ),
                   ),
                   if (plan.isRecommended) _buildRecommendedBadge(),
                 ],
@@ -630,23 +620,11 @@ class _PricingScreenState extends State<PricingScreen>
     return SizedBox(
       width: double.infinity,
       height: 50,
-      child: ElevatedButton(
+      child: GlassButton(
         onPressed: _isLoading ? null : () => _handleSubscribe(plan),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: plan.value == 'FREE'
-              ? Colors.transparent
-              : (plan.isRecommended
-                  ? AppColors.primaryBlue
-                  : AppColors.primaryBlue.withOpacity(0.8)),
-          foregroundColor: Colors.white,
-          side: plan.value == 'FREE'
-              ? const BorderSide(color: AppColors.primaryBlue, width: 2)
-              : null,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-          elevation: plan.value == 'FREE' ? 0 : 8,
-        ),
+        isPrimary: plan.value != 'FREE',
+        showGlow: plan.isRecommended,
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: isSelected && _isLoading
             ? const SizedBox(
                 width: 20,

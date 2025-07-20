@@ -51,37 +51,50 @@ class ChatService {
     _transactionService = TransactionService(_walletService, _blockfrostService);
   }
   
+  // Main entry point for processing user messages
   Future<ChatMessage> processMessage(String userInput) async {
     try {
-      // Check if we're in the middle of a multi-turn conversation
-      if (_pendingSwapRequest != null && _pendingSwapRequest!.awaitingAddressFor != null) {
-        return _handleSwapAddressInput(userInput);
-      }
+      print('🔍 DEBUG: Starting processMessage with input: "$userInput"');
       
-      // Detect intent
       final intent = _detectIntent(userInput);
+      print('🔍 DEBUG: Detected intent: $intent');
       
       switch (intent) {
         case ChatIntent.balance:
-          return _handleBalanceQuery();
+          return await _handleBalanceQuery();
         case ChatIntent.send:
-          return _handleSendCommand(userInput);
+          return await _handleSendCommand(userInput);
         case ChatIntent.receive:
-          return _handleReceiveAddress();
+          return await _handleReceiveAddress();
         case ChatIntent.swap:
-          return _handleSwapCommand(userInput);
+          return await _handleSwapCommand(userInput);
         case ChatIntent.swapStatus:
-          return _handleSwapStatus(userInput);
+          return await _handleSwapStatus(userInput);
         case ChatIntent.transaction:
-          return _handleTransactionQuery(userInput);
+          return await _handleTransactionQuery(userInput);
         case ChatIntent.general:
-          return _handleGeneralQuery(userInput);
+          return await _handleGeneralQuery(userInput);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('🔍 DEBUG: Error in processMessage: $e');
+      print('🔍 DEBUG: Stack trace: $stackTrace');
       return ChatMessage.text(
-        text: "❌ I encountered an error: ${e.toString()}",
+        text: "❌ I'm sorry, something went wrong. Please try again.\n\nError: $e",
         isUser: false,
       );
+    }
+  }
+
+  // Simplified method for UI - returns just the text
+  Future<String> sendMessage(String userInput) async {
+    try {
+      print('🔍 DEBUG: sendMessage called with: "$userInput"');
+      final chatMessage = await processMessage(userInput);
+      print('🔍 DEBUG: sendMessage returning: "${chatMessage.text}"');
+      return chatMessage.text;
+    } catch (e) {
+      print('🔍 DEBUG: sendMessage error: $e');
+      return "Sorry, I encountered an error. Please try again.";
     }
   }
   
@@ -474,23 +487,47 @@ class ChatService {
   }
   
   Future<String> _callTBackend(String message) async {
+    print('🔍 DEBUG: _callTBackend called with message: "$message"');
+    
     final url = Uri.parse("${_config.tBackendUrl}/chat");
+    print('🔍 DEBUG: API URL: $url');
+    
     final headers = {
       'Content-Type': 'application/json',
       if (_config.tBackendApiKey.isNotEmpty) 'api-key': _config.tBackendApiKey,
     };
+    print('🔍 DEBUG: Headers: $headers');
+    print('🔍 DEBUG: API Key present: ${_config.tBackendApiKey.isNotEmpty}');
+    print('🔍 DEBUG: API Key value: ${_config.tBackendApiKey.isEmpty ? 'EMPTY' : '${_config.tBackendApiKey.substring(0, 10)}...'}');
+    
     final body = jsonEncode({
       'message': message,
       'session_id': _sessionId,
     });
+    print('🔍 DEBUG: Request body: $body');
     
-    final response = await http.post(url, headers: headers, body: body);
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['reply'] ?? "I'm not sure how to respond to that.";
-    } else {
-      throw Exception('T-Backend error: ${response.statusCode}');
+    try {
+      print('🔍 DEBUG: Making HTTP POST request...');
+      final response = await http.post(url, headers: headers, body: body);
+      
+      print('🔍 DEBUG: HTTP response status: ${response.statusCode}');
+      print('🔍 DEBUG: HTTP response headers: ${response.headers}');
+      print('🔍 DEBUG: HTTP response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('🔍 DEBUG: Parsed response data: $data');
+        final reply = data['reply'] ?? "I'm not sure how to respond to that.";
+        print('🔍 DEBUG: Extracted reply: "$reply"');
+        return reply;
+      } else {
+        print('🔍 DEBUG: Non-200 status code, throwing exception');
+        throw Exception('T-Backend error: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      print('🔍 DEBUG: Exception in _callTBackend: $e');
+      print('🔍 DEBUG: Exception type: ${e.runtimeType}');
+      rethrow;
     }
   }
   

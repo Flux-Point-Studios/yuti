@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
+import '../widgets/glassmorphism_container.dart';
 import 'pricing_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -186,17 +187,12 @@ class _SignupScreenState extends State<SignupScreen>
   }
 
   Widget _buildSignupForm() {
-    return ClipRRect(
+    return GlassmorphismContainer(
+      glassType: GlassType.medium,
+      padding: const EdgeInsets.all(24),
       borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
-          ),
+      blur: 15.0,
+      showGlow: true,
           child: Form(
             key: _formKey,
             child: Column(
@@ -222,8 +218,6 @@ class _SignupScreenState extends State<SignupScreen>
               ],
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -251,7 +245,7 @@ class _SignupScreenState extends State<SignupScreen>
               color: Colors.white.withOpacity(0.7),
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
+            fillColor: AppColors.glassBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -297,7 +291,7 @@ class _SignupScreenState extends State<SignupScreen>
               color: Colors.white.withOpacity(0.7),
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
+            fillColor: AppColors.glassBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -344,7 +338,7 @@ class _SignupScreenState extends State<SignupScreen>
               color: Colors.white.withOpacity(0.7),
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
+            fillColor: AppColors.glassBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -405,7 +399,7 @@ class _SignupScreenState extends State<SignupScreen>
               },
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
+            fillColor: AppColors.glassBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -468,7 +462,7 @@ class _SignupScreenState extends State<SignupScreen>
               },
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
+            fillColor: AppColors.glassBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -560,16 +554,11 @@ class _SignupScreenState extends State<SignupScreen>
   Widget _buildSignupButton() {
     return SizedBox(
       height: 56,
-      child: ElevatedButton(
+      child: GlassButton(
         onPressed: _isLoading || !_acceptTerms ? null : _handleSignup,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryBlue,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          elevation: 8,
-          shadowColor: AppColors.primaryBlue.withOpacity(0.4),
-        ),
+        isPrimary: true,
+        showGlow: true,
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: _isLoading
             ? const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
