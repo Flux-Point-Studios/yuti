@@ -524,6 +524,70 @@ class GameChangerService {
       return false;
     }
   }
+
+  /// Decode GameChanger callback result data
+  GameChangerWalletData? decodeCallbackResult(String callbackData) {
+    try {
+      print('🔍 DEBUG: Decoding GameChanger callback data: $callbackData');
+      
+      // First, decode from base64url
+      String decodedJson;
+      
+      // Handle base64url decoding
+      try {
+        final base64Data = callbackData.replaceAll('-', '+').replaceAll('_', '/');
+        // Add padding if needed
+        final padding = 4 - (base64Data.length % 4);
+        final paddedData = padding == 4 ? base64Data : base64Data + ('=' * padding);
+        final bytes = base64.decode(paddedData);
+        decodedJson = utf8.decode(bytes);
+      } catch (e) {
+        // If base64 decoding fails, assume it's already JSON
+        print('🔍 DEBUG: Base64 decode failed, treating as raw JSON: $e');
+        decodedJson = callbackData;
+      }
+      
+      print('🔍 DEBUG: Decoded JSON: $decodedJson');
+      
+      // Parse the JSON
+      final Map<String, dynamic> data = json.decode(decodedJson);
+      
+      // Extract the 'connect' object
+      if (data.containsKey('connect')) {
+        final connectData = data['connect'] as Map<String, dynamic>;
+        
+        final walletName = connectData['name'] as String? ?? 'GameChanger Wallet';
+        final address = connectData['address'] as String;
+        
+        // Extract stake address from the spending public key hash
+        String? stakeAddress;
+        if (connectData.containsKey('stakePubKey')) {
+          final stakeKey = connectData['stakePubKey'] as Map<String, dynamic>;
+          // For now, we'll use a placeholder - in a real implementation you'd derive this
+          stakeAddress = 'stake_' + (stakeKey['pubKeyHashHex'] as String? ?? '');
+        }
+        
+        print('🔍 DEBUG: Extracted wallet data - name: $walletName, address: $address');
+        
+        return GameChangerWalletData(
+          walletName: walletName,
+          address: address,
+          stakeAddress: stakeAddress ?? '',
+          networkId: address.startsWith('addr1') ? 1 : 0, // Simple mainnet/testnet detection
+          network: address.startsWith('addr1') ? 'mainnet' : 'testnet',
+          spendingPubKey: connectData['spendPubKey']?['pubKeyHex'] as String?,
+          stakingPubKey: connectData['stakePubKey']?['pubKeyHex'] as String?,
+          rawData: connectData,
+        );
+      } else {
+        print('🔍 DEBUG: No "connect" key found in callback data');
+        return null;
+      }
+    } catch (e) {
+      print('🔍 DEBUG: Error decoding GameChanger callback: $e');
+      return null;
+    }
+  }
 }
 
 /// Data class for GameChanger wallet information
