@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:crypto/crypto.dart';
-import 'package:hex/hex.dart';
+// Add Cardano SDK imports
+import 'package:cardano_flutter_sdk/cardano_flutter_sdk.dart';
+import 'package:cardano_dart_types/cardano_dart_types.dart';
 import '../config/app_config.dart';
 import '../config/secure_config.dart';
 import 'blockfrost_service.dart';
@@ -65,34 +65,54 @@ class CardanoWalletService {
     }
   }
 
-  /// Create a new wallet with mnemonic (simplified version for premium access checking)
+  /// Create a new wallet with mnemonic using real Cardano SDK
   Future<bool> createWallet(String walletName, {String? mnemonic}) async {
     try {
       _connectionStatus = WalletConnectionStatus.connecting;
-
-      // Clean up any existing external wallet data
+      
+      // Clear any leftover external wallet data
       await _storage.delete(key: 'external_wallet_address');
       await _storage.delete(key: 'external_wallet_stake_address');
 
-      // For now, we'll store the mnemonic and generate a dummy address
-      // In a real implementation, you'd use the proper Cardano SDK
-      _mnemonic = mnemonic ?? _generateDummyMnemonic();
+      // 1. Determine or generate mnemonic:
+      List<String> mnemonicWords;
+      if (mnemonic != null) {
+        // Use provided mnemonic (e.g. user restoring with phrase)
+        mnemonicWords = mnemonic.trim().split(' ');
+      } else {
+        // Generate a new 24-word mnemonic using Cardano SDK
+        mnemonicWords = WalletFactory.generateNewMnemonic(
+          wordsCount: MnemonicsWordsCount.w24,
+        );
+      }
+
+      // 2. Create a Cardano wallet from mnemonic (using mainnet or testnet):
+      final network = _isMainnet ? NetworkId.mainnet : NetworkId.testnet;
+      final cardanoWallet = await WalletFactory.fromMnemonic(network, mnemonicWords);
+
+      // 3. Derive the first payment address and stake address:
+      final addressKit = await cardanoWallet.getPaymentAddressKit(addressIndex: 0);
+      final String paymentAddr = addressKit.address.bech32Encoded;
+      final String stakeAddr = cardanoWallet.stakeAddress.bech32Encoded;
+
+      // 4. Store in memory state:
+      _mnemonic = mnemonicWords.join(' ');
       _walletName = walletName;
+      _currentAddress = paymentAddr;
+      _stakeAddress = stakeAddr;
 
-      // Generate dummy addresses for testing
-      // In a real implementation, you'd derive these from the mnemonic
-      _currentAddress = _generateDummyAddress();
-      _stakeAddress = _generateDummyStakeAddress();
-
-      // Store wallet data securely
+      // 5. Persist to secure storage:
       await _storage.write(key: _mnemonicKey, value: _mnemonic);
       await _storage.write(key: _walletNameKey, value: walletName);
       await _storage.write(key: _isConnectedKey, value: 'true');
 
+      // 6. Mark connected and check premium status:
       _connectionStatus = WalletConnectionStatus.connected;
-
-      // Check premium access
       await _checkPremiumAccess();
+
+      print('Created real Cardano wallet: $walletName');
+      print('Address: $paymentAddr');
+      print('Stake Address: $stakeAddr');
 
       return true;
     } catch (e) {
@@ -127,23 +147,32 @@ class CardanoWalletService {
 
         print('Restored external wallet: $walletName');
       } else {
-        // Restore mnemonic-based wallet
+        // Restore mnemonic-based wallet using Cardano SDK
         final mnemonic = await _storage.read(key: _mnemonicKey);
         if (mnemonic == null) {
           return false;
         }
-
         _mnemonic = mnemonic;
         _walletName = walletName;
-        _currentAddress = _generateDummyAddress();
-        _stakeAddress = _generateDummyStakeAddress();
+
+        // Derive wallet from mnemonic using Cardano SDK
+        final network = _isMainnet ? NetworkId.mainnet : NetworkId.testnet;
+        final mnemonicWords = mnemonic.split(' ');
+        final cardanoWallet = await WalletFactory.fromMnemonic(network, mnemonicWords);
+        
+        // Get first address and stake address
+        final addressKit = await cardanoWallet.getPaymentAddressKit(addressIndex: 0);
+        _currentAddress = addressKit.address.bech32Encoded;
+        _stakeAddress = cardanoWallet.stakeAddress.bech32Encoded;
 
         print('Restored mnemonic-based wallet: $walletName');
+        print('Address: $_currentAddress');
+        print('Stake Address: $_stakeAddress');
       }
 
       _connectionStatus = WalletConnectionStatus.connected;
 
-      // Check premium access
+      // Re-check premium status on app launch
       await _checkPremiumAccess();
 
       return true;
@@ -377,67 +406,7 @@ class CardanoWalletService {
     }
   }
 
-  /// Generate dummy mnemonic for testing
-  String _generateDummyMnemonic() {
-    // In a real implementation, use proper BIP39 mnemonic generation
-    const words = [
-      'abandon',
-      'ability',
-      'able',
-      'about',
-      'above',
-      'absent',
-      'absorb',
-      'abstract',
-      'absurd',
-      'abuse',
-      'access',
-      'accident',
-      'account',
-      'accuse',
-      'achieve',
-      'acid',
-      'acoustic',
-      'acquire',
-      'across',
-      'act',
-      'action',
-      'actor',
-      'actress',
-      'actual'
-    ];
-
-    final random = DateTime.now().millisecondsSinceEpoch;
-    final selectedWords = <String>[];
-
-    for (int i = 0; i < 24; i++) {
-      selectedWords.add(words[random % words.length]);
-    }
-
-    return selectedWords.join(' ');
-  }
-
-  /// Generate dummy address for testing
-  String _generateDummyAddress() {
-    // Generate a dummy Cardano address for testing
-    final random = DateTime.now().millisecondsSinceEpoch;
-    final hash = sha256.convert(utf8.encode(random.toString()));
-    final hex = HEX.encode(hash.bytes);
-
-    // Create a dummy Cardano address format
-    return 'addr1${hex.substring(0, 56)}';
-  }
-
-  /// Generate dummy stake address for testing
-  String _generateDummyStakeAddress() {
-    // Generate a dummy stake address for testing
-    final random = DateTime.now().millisecondsSinceEpoch + 1;
-    final hash = sha256.convert(utf8.encode(random.toString()));
-    final hex = HEX.encode(hash.bytes);
-
-    // Create a dummy stake address format
-    return 'stake1${hex.substring(0, 56)}';
-  }
+  // Note: Dummy generation methods removed - now using real Cardano SDK for all wallet creation
 
   /// Validate Cardano address format (basic validation)
   bool _validateAddress(String address) {
