@@ -5,6 +5,7 @@ import 'package:cardano_flutter_sdk/cardano_flutter_sdk.dart';
 import 'package:cardano_dart_types/cardano_dart_types.dart';
 import '../services/auth_service.dart';
 import '../services/gamechanger_service.dart';
+import '../screens/gamechanger_callback_screen.dart';
 import '../utils/app_colors.dart';
 
 class CardanoWalletDialog extends StatefulWidget {
@@ -764,6 +765,28 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       print('🔍 DEBUG: GameChanger connection error: $e');
+
+      // Handle special iOS redirect signal
+      if (e.toString().contains('REDIRECT_TO_CALLBACK_SCREEN')) {
+        print('🔍 DEBUG: iOS redirect signal detected - navigating to callback screen');
+        
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Navigate to callback screen
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const GameChangerCallbackScreen(),
+          ),
+        ).then((result) {
+          // If callback screen returns with success, close this dialog
+          if (result == true) {
+            Navigator.of(context).pop(true);
+          }
+        });
+        return;
+      }
 
       // Enhanced error handling with specific focus on cancellation
       String errorMessage = _parseErrorMessage(e);
