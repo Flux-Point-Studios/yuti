@@ -4,6 +4,7 @@ import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/gamechanger_service.dart';
 import '../services/supabase_service.dart';
+import '../main.dart';
 import 'chat_screen.dart';
 import 'pricing_screen.dart';
 import 'welcome_screen.dart';
@@ -81,19 +82,59 @@ class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
       _status = 'Checking for GameChanger callback data...';
     });
 
-    // For iOS/Android, we need to check if there's pending callback data
-    // This would typically come from app launch parameters or saved state
-    // For now, we'll show a message for the user to manually retry
+    // Check for pending callback data from iOS
+    final callbackData = getPendingGameChangerCallback();
     
-    await Future.delayed(Duration(seconds: 2));
-    
-    setState(() {
-      _status = 'iOS callback screen active.\n\n'
-          'If you were redirected here from GameChanger:\n'
-          '1. The wallet connection should complete automatically\n'
-          '2. If not, please return to the app and try connecting again\n\n'
-          'This callback is primarily for web browser connections.';
-    });
+    if (callbackData != null) {
+      print('🔍 DEBUG: Found pending callback data: $callbackData');
+      
+      setState(() {
+        _status = 'Processing GameChanger wallet data...';
+      });
+      
+      try {
+        // Decode the callback data
+        final decodedData = _gameChangerService.decodeCallbackResult(callbackData);
+        
+        if (decodedData != null) {
+          print('🔍 DEBUG: Successfully decoded callback data');
+          await _processWalletData(decodedData);
+        } else {
+          print('🔍 DEBUG: Failed to decode callback data');
+          setState(() {
+            _status = 'Error: Could not process wallet data from GameChanger';
+            _isProcessing = false;
+          });
+        }
+      } catch (e) {
+        print('🔍 DEBUG: Error processing callback data: $e');
+        setState(() {
+          _status = 'Error: ${e.toString()}';
+          _isProcessing = false;
+        });
+      }
+    } else {
+      print('🔍 DEBUG: No pending callback data found, waiting...');
+      
+      // Wait a bit more and check again in case the callback is still coming
+      await Future.delayed(Duration(seconds: 3));
+      
+      final callbackDataRetry = getPendingGameChangerCallback();
+      if (callbackDataRetry != null) {
+        print('🔍 DEBUG: Found callback data on retry');
+        return _handleNativeCallback(); // Retry processing
+      }
+      
+      setState(() {
+        _status = 'No GameChanger callback data received.\n\n'
+            'If you were redirected here from GameChanger:\n'
+            '1. Please try the wallet connection again\n'
+            '2. Make sure you approved the connection in GameChanger\n'
+            '3. Check that BlueLight is set as the return app\n\n'
+            'Return to chat to try again.';
+        _isProcessing = false;
+      });
+    }
   }
 
   Future<void> _processWalletData(GameChangerWalletData walletData) async {

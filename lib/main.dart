@@ -21,6 +21,9 @@ void main() async {
   // Initialize API keys for Flutter web
   await _initializeApiKeys();
 
+  // Set up GameChanger callback handler for iOS
+  _setupGameChangerCallbackHandler();
+
   // Set system UI overlay style for blue light theme
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -53,6 +56,35 @@ Future<void> _initializeApiKeys() async {
   } catch (e) {
     print('🔍 DEBUG: Error initializing API keys: $e');
   }
+}
+
+// Global variable to store GameChanger callback data for iOS
+String? _pendingGameChangerCallback;
+
+/// Set up method channel handler for GameChanger callbacks from iOS
+void _setupGameChangerCallbackHandler() {
+  const platform = MethodChannel('com.bluelight/gamechanger');
+  
+  platform.setMethodCallHandler((call) async {
+    if (call.method == 'handleGameChangerCallback') {
+      final String callbackData = call.arguments as String;
+      print('🔍 DEBUG: Received GameChanger callback data from iOS: $callbackData');
+      
+      // Store the callback data globally so the callback screen can access it
+      _pendingGameChangerCallback = callbackData;
+      
+      print('🔍 DEBUG: Stored callback data for processing');
+    }
+  });
+  
+  print('🔍 DEBUG: GameChanger method channel handler set up');
+}
+
+/// Get and clear pending GameChanger callback data
+String? getPendingGameChangerCallback() {
+  final data = _pendingGameChangerCallback;
+  _pendingGameChangerCallback = null; // Clear after reading
+  return data;
 }
 
 class MyApp extends StatelessWidget {

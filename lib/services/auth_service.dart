@@ -80,6 +80,27 @@ class AuthService {
     }
   }
 
+  Future<void> _updateUserInDatabase() async {
+    if (_currentUser == null) return;
+    
+    try {
+      await SupabaseService.client
+          .from('users')
+          .update({
+            'wallet_address': _currentUser!.walletAddress,
+            'stake_address': _currentUser!.stakeAddress,
+            'premium_access_details': _currentUser!.premiumAccessDetails,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', _currentUser!.id);
+      
+      print('User wallet data updated in database successfully');
+    } catch (e) {
+      print('Error updating user wallet data in database: $e');
+      // Don't throw - we want the wallet connection to succeed even if DB update fails
+    }
+  }
+
   Future<void> _clearUserSession() async {
     try {
       await _storage.delete(key: _userKey);
@@ -342,6 +363,7 @@ class AuthService {
       );
 
       await _saveUserSession();
+      await _updateUserInDatabase(); // Save wallet data to database
       return true;
     } catch (e) {
       print('Error connecting Cardano wallet: $e');
@@ -385,6 +407,7 @@ class AuthService {
       );
 
       await _saveUserSession();
+      await _updateUserInDatabase(); // Save wallet data to database
       print('External Cardano wallet connected successfully: $walletName');
       return true;
     } catch (e) {
@@ -424,6 +447,7 @@ class AuthService {
       );
 
       await _saveUserSession();
+      await _updateUserInDatabase(); // Update premium access in database
       return hasPremiumAccess;
     } catch (e) {
       print('Error refreshing Cardano premium access: $e');
@@ -456,6 +480,7 @@ class AuthService {
       );
 
       await _saveUserSession();
+      await _updateUserInDatabase(); // Clear wallet data from database
     }
   }
 
