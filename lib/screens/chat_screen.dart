@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/chat_message.dart';
 import '../models/chat_session.dart';
+import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/speech_service.dart';
 import '../services/chat_history_service.dart';
@@ -15,6 +16,7 @@ import '../widgets/glassmorphism_container.dart';
 import '../widgets/message_limit_widget.dart';
 import '../screens/profile_screen.dart';
 import '../screens/pricing_screen.dart';
+import '../screens/wallet_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -30,6 +32,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final SpeechService _speechService = SpeechService();
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
+  final AuthService _authService = AuthService();
 
   bool _isTyping = false;
   bool _isListening = false;
@@ -308,6 +311,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
+          ),
+          // Wallet button
+          IconButton(
+            icon: Icon(Icons.account_balance_wallet, color: Colors.white.withOpacity(0.8)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WalletScreen(authService: _authService),
+                ),
+              );
+            },
           ),
           // Profile button
           IconButton(

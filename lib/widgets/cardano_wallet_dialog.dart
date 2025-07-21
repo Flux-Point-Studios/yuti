@@ -32,6 +32,9 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   String? _errorMessage;
   String? _qrCodeUrl;
   ConnectionMode _connectionMode = ConnectionMode.mnemonic;
+  
+  // Security state for mnemonic display
+  bool _hasAcknowledgedSecurityWarning = false;
 
   @override
   void initState() {
@@ -1008,93 +1011,231 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     }
   }
 
-  /// Show mnemonic backup dialog to user
+  /// Show mnemonic backup dialog to user with security warning
   Future<void> _showMnemonicBackupDialog(String mnemonic) async {
+    // Reset security acknowledgment for each new dialog
+    _hasAcknowledgedSecurityWarning = false;
+    
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.backgroundDark,
-          title: Text(
-            'Backup Your Wallet',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppColors.backgroundDark,
+              title: Text(
+                'Backup Your Wallet',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!_hasAcknowledgedSecurityWarning) ...[
+                      // Security Warning Section
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.security,
+                                  color: AppColors.error,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'SECURITY WARNING',
+                                  style: TextStyle(
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Before revealing your seed phrase:\n\n'
+                              '• Ensure you are in a private location\n'
+                              '• Make sure no one can see your screen\n'
+                              '• Check for cameras or recording devices\n'
+                              '• Never share this phrase with anyone\n\n'
+                              'Anyone with access to these words can steal your funds!',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _hasAcknowledgedSecurityWarning = true;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          child: const Text('I Understand - Show Seed Phrase'),
+                        ),
+                      ),
+                    ] else ...[
+                      // Mnemonic Display Section
+                      Text(
+                        'IMPORTANT: Save these 24 words in a safe place. This is the only way to recover your wallet!',
+                        style: TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundLight.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+                        ),
+                        child: SelectableText(
+                          mnemonic,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '• Write down these words in order\n• Keep them safe and private\n• Never share them with anyone\n• You will need them to restore your wallet',
+                        style: TextStyle(
+                          color: AppColors.textSecondary.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: _hasAcknowledgedSecurityWarning ? [
+                TextButton(
+                  onPressed: () async {
+                    // Copy to clipboard
+                    await Clipboard.setData(ClipboardData(text: mnemonic));
+                    
+                    // Show confirmation with overlay to ensure visibility
+                    _showCopyConfirmation(context);
+                  },
+                  child: Text(
+                    'Copy',
+                    style: TextStyle(color: AppColors.primaryBlue),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('I\'ve Saved It'),
+                ),
+              ] : [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Show copy confirmation with overlay to ensure visibility above modal
+  void _showCopyConfirmation(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).size.height * 0.1,
+        left: 0,
+        right: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryBlue.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  'IMPORTANT: Save these 24 words in a safe place. This is the only way to recover your wallet!',
-                  style: TextStyle(
-                    color: AppColors.primaryBlue,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                Icon(
+                  Icons.check_circle,
+                  color: Colors.white,
+                  size: 20,
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundLight.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
-                  ),
-                  child: SelectableText(
-                    mnemonic,
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(width: 8),
                 Text(
-                  '• Write down these words in order\n• Keep them safe and private\n• Never share them with anyone\n• You will need them to restore your wallet',
+                  'Mnemonic copied to clipboard',
                   style: TextStyle(
-                    color: AppColors.textSecondary.withOpacity(0.8),
-                    fontSize: 12,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                // Copy to clipboard
-                await Clipboard.setData(ClipboardData(text: mnemonic));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Mnemonic copied to clipboard'),
-                    backgroundColor: AppColors.primaryBlue,
-                  ),
-                );
-              },
-              child: Text(
-                'Copy',
-                style: TextStyle(color: AppColors.primaryBlue),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('I\'ve Saved It'),
-            ),
-          ],
-        );
-      },
+        ),
+      ),
     );
+    
+    overlay.insert(overlayEntry);
+    
+    // Remove after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      overlayEntry.remove();
+    });
   }
 
   /// Parse error message to provide user-friendly feedback
