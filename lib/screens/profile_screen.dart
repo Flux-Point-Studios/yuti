@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../widgets/cardano_wallet_dialog.dart';
 
@@ -16,6 +20,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   User? _currentUser;
   bool _isLoading = true;
   bool _isWalletLoading = false;
+  
+  // Usage statistics
+  int _chatCount = 0;
+  int _fragmentCount = 0;
+  int _referralCount = 0;
+  bool _isStatsLoading = false;
+  
+  // Affiliate program
+  String? _referralLink;
+  bool _isAffiliateLoading = false;
+  
+  // Activity chart data
+  List<FlSpot> _chatSpots = [];
+  List<FlSpot> _fragmentSpots = [];
+  List<FlSpot> _referralSpots = [];
+  bool _isChartLoading = false;
 
   @override
   void initState() {
@@ -28,6 +48,360 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _currentUser = _authService.currentUser;
       _isLoading = false;
     });
+    
+    // Load additional profile data
+    await Future.wait([
+      _loadUserStats(),
+      _loadReferralLink(),
+      _loadActivityChartData(),
+    ]);
+  }
+
+  Future<void> _loadUserStats() async {
+    if (_currentUser?.id == null) return;
+    
+    setState(() => _isStatsLoading = true);
+    
+    try {
+      // Try to fetch from user_analysis table first
+      final statsResponse = await SupabaseService.client
+          .from('user_analysis')
+          .select('chat_count, fragments, referral_count')
+          .eq('id', _currentUser!.id)
+          .maybeSingle();
+      
+      if (statsResponse != null) {
+        setState(() {
+          _chatCount = statsResponse['chat_count'] ?? 0;
+          _fragmentCount = statsResponse['fragments'] ?? 0;
+          _referralCount = statsResponse['referral_count'] ?? 0;
+        });
+      } else {
+        // Fallback: calculate stats from individual tables
+        await _calculateStatsFromTables();
+      }
+    } catch (e) {
+      print('Error loading user stats: $e');
+      // Fallback: calculate stats from individual tables
+      await _calculateStatsFromTables();
+    } finally {
+      setState(() => _isStatsLoading = false);
+    }
+  }
+
+  Future<void> _calculateStatsFromTables() async {
+    try {
+      // Count chats for user
+      final chatResponse = await SupabaseService.client
+          .from('chats')
+          .select('id')
+          .eq('user_id', _currentUser!.id);
+      
+      // Count messages for user (alternative chat metric)
+      final messageResponse = await SupabaseService.client
+          .from('messages')
+          .select('id')
+          .eq('user_id', _currentUser!.id);
+      
+      // For fragments, we'll use message count as a proxy for now
+      // In the future, this could be a separate metric
+      
+      // Count referrals (if referrals table exists)
+      int referralCount = 0;
+      try {
+        final referralResponse = await SupabaseService.client
+            .from('referral_uses')
+            .select('id')
+            .eq('referrer_id', _currentUser!.id);
+        referralCount = referralResponse.length;
+      } catch (e) {
+        // Referral table might not exist yet
+        print('Referral count not available: $e');
+      }
+      
+      setState(() {
+        _chatCount = chatResponse.length;
+        _fragmentCount = messageResponse.length; // Using messages as proxy for fragments
+        _referralCount = referralCount;
+      });
+    } catch (e) {
+      print('Error calculating stats from tables: $e');
+    }
+  }
+
+  Future<void> _loadReferralLink() async {
+    if (_currentUser?.id == null) return;
+    
+    try {
+      final referralResponse = await SupabaseService.client
+          .from('referrals')
+          .select('referral_link')
+          .eq('user_id', _currentUser!.id)
+          .maybeSingle();
+      
+      if (referralResponse != null) {
+        setState(() {
+          _referralLink = referralResponse['referral_link'];
+        });
+      }
+    } catch (e) {
+      print('Error loading referral link: $e');
+      // Referrals table might not exist yet - this is fine
+    }
+  }
+
+  Future<void> _createReferralLink() async {
+    if (_currentUser?.id == null) return;
+    
+    setState(() => _isAffiliateLoading = true);
+    
+    try {
+      // Generate unique referral code
+      final referralCode = const Uuid().v4().substring(0, 8).toUpperCase();
+      
+      // Create referral link (adjust domain as needed)
+      final referralLink = 'https://bluelight.ai/signup?ref=$referralCode';
+      
+      // Insert into referrals table
+      await SupabaseService.client.from('referrals').insert({
+        'user_id': _currentUser!.id,
+        'referral_code': referralCode,
+        'referral_link': referralLink,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      
+      setState(() {
+        _referralLink = referralLink;
+      });
+      
+      _showSuccess('Affiliate link created successfully!');
+      
+      // Refresh stats to update referral count
+      await _loadUserStats();
+      
+    } catch (e) {
+      print('Error creating referral link: $e');
+      _showError('Failed to create affiliate link. Please try again.');
+    } finally {
+      setState(() => _isAffiliateLoading = false);
+    }
+  }
+
+  Future<void> _loadActivityChartData() async {
+    if (_currentUser?.id == null) return;
+    
+    setState(() => _isChartLoading = true);
+    
+    try {
+      // Try to fetch from analysis_month table
+      final monthlyResponse = await SupabaseService.client
+          .from('analysis_month')
+          .select('month, chat_count, fragments, referral_count')
+          .eq('user_id', _currentUser!.id)
+          .order('month', ascending: true);
+      
+      if (monthlyResponse.isNotEmpty) {
+        _buildChartDataFromMonthly(monthlyResponse);
+      } else {
+        // Fallback: create sample data based on current stats
+        _buildSampleChartData();
+      }
+    } catch (e) {
+      print('Error loading activity chart data: $e');
+      // Fallback: create sample data
+      _buildSampleChartData();
+    } finally {
+      setState(() => _isChartLoading = false);
+    }
+  }
+
+  void _buildChartDataFromMonthly(List<dynamic> monthlyData) {
+    _chatSpots.clear();
+    _fragmentSpots.clear();
+    _referralSpots.clear();
+    
+    for (int i = 0; i < monthlyData.length; i++) {
+      final data = monthlyData[i];
+      final x = i.toDouble();
+      
+      _chatSpots.add(FlSpot(x, (data['chat_count'] ?? 0).toDouble()));
+      _fragmentSpots.add(FlSpot(x, (data['fragments'] ?? 0).toDouble()));
+      _referralSpots.add(FlSpot(x, (data['referral_count'] ?? 0).toDouble()));
+    }
+  }
+
+  void _buildSampleChartData() {
+    // Create sample data for the last 6 months based on current stats
+    _chatSpots.clear();
+    _fragmentSpots.clear();
+    _referralSpots.clear();
+    
+    final random = DateTime.now().millisecond;
+    for (int i = 0; i < 6; i++) {
+      final x = i.toDouble();
+      // Create realistic progression
+      final chatBase = (_chatCount / 6) * (i + 1);
+      final fragmentBase = (_fragmentCount / 6) * (i + 1);
+      final referralBase = (_referralCount / 6) * (i + 1);
+      
+      _chatSpots.add(FlSpot(x, chatBase.toDouble()));
+      _fragmentSpots.add(FlSpot(x, fragmentBase.toDouble()));
+      _referralSpots.add(FlSpot(x, referralBase.toDouble()));
+    }
+  }
+
+  Widget _buildActivityChartSection() {
+    return _buildSection(
+      title: 'Activity Overview',
+      children: [
+        if (_isChartLoading)
+          const Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+          )
+        else
+          Container(
+            height: 250,
+            padding: const EdgeInsets.all(16),
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppColors.textSecondary.withOpacity(0.1),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: 1,
+                      getTitlesWidget: (double value, TitleMeta meta) {
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+                        if (value.toInt() < months.length) {
+                          return Text(
+                            months[value.toInt()],
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (double value, TitleMeta meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border.all(
+                    color: AppColors.textSecondary.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                minX: 0,
+                maxX: 5,
+                minY: 0,
+                lineBarsData: [
+                  // Chats line
+                  LineChartBarData(
+                    spots: _chatSpots,
+                    isCurved: true,
+                    color: AppColors.primaryBlue,
+                    barWidth: 3,
+                    dotData: FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.primaryBlue.withOpacity(0.1),
+                    ),
+                  ),
+                  // Fragments line
+                  LineChartBarData(
+                    spots: _fragmentSpots,
+                    isCurved: true,
+                    color: AppColors.success,
+                    barWidth: 3,
+                    dotData: FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.success.withOpacity(0.1),
+                    ),
+                  ),
+                  // Referrals line
+                  LineChartBarData(
+                    spots: _referralSpots,
+                    isCurved: true,
+                    color: AppColors.warning,
+                    barWidth: 3,
+                    dotData: FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.warning.withOpacity(0.1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+        // Chart legend
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildLegendItem('Chats', AppColors.primaryBlue),
+            _buildLegendItem('Fragments', AppColors.success),
+            _buildLegendItem('Referrals', AppColors.warning),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _linkWallet() async {
@@ -212,6 +586,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 40),
 
+          // Usage Statistics section
+          _buildUsageStatsSection(),
+
+          const SizedBox(height: 32),
+
+          // Affiliate Program section
+          _buildAffiliateSection(),
+
+          const SizedBox(height: 32),
+
+          // Activity Chart section
+          _buildActivityChartSection(),
+
+          const SizedBox(height: 32),
+
           // Account details section
           _buildSection(
             title: 'Account Details',
@@ -221,6 +610,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildDetailRow('Member Since', _formatDate(_currentUser!.createdAt)),
               if (_currentUser!.subscriptionStatus != null)
                 _buildDetailRow('Subscription Status', _currentUser!.subscriptionStatus!),
+              if (_currentUser!.tier != 'FREE' && _currentUser!.endedAt != null)
+                _buildDetailRow(
+                  'Subscription Expiry', 
+                  _currentUser!.hasExpired 
+                    ? 'Expired' 
+                    : '${_currentUser!.daysLeft} days left'
+                ),
             ],
           ),
 
@@ -307,6 +703,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildUsageStatsSection() {
+    return _buildSection(
+      title: 'Usage Statistics',
+      children: [
+        if (_isStatsLoading)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+          )
+        else ...[
+          _buildStatRow(
+            icon: Icons.chat_bubble_outline,
+            label: 'Total Chats',
+            value: _chatCount.toString(),
+          ),
+          _buildStatRow(
+            icon: Icons.auto_awesome,
+            label: 'Fragments',
+            value: _fragmentCount.toString(),
+          ),
+          _buildStatRow(
+            icon: Icons.people_outline,
+            label: 'Referrals',
+            value: _referralCount.toString(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStatRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.primaryBlue,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAffiliateSection() {
+    return _buildSection(
+      title: 'Referral Program',
+      children: [
+        if (_isAffiliateLoading)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+          )
+        else if (_referralLink == null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Earn rewards by referring friends to BlueLight!',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _createReferralLink,
+                    icon: const Icon(Icons.card_giftcard, color: Colors.white),
+                    label: const Text(
+                      'Become an Affiliate',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          _buildDetailRow('Your Referral Link', _referralLink!),
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _copyToClipboard(_referralLink!),
+                    icon: const Icon(Icons.copy, size: 18),
+                    label: const Text('Copy Link'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryBlue,
+                      side: BorderSide(color: AppColors.primaryBlue),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    _showSuccess('Referral link copied to clipboard!');
   }
 
   Widget _buildWalletSection() {
