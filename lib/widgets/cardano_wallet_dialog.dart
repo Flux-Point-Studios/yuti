@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:cardano_flutter_sdk/cardano_flutter_sdk.dart';
+import 'package:cardano_dart_types/cardano_dart_types.dart';
 import '../services/auth_service.dart';
 import '../services/gamechanger_service.dart';
 import '../utils/app_colors.dart';
@@ -966,33 +968,134 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     });
 
     try {
-      // Here you would integrate with the Cardano SDK to generate a new wallet
-      // For now, we'll show a placeholder message
-      setState(() {
-        _errorMessage = 'Wallet generation coming soon! Please use GameChanger or Recovery Phrase for now.';
-      });
+      // Generate new 24-word mnemonic using Cardano SDK
+      final newMnemonicWords = WalletFactory.generateNewMnemonic(
+        wordsCount: MnemonicsWordsCount.w24,
+      );
+      final newMnemonic = newMnemonicWords.join(' ');
       
-      // TODO: Implement actual wallet generation
-      // Example implementation:
-      // final newWallet = await CardanoSDK.generateWallet();
-      // final success = await widget.authService.connectCardanoWallet(
-      //   newWallet.mnemonic, 
-      //   'Generated Wallet'
-      // );
-      // if (success) {
-      //   Navigator.of(context).pop(true);
-      // }
+      // Connect the wallet using the real mnemonic
+      final success = await widget.authService.connectCardanoWallet(
+        newMnemonic, 
+        'Generated Wallet',
+      );
+      
+      if (success) {
+        // Show the mnemonic to the user for backup before closing
+        if (mounted) {
+          await _showMnemonicBackupDialog(newMnemonic);
+        }
+        
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to create wallet. Please try again.';
+        });
+      }
       
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to generate wallet: ${e.toString()}';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-             });
-     }
-   }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Show mnemonic backup dialog to user
+  Future<void> _showMnemonicBackupDialog(String mnemonic) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.backgroundDark,
+          title: Text(
+            'Backup Your Wallet',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'IMPORTANT: Save these 24 words in a safe place. This is the only way to recover your wallet!',
+                  style: TextStyle(
+                    color: AppColors.primaryBlue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundLight.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+                  ),
+                  child: SelectableText(
+                    mnemonic,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '• Write down these words in order\n• Keep them safe and private\n• Never share them with anyone\n• You will need them to restore your wallet',
+                  style: TextStyle(
+                    color: AppColors.textSecondary.withOpacity(0.8),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                // Copy to clipboard
+                await Clipboard.setData(ClipboardData(text: mnemonic));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Mnemonic copied to clipboard'),
+                    backgroundColor: AppColors.primaryBlue,
+                  ),
+                );
+              },
+              child: Text(
+                'Copy',
+                style: TextStyle(color: AppColors.primaryBlue),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('I\'ve Saved It'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   /// Parse error message to provide user-friendly feedback
   String _parseErrorMessage(dynamic error) {
