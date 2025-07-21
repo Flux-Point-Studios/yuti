@@ -162,46 +162,59 @@ class GameChangerService {
     return _encodeScriptToUrl(script, isMainnet: isMainnet);
   }
 
-  /// Initiate the GameChanger wallet connection flow with fallback strategy
+  /// Initiate the GameChanger wallet connection flow with platform-specific strategy
   Future<GameChangerWalletData> connectWallet({bool isMainnet = true}) async {
-    // Try the standard flow first
+    print('🔍 DEBUG: Starting connectWallet - isMainnet: $isMainnet');
+    print('🔍 DEBUG: Platform detection - kIsWeb: $kIsWeb');
+    
+    // For iOS/Android, use the direct URL launch approach since FlutterWebAuth 
+    // may not work correctly with GameChanger's redirect mechanism
+    if (!kIsWeb) {
+      print('🔍 DEBUG: Native platform detected - using direct URL launch approach');
+      return await _connectWalletIosFallback(isMainnet: isMainnet);
+    }
+    
+    // For web, use the standard FlutterWebAuth approach
     try {
+      print('🔍 DEBUG: Web platform detected - using FlutterWebAuth approach');
       return await _connectWalletWithOptions(
         isMainnet: isMainnet,
         includeMacro: false,
       );
     } catch (e) {
-      print('🔍 DEBUG: Standard connection failed: $e');
-      
-      // On iOS, if the standard method fails, try with URL launcher as fallback
-      if (!kIsWeb && e.toString().contains('scheme') || e.toString().contains('FlutterWebAuth')) {
-        print('🔍 DEBUG: Attempting iOS fallback connection method...');
-        return await _connectWalletIosFallback(isMainnet: isMainnet);
-      }
-      
-      // If not an iOS scheme issue, rethrow the original error
+      print('🔍 DEBUG: Web connection failed: $e');
       rethrow;
     }
   }
   
-  /// iOS-specific fallback connection method using URL launcher
+  /// iOS-specific connection method using URL launcher and deep link callback
   Future<GameChangerWalletData> _connectWalletIosFallback({bool isMainnet = true}) async {
-    print('🔍 DEBUG: Starting iOS fallback connection flow');
+    print('🔍 DEBUG: Starting iOS connection flow');
     
     try {
-      // Generate the connection URL without flutter_web_auth
+      // Generate the connection URL
       final connectionUrl = generateConnectionUrl(
           isMainnet: isMainnet, includeMacro: false);
-      print('🔍 DEBUG: Generated connection URL for iOS fallback: $connectionUrl');
+      print('🔍 DEBUG: Generated connection URL for iOS: $connectionUrl');
       
-      // Launch GameChanger directly using url_launcher
+      // Verify the callback URL scheme is correct for iOS
+      final script = _generateConnectScript(includeMacro: false);
+      final callbackUrl = script['returnURLPattern'] as String;
+      print('🔍 DEBUG: Callback URL pattern: $callbackUrl');
+      
+      if (!callbackUrl.contains('bluelight://gamechanger-callback')) {
+        throw GameChangerException(
+            'Invalid callback URL for iOS. Expected bluelight:// scheme.');
+      }
+      
+      // Launch GameChanger using url_launcher  
       final canLaunch = await canLaunchUrl(Uri.parse(connectionUrl));
       if (!canLaunch) {
         throw GameChangerException(
-            'Cannot launch GameChanger URL. GameChanger app may not be installed.');
+            'Cannot launch GameChanger. Please ensure GameChanger wallet is accessible.');
       }
       
-      print('🔍 DEBUG: Launching GameChanger app directly...');
+      print('🔍 DEBUG: Launching GameChanger...');
       final launched = await launchUrl(
         Uri.parse(connectionUrl),
         mode: LaunchMode.externalApplication,
@@ -209,20 +222,25 @@ class GameChangerService {
       
       if (!launched) {
         throw GameChangerException(
-            'Failed to launch GameChanger app. Please ensure GameChanger is installed.');
+            'Failed to launch GameChanger. Please try again.');
       }
       
-      // Note: In this fallback mode, the app would need to handle the callback
-      // through the gamechanger_callback_screen when the user returns to the app
+      print('🔍 DEBUG: GameChanger launched successfully. Waiting for callback...');
+      
+      // Wait for the callback through AppDelegate -> MethodChannel -> main.dart
+      // This is handled by the iOS AppDelegate and the callback screen
       throw GameChangerException(
-          'iOS Fallback: GameChanger launched successfully.\n\n'
-          'Please complete the wallet connection in GameChanger and return to this app.\n'
-          'If the connection doesn\'t complete automatically, please try again.');
+          'REDIRECT_TO_CALLBACK_SCREEN'); // Special signal for UI to show callback screen
           
     } catch (e) {
-      print('🔍 DEBUG: iOS fallback connection failed: $e');
+      print('🔍 DEBUG: iOS connection flow failed: $e');
+      
+      if (e.toString().contains('REDIRECT_TO_CALLBACK_SCREEN')) {
+        rethrow; // Pass through the redirect signal
+      }
+      
       throw GameChangerException(
-          'iOS fallback connection failed: $e');
+          'iOS connection failed: $e');
     }
   }
 
@@ -276,6 +294,7 @@ class GameChangerService {
       final resultUrl = await FlutterWebAuth.authenticate(
         url: connectionUrl,
         callbackUrlScheme: callbackUrlScheme,
+        preferEphemeral: true, // Use ephemeral session for better security
       );
 
       print('🔍 DEBUG: Received callback URL: $resultUrl');

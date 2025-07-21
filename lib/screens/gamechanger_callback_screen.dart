@@ -125,13 +125,19 @@ class _GameChangerCallbackScreenState extends State<GameChangerCallbackScreen> {
         return _handleNativeCallback(); // Retry processing
       }
       
+      // Try one more time with a longer wait for iOS
+      await Future.delayed(Duration(seconds: 5));
+      final callbackDataFinal = getPendingGameChangerCallback();
+      if (callbackDataFinal != null) {
+        print('🔍 DEBUG: Found callback data on final retry');
+        return _handleNativeCallback(); // Final retry
+      }
+      
       setState(() {
-        _status = 'No GameChanger callback data received.\n\n'
-            'If you were redirected here from GameChanger:\n'
-            '1. Please try the wallet connection again\n'
-            '2. Make sure you approved the connection in GameChanger\n'
-            '3. Check that BlueLight is set as the return app\n\n'
-            'Return to chat to try again.';
+        _status = 'Waiting for GameChanger callback...\n\n'
+            'Please complete the wallet connection in GameChanger.\n\n'
+            'If you see "Return with Data" or "Done", tap it to return here.\n\n'
+            'If the connection doesn\'t complete, you can go back and try again.';
         _isProcessing = false;
       });
     }
