@@ -3,7 +3,7 @@ description: A conversational Cardano wallet with Agent T AI assistant
 
 publish_to: 'none'
 
-version: 1.0.1+18
+version: 1.0.1+19
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
@@ -37,6 +37,8 @@ dependencies:
   video_player: ^2.8.1
   # Chart library for activity overview
   fl_chart: ^0.66.0
+  # Biometric authentication for enhanced security
+  local_auth: ^2.1.6
 
 dev_dependencies:
   flutter_test:
