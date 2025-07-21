@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../widgets/cardano_wallet_dialog.dart';
+import '../widgets/wallet_security_settings.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -601,6 +602,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 32),
 
+          // Security Settings section
+          _buildSecuritySection(),
+
+          const SizedBox(height: 32),
+
           // Account details section
           _buildSection(
             title: 'Account Details',
@@ -859,6 +865,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     _showSuccess('Referral link copied to clipboard!');
+  }
+
+  Widget _buildSecuritySection() {
+    return _buildSection(
+      title: 'Security & Privacy',
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Security Overview
+              Row(
+                children: [
+                  Icon(Icons.security, color: AppColors.primaryBlue, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Wallet Security',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Manage biometric authentication and backup verification',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: AppColors.textSecondary,
+                    size: 16,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              
+              // Security features quick preview
+              Row(
+                children: [
+                  Icon(Icons.fingerprint, color: AppColors.success, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Biometric Protection',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Icon(Icons.backup, color: AppColors.success, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Backup Verification',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        
+        // Security Settings Button
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: ElevatedButton.icon(
+            onPressed: _openSecuritySettings,
+            icon: Icon(Icons.security, size: 18),
+            label: Text('Open Security Settings'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openSecuritySettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const WalletSecuritySettings(),
+      ),
+    );
   }
 
   Widget _buildWalletSection() {
