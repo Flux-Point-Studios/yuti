@@ -167,44 +167,50 @@ class GameChangerService {
     print('🔍 DEBUG: Starting connectWallet - isMainnet: $isMainnet');
     print('🔍 DEBUG: Platform detection - kIsWeb: $kIsWeb');
     
-    // For iOS/Android, use the direct URL launch approach since FlutterWebAuth 
-    // may not work correctly with GameChanger's redirect mechanism
-    if (!kIsWeb) {
-      print('🔍 DEBUG: Native platform detected - using direct URL launch approach');
-      return await _connectWalletIosFallback(isMainnet: isMainnet);
+    // Use FlutterWebAuth for both web and iOS to maintain browser session control
+    // This ensures proper callback handling and "Return to App" functionality
+    if (kIsWeb) {
+      print('🔍 DEBUG: Web platform detected - using FlutterWebAuth');
+    } else {
+      print('🔍 DEBUG: iOS platform detected - using FlutterWebAuth with ASWebAuthenticationSession');
     }
     
-    // For web, use the standard FlutterWebAuth approach
     try {
-      print('🔍 DEBUG: Web platform detected - using FlutterWebAuth approach');
       return await _connectWalletWithOptions(
         isMainnet: isMainnet,
         includeMacro: false,
       );
     } catch (e) {
-      print('🔍 DEBUG: Web connection failed: $e');
+      print('🔍 DEBUG: FlutterWebAuth connection failed: $e');
+      
+      // Only fall back to external browser on Android or if specifically needed
+      if (!kIsWeb && !Platform.isIOS && e.toString().contains('WebAuth')) {
+        print('🔍 DEBUG: Falling back to external browser for Android');
+        return await _connectWalletAndroidFallback(isMainnet: isMainnet);
+      }
+      
       rethrow;
     }
   }
   
-  /// iOS-specific connection method using URL launcher and deep link callback
-  Future<GameChangerWalletData> _connectWalletIosFallback({bool isMainnet = true}) async {
-    print('🔍 DEBUG: Starting iOS connection flow');
+  /// Android-specific fallback connection method using URL launcher and deep link callback
+  Future<GameChangerWalletData> _connectWalletAndroidFallback({bool isMainnet = true}) async {
+    print('🔍 DEBUG: Starting Android fallback connection flow');
     
     try {
       // Generate the connection URL
       final connectionUrl = generateConnectionUrl(
           isMainnet: isMainnet, includeMacro: false);
-      print('🔍 DEBUG: Generated connection URL for iOS: $connectionUrl');
+      print('🔍 DEBUG: Generated connection URL for Android: $connectionUrl');
       
-      // Verify the callback URL scheme is correct for iOS
+      // Verify the callback URL scheme is correct for Android
       final script = _generateConnectScript(includeMacro: false);
       final callbackUrl = script['returnURLPattern'] as String;
       print('🔍 DEBUG: Callback URL pattern: $callbackUrl');
       
       if (!callbackUrl.contains('bluelight://gamechanger-callback')) {
         throw GameChangerException(
-            'Invalid callback URL for iOS. Expected bluelight:// scheme.');
+            'Invalid callback URL for Android. Expected bluelight:// scheme.');
       }
       
       // Launch GameChanger using url_launcher  
@@ -228,19 +234,19 @@ class GameChangerService {
       print('🔍 DEBUG: GameChanger launched successfully. Waiting for callback...');
       
       // Wait for the callback through AppDelegate -> MethodChannel -> main.dart
-      // This is handled by the iOS AppDelegate and the callback screen
+      // This is handled by the Android system and the callback screen
       throw GameChangerException(
           'REDIRECT_TO_CALLBACK_SCREEN'); // Special signal for UI to show callback screen
           
     } catch (e) {
-      print('🔍 DEBUG: iOS connection flow failed: $e');
+      print('🔍 DEBUG: Android connection flow failed: $e');
       
       if (e.toString().contains('REDIRECT_TO_CALLBACK_SCREEN')) {
         rethrow; // Pass through the redirect signal
       }
       
       throw GameChangerException(
-          'iOS connection failed: $e');
+          'Android connection failed: $e');
     }
   }
 
@@ -265,44 +271,54 @@ class GameChangerService {
             'Generated URL missing transport header (1-)');
       }
 
-      print('🔍 DEBUG: Launching flutter_web_auth...');
+      print('🔍 DEBUG: Launching FlutterWebAuth...');
 
       // Use flutter_web_auth to handle the OAuth-style flow
       String callbackUrlScheme;
 
       // Enhanced platform detection for better iOS compatibility
       final currentUri = Uri.base;
-      final isRunningOnWeb = kIsWeb || 
-          currentUri.scheme == 'https' || 
-          currentUri.scheme == 'http';
-
+      
       print('🔍 DEBUG: Platform detection - kIsWeb: $kIsWeb, currentUri: $currentUri');
-      print('🔍 DEBUG: isRunningOnWeb: $isRunningOnWeb');
+      print('🔍 DEBUG: Platform.isIOS: ${Platform.isIOS}, Platform.isAndroid: ${Platform.isAndroid}');
 
-      if (isRunningOnWeb) {
+      if (kIsWeb) {
         // For web, flutter_web_auth expects the web protocol (https)
         callbackUrlScheme = 'https';
         print('🔍 DEBUG: Web environment - using HTTPS as callback scheme');
       } else {
         // For native apps (iOS/Android), use custom scheme
         callbackUrlScheme = _callbackScheme;
-        print(
-            '🔍 DEBUG: Native environment (iOS/Android) - using custom scheme: $callbackUrlScheme');
-        print('🔍 DEBUG: Make sure "$callbackUrlScheme" is properly configured in Info.plist/AndroidManifest.xml');
+        final platformName = Platform.isIOS ? 'iOS' : Platform.isAndroid ? 'Android' : 'Unknown';
+        print('🔍 DEBUG: $platformName environment - using custom scheme: $callbackUrlScheme');
+        
+        if (Platform.isIOS) {
+          print('🔍 DEBUG: iOS will use ASWebAuthenticationSession for in-app browser session');
+          print('🔍 DEBUG: This should show "Return to BlueLight" instead of "Done"');
+        }
       }
 
+      print('🔍 DEBUG: Calling FlutterWebAuth.authenticate with:');
+      print('🔍 DEBUG: - URL: ${connectionUrl.length > 100 ? connectionUrl.substring(0, 100) + '...' : connectionUrl}');
+      print('🔍 DEBUG: - Callback Scheme: $callbackUrlScheme');
+      print('🔍 DEBUG: - Ephemeral: true');
+      
       final resultUrl = await FlutterWebAuth.authenticate(
         url: connectionUrl,
         callbackUrlScheme: callbackUrlScheme,
         preferEphemeral: true, // Use ephemeral session for better security
       );
 
+      print('🔍 DEBUG: ✅ FlutterWebAuth completed successfully!');
       print('🔍 DEBUG: Received callback URL: $resultUrl');
 
       // Parse and decode the result
       final walletData = _parseCallbackResult(resultUrl);
 
-      print('🔍 DEBUG: Successfully parsed wallet data');
+      print('🔍 DEBUG: ✅ Successfully parsed wallet data');
+      print('🔍 DEBUG: Wallet: ${walletData.walletName}');
+      print('🔍 DEBUG: Address: ${walletData.address}');
+      print('🔍 DEBUG: Network: ${walletData.network}');
       return walletData;
     } catch (e) {
       print('🔍 DEBUG: Error in GameChanger connection flow: $e');

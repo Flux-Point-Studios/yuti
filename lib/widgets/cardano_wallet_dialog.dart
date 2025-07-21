@@ -766,15 +766,15 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     } catch (e) {
       print('🔍 DEBUG: GameChanger connection error: $e');
 
-      // Handle special iOS redirect signal
+      // Handle special Android fallback redirect signal
       if (e.toString().contains('REDIRECT_TO_CALLBACK_SCREEN')) {
-        print('🔍 DEBUG: iOS redirect signal detected - navigating to callback screen');
+        print('🔍 DEBUG: Android fallback redirect signal detected - navigating to callback screen');
         
         setState(() {
           _isLoading = false;
         });
         
-        // Navigate to callback screen
+        // Navigate to callback screen for Android fallback only
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => const GameChangerCallbackScreen(),

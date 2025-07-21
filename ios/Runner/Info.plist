@@ -75,14 +75,6 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>bluelight.app</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>bluelight</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleURLName</key>
 			<string>bluelight.gamechanger</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
