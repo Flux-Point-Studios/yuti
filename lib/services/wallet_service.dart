@@ -1,13 +1,14 @@
 import 'package:bip39_plus/bip39_plus.dart' as bip39;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
-import 'dart:math';
+import 'cardano_wallet_service.dart';
 
 class WalletService {
   static const _storage = FlutterSecureStorage();
   static const String _mnemonicKey = 'wallet_mnemonic';
   static const String _walletsKey = 'wallets';
 
+  final CardanoWalletService _cardanoWalletService = CardanoWalletService();
   String? _currentMnemonic;
   List<Wallet> _wallets = [];
 
@@ -39,17 +40,33 @@ class WalletService {
 
   Future<String> createWallet() async {
     try {
-      // Generate a new mnemonic using bip39 package
-      final mnemonic = bip39.generateMnemonic(strength: 256);
+      // Create wallet using real Cardano SDK via CardanoWalletService
+      final success = await _cardanoWalletService.createWallet('Main Wallet');
+      
+      if (!success) {
+        throw Exception('Failed to create Cardano wallet');
+      }
 
+      // Get the generated mnemonic from CardanoWalletService
+      final mnemonic = await _cardanoWalletService.exportMnemonic();
+      if (mnemonic == null) {
+        throw Exception('Failed to retrieve wallet mnemonic');
+      }
+
+      // Store mnemonic in WalletService storage as well (for compatibility)
       await _storage.write(key: _mnemonicKey, value: mnemonic);
       _currentMnemonic = mnemonic;
 
-      // Create default wallet
+      // Create wallet record with real Cardano address
+      final realAddress = _cardanoWalletService.currentAddress;
+      if (realAddress == null) {
+        throw Exception('Failed to get wallet address');
+      }
+
       final wallet = Wallet(
         id: 'wallet_${DateTime.now().millisecondsSinceEpoch}',
         name: 'Main Wallet',
-        address: _generateAddress(),
+        address: realAddress,
         balance: 0.0,
         createdAt: DateTime.now(),
       );
@@ -70,14 +87,27 @@ class WalletService {
         throw Exception('Invalid mnemonic phrase');
       }
 
+      // Create wallet using real Cardano SDK with provided mnemonic
+      final success = await _cardanoWalletService.createWallet('Restored Wallet', mnemonic: mnemonic);
+      
+      if (!success) {
+        throw Exception('Failed to restore Cardano wallet');
+      }
+
+      // Store mnemonic in WalletService storage as well (for compatibility)
       await _storage.write(key: _mnemonicKey, value: mnemonic);
       _currentMnemonic = mnemonic;
 
-      // Create restored wallet
+      // Create wallet record with real Cardano address
+      final realAddress = _cardanoWalletService.currentAddress;
+      if (realAddress == null) {
+        throw Exception('Failed to get wallet address');
+      }
+
       final wallet = Wallet(
         id: 'wallet_${DateTime.now().millisecondsSinceEpoch}',
         name: 'Restored Wallet',
-        address: _generateAddress(),
+        address: realAddress,
         balance: 0.0,
         createdAt: DateTime.now(),
       );
@@ -101,21 +131,15 @@ class WalletService {
     }
   }
 
-  String _generateAddress() {
-    // Generate a mock Cardano address for demo purposes
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    final random = Random();
-    const addressLength = 59; // Typical Cardano address length
-
-    String address = 'addr1';
-    for (int i = 0; i < addressLength - 5; i++) {
-      address += chars[random.nextInt(chars.length)];
-    }
-
-    return address;
-  }
+  // Note: Dummy address generation removed - now using real Cardano SDK addresses
 
   Future<String> getReceiveAddress() async {
+    // Return real Cardano address from CardanoWalletService if available
+    if (_cardanoWalletService.isConnected && _cardanoWalletService.currentAddress != null) {
+      return _cardanoWalletService.currentAddress!;
+    }
+    
+    // Fallback to stored wallet address
     if (_wallets.isEmpty) {
       throw Exception('No wallet available');
     }
