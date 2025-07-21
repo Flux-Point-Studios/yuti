@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/cardano_wallet_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/glassmorphism_container.dart';
+import '../widgets/wallet_security_settings.dart';
 
 class WalletScreen extends StatefulWidget {
   final AuthService authService;
@@ -314,30 +315,60 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildActionButtons() {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _buildActionButton(
-            icon: Icons.call_received,
-            label: 'Receive',
-            onTap: _showReceiveDialog,
-          ),
+        // Primary actions row
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.call_received,
+                label: 'Receive',
+                onTap: _showReceiveDialog,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.send,
+                label: 'Send',
+                onTap: _handleSendAction,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.swap_horiz,
+                label: 'Swap',
+                onTap: _handleSwapAction,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildActionButton(
-            icon: Icons.send,
-            label: 'Send',
-            onTap: _handleSendAction,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildActionButton(
-            icon: Icons.swap_horiz,
-            label: 'Swap',
-            onTap: _handleSwapAction,
-          ),
+        const SizedBox(height: 12),
+        // Security action row
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.security,
+                label: 'Security',
+                onTap: _openSecuritySettings,
+                color: AppColors.primaryBlue.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.settings,
+                label: 'Settings',
+                onTap: _openWalletSettings,
+                color: AppColors.textSecondary.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: SizedBox()), // Empty space for symmetry
+          ],
         ),
       ],
     );
@@ -347,6 +378,7 @@ class _WalletScreenState extends State<WalletScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    Color? color,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -357,7 +389,7 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               Icon(
                 icon,
-                color: AppColors.primaryBlue,
+                color: color ?? AppColors.primaryBlue,
                 size: 28,
               ),
               const SizedBox(height: 8),
@@ -610,5 +642,149 @@ class _WalletScreenState extends State<WalletScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       overlayEntry.remove();
     });
+  }
+
+  /// Open wallet security settings
+  void _openSecuritySettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const WalletSecuritySettings(),
+      ),
+    );
+  }
+
+  /// Open wallet general settings
+  void _openWalletSettings() {
+    // For now, show a simple dialog with wallet settings
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundDark,
+        title: const Text(
+          'Wallet Settings',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.backup, color: AppColors.primaryBlue),
+              title: const Text(
+                'Export Mnemonic',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: const Text(
+                'Backup your wallet seed phrase',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _exportMnemonic();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.info, color: AppColors.primaryBlue),
+              title: const Text(
+                'Wallet Info',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: const Text(
+                'View wallet details and debug info',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _walletService.debugWalletStorage();
+                _showCopyConfirmation('Debug info printed to console');
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Close',
+              style: TextStyle(color: AppColors.primaryBlue),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Export wallet mnemonic with security check
+  Future<void> _exportMnemonic() async {
+    try {
+      final mnemonic = await _walletService.exportMnemonic();
+      if (mnemonic == null) {
+        _showCopyConfirmation('Failed to export mnemonic - authentication required');
+        return;
+      }
+
+      // Show mnemonic in a secure dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.backgroundDark,
+          title: const Text(
+            '🔐 Wallet Backup Phrase',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '⚠️ KEEP THIS SAFE! Anyone with this phrase can access your wallet.',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.glassBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                child: SelectableText(
+                  mnemonic,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: mnemonic));
+                Navigator.pop(context);
+                _showCopyConfirmation('Mnemonic copied to clipboard');
+              },
+              child: const Text(
+                'Copy',
+                style: TextStyle(color: AppColors.primaryBlue),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      print('Error exporting mnemonic: $e');
+      _showCopyConfirmation('Error exporting mnemonic');
+    }
   }
 } 

@@ -66,6 +66,10 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app may access your photo library to share QR codes</string>
 	
+	<!-- Face ID permission for biometric wallet security -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>This app uses Face ID to secure access to your wallet and private keys</string>
+	
 	<!-- URL Types for GameChanger deep link callback -->
 	<key>CFBundleURLTypes</key>
 	<array>

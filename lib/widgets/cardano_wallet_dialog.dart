@@ -1134,6 +1134,59 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                           fontSize: 12,
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      
+                      // Enhanced Security Features info
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primaryBlue.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.security,
+                                  color: AppColors.primaryBlue,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Enhanced Security Features',
+                                  style: TextStyle(
+                                    color: AppColors.primaryBlue,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '🔐 Biometric authentication available\n✅ Backup verification system\n🔑 On-demand key derivation',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Access Security Settings from your wallet after setup.',
+                              style: TextStyle(
+                                color: AppColors.primaryBlue.withOpacity(0.8),
+                                fontSize: 10,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ],
                 ),
