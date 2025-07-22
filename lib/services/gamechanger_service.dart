@@ -163,8 +163,12 @@ class GameChangerService {
   }
 
   /// Initiate the GameChanger wallet connection flow with platform-specific strategy
-  Future<GameChangerWalletData> connectWallet({bool isMainnet = true}) async {
-    print('🔍 DEBUG: Starting connectWallet - isMainnet: $isMainnet');
+  /// Includes automatic retry mechanism for Chrome default browser issues on iOS
+  Future<GameChangerWalletData> connectWallet({
+    bool isMainnet = true, 
+    bool isRetry = false
+  }) async {
+    print('🔍 DEBUG: Starting connectWallet - isMainnet: $isMainnet, isRetry: $isRetry');
     print('🔍 DEBUG: Platform detection - kIsWeb: $kIsWeb');
     
     // Use FlutterWebAuth for both web and iOS to maintain browser session control
@@ -173,6 +177,9 @@ class GameChangerService {
       print('🔍 DEBUG: Web platform detected - using FlutterWebAuth');
     } else {
       print('🔍 DEBUG: iOS platform detected - using FlutterWebAuth with ASWebAuthenticationSession');
+      if (isRetry) {
+        print('🔍 DEBUG: RETRY ATTEMPT - This may work if Chrome was blocking the first attempt');
+      }
     }
     
     try {
@@ -183,7 +190,21 @@ class GameChangerService {
     } catch (e) {
       print('🔍 DEBUG: FlutterWebAuth connection failed: $e');
       
-      // Only fall back to external browser on Android or if specifically needed
+      // Handle Chrome default browser issue with automatic retry
+      if (!kIsWeb && Platform.isIOS && e.toString().contains('CHROME_DEFAULT_BROWSER_ISSUE') && !isRetry) {
+        print('🔍 DEBUG: Chrome browser issue detected - attempting automatic retry...');
+        await Future.delayed(Duration(seconds: 1)); // Brief pause before retry
+        
+        try {
+          return await connectWallet(isMainnet: isMainnet, isRetry: true);
+        } catch (retryError) {
+          print('🔍 DEBUG: Retry also failed: $retryError');
+          // Let the retry error bubble up with Chrome-specific handling
+          rethrow;
+        }
+      }
+      
+      // Android fallback
       if (!kIsWeb && !Platform.isIOS && e.toString().contains('WebAuth')) {
         print('🔍 DEBUG: Falling back to external browser for Android');
         return await _connectWalletAndroidFallback(isMainnet: isMainnet);
@@ -338,8 +359,10 @@ class GameChangerService {
       }
 
       if (errorMessage.contains('User cancelled') ||
-          errorMessage.contains('CANCELLED')) {
-        throw GameChangerException('Connection cancelled by user');
+          errorMessage.contains('User canceled') ||
+          errorMessage.contains('CANCELLED') ||
+          errorMessage.contains('CANCELED')) {
+        throw GameChangerException('CHROME_DEFAULT_BROWSER_ISSUE');
       }
 
       // iOS-specific error handling
