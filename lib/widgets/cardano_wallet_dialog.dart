@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cardano_flutter_sdk/cardano_flutter_sdk.dart';
 import 'package:cardano_dart_types/cardano_dart_types.dart';
@@ -434,7 +435,38 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                   fontSize: 12,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              
+              // iOS Safari requirement tip
+              if (!kIsWeb) ...[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.blue, size: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'iOS Tip: Set Safari as default browser for best results',
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -600,32 +632,72 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   }
 
   Widget _buildErrorMessage() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.error,
-            color: Colors.red,
-            size: 20,
+    final isChromeBrowserIssue = _errorMessage != null && 
+        _errorMessage!.contains('Chrome Default Browser Issue');
+        
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isChromeBrowserIssue 
+                ? Colors.orange.withOpacity(0.1) 
+                : Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isChromeBrowserIssue 
+                  ? Colors.orange.withOpacity(0.3)
+                  : Colors.red.withOpacity(0.3)
+            ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _errorMessage!,
-              style: const TextStyle(
-                color: Colors.red,
-                fontSize: 14,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                isChromeBrowserIssue ? Icons.settings : Icons.error,
+                color: isChromeBrowserIssue ? Colors.orange : Colors.red,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: isChromeBrowserIssue ? Colors.orange : Colors.red,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Show retry button for Chrome browser issue
+        if (isChromeBrowserIssue) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : () {
+                setState(() {
+                  _errorMessage = null; // Clear error message
+                });
+                _connectWithGameChanger(); // Retry connection
+              },
+              icon: Icon(Icons.refresh, size: 16),
+              label: Text('Retry After Switching to Safari'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
@@ -1318,7 +1390,24 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   String _parseErrorMessage(dynamic error) {
     final errorString = error.toString().toLowerCase();
     
-    // Handle cancellation gracefully (most common case)
+    // Handle Chrome default browser issue (iOS-specific)
+    if (errorString.contains('chrome_default_browser_issue')) {
+      return '''🚨 Chrome Default Browser Issue Detected
+
+The GameChanger connection failed because Chrome is your default browser. 
+
+✅ SOLUTION:
+1. Go to iOS Settings → Safari → Default Browser App
+2. Select "Safari" (temporarily)
+3. Return to BlueLight and try connecting again
+4. You should see "Return to BlueLight" instead of "Done"
+
+📱 WHY: iOS ASWebAuthenticationSession requires Safari for custom URL callbacks. Chrome blocks the return to BlueLight.
+
+After connecting, you can switch back to Chrome as default.''';
+    }
+
+    // Handle regular cancellation
     if (errorString.contains('canceled') || 
         errorString.contains('cancelled') ||
         errorString.contains('user canceled') ||
