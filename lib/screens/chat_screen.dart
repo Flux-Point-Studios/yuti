@@ -14,9 +14,7 @@ import '../utils/app_colors.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/glassmorphism_container.dart';
 import '../widgets/message_limit_widget.dart';
-import '../screens/profile_screen.dart';
 import '../screens/pricing_screen.dart';
-import '../screens/wallet_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -311,28 +309,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
-          ),
-          // Wallet button
-          IconButton(
-            icon: Icon(Icons.account_balance_wallet, color: Colors.white.withOpacity(0.8)),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => WalletScreen(authService: _authService),
-                ),
-              );
-            },
-          ),
-          // Profile button
-          IconButton(
-            icon: Icon(Icons.person, color: Colors.white.withOpacity(0.8)),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            },
           ),
         ],
       ),

@@ -7,6 +7,9 @@ import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
 import '../config/app_config.dart';
 import '../screens/welcome_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/wallet_screen.dart';
+import '../screens/browser_screen.dart';
 import 'glassmorphism_container.dart';
 
 class ChatSidebar extends StatefulWidget {
@@ -427,18 +430,69 @@ class _ChatSidebarState extends State<ChatSidebar>
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Column(
         children: [
-          _buildFooterButton(
-            icon: Icons.settings,
-            label: 'Settings',
-            onTap: () => _showSettings(),
+          // First row: Profile, Wallet, Browser
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildFooterButton(
+                icon: Icons.person,
+                label: 'Profile',
+                onTap: () {
+                  widget.onClose();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
+                },
+              ),
+              _buildFooterButton(
+                icon: Icons.account_balance_wallet,
+                label: 'Wallet',
+                onTap: () {
+                  widget.onClose();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => WalletScreen(authService: AuthService()),
+                    ),
+                  );
+                },
+              ),
+              _buildFooterButton(
+                icon: Icons.language,
+                label: 'Browser',
+                onTap: () {
+                  widget.onClose();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BrowserScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-          _buildFooterButton(
-            icon: Icons.help_outline,
-            label: 'Help',
-            onTap: () => _launchUrl(AppConfig().supportUrl),
+          const SizedBox(height: 8),
+          // Second row: Settings, Help
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildFooterButton(
+                icon: Icons.settings,
+                label: 'Settings',
+                onTap: () => _showSettings(),
+              ),
+              _buildFooterButton(
+                icon: Icons.help_outline,
+                label: 'Help',
+                onTap: () => _launchUrl(AppConfig().supportUrl),
+              ),
+              // Empty space to balance the layout
+              const SizedBox(width: 48),
+            ],
           ),
         ],
       ),
