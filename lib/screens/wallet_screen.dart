@@ -3,9 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../services/auth_service.dart';
 import '../services/cardano_wallet_service.dart';
+import '../services/transaction_history_service.dart';
+import '../services/address_book_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/glassmorphism_container.dart';
 import '../widgets/wallet_security_settings.dart';
+import 'send_screen.dart';
+import 'swap_screen.dart';
+import 'transactions_screen.dart';
+import 'address_book_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   final AuthService authService;
@@ -21,6 +27,8 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   final CardanoWalletService _walletService = CardanoWalletService();
+  final TransactionHistoryService _transactionHistoryService = TransactionHistoryService();
+  final AddressBookService _addressBookService = AddressBookService();
   
   bool _isLoading = false;
   Map<String, dynamic>? _walletBalance;
@@ -30,7 +38,13 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeServices();
     _loadWalletData();
+  }
+
+  Future<void> _initializeServices() async {
+    await _transactionHistoryService.initialize();
+    await _addressBookService.initialize();
   }
 
   Future<void> _loadWalletData() async {
@@ -346,9 +360,27 @@ class _WalletScreenState extends State<WalletScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        // Security action row
+        // Secondary actions row
         Row(
           children: [
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.receipt_long,
+                label: 'Transactions',
+                onTap: _openTransactions,
+                color: AppColors.primaryBlue.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.contact_page,
+                label: 'Address Book',
+                onTap: _openAddressBook,
+                color: AppColors.primaryBlue.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildActionButton(
                 icon: Icons.security,
@@ -357,7 +389,12 @@ class _WalletScreenState extends State<WalletScreen> {
                 color: AppColors.primaryBlue.withOpacity(0.8),
               ),
             ),
-            const SizedBox(width: 12),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Settings row
+        Row(
+          children: [
             Expanded(
               child: _buildActionButton(
                 icon: Icons.settings,
@@ -366,6 +403,8 @@ class _WalletScreenState extends State<WalletScreen> {
                 color: AppColors.textSecondary.withOpacity(0.6),
               ),
             ),
+            const SizedBox(width: 12),
+            const Expanded(child: SizedBox()), // Empty space
             const SizedBox(width: 12),
             const Expanded(child: SizedBox()), // Empty space for symmetry
           ],
@@ -565,27 +604,21 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _handleSendAction() {
-    // Navigate back to chat for send functionality
-    Navigator.of(context).pop(); // Go back to main app
-    // User will manually type send commands in chat
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Navigate to chat to send ADA or tokens'),
-        backgroundColor: AppColors.primaryBlue,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SendScreen(walletService: _walletService),
       ),
-    );
+    ).then((_) => _loadWalletData()); // Refresh wallet data when returning
   }
 
   void _handleSwapAction() {
-    // Navigate back to chat for swap functionality
-    Navigator.of(context).pop(); // Go back to main app
-    // User will manually type swap commands in chat
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Navigate to chat to swap tokens'),
-        backgroundColor: AppColors.primaryBlue,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SwapScreen(walletService: _walletService),
       ),
-    );
+    ).then((_) => _loadWalletData()); // Refresh wallet data when returning
   }
 
   void _showCopyConfirmation(String message) {
@@ -710,6 +743,26 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Open transactions screen
+  void _openTransactions() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const TransactionsScreen(),
+      ),
+    );
+  }
+
+  /// Open address book screen
+  void _openAddressBook() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AddressBookScreen(),
       ),
     );
   }
