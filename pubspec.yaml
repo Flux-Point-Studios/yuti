@@ -29,9 +29,9 @@ dependencies:
   url_launcher: ^6.2.2
   flutter_web_auth: ^0.6.0
   archive: ^3.4.10
-  # VESPR SDK for Cardano wallet functionality (same as working project)
-  cardano_flutter_sdk: ^2.5.3
-  cardano_dart_types: ^2.9.3
+  # VESPR SDK for Cardano wallet functionality (compatible versions)
+  cardano_flutter_sdk: ^2.5.0
+  cardano_dart_types: ^2.9.0
   hex: ^0.2.0
   # Video player for splash screen
   video_player: ^2.8.1
@@ -39,6 +39,8 @@ dependencies:
   fl_chart: ^0.66.0
   # Biometric authentication for enhanced security
   local_auth: ^2.1.6
+  # WebView for in-app browser
+  webview_flutter: ^4.4.2
 
 dev_dependencies:
   flutter_test:

@@ -9,6 +9,7 @@ import 'services/supabase_service.dart';
 import 'services/wallet_service.dart';
 import 'screens/chat_screen.dart';
 import 'screens/gamechanger_callback_screen.dart';
+import 'screens/browser_screen.dart';
 import 'utils/app_colors.dart';
 import 'config/secure_config.dart';
 
@@ -209,6 +210,7 @@ class MyApp extends StatelessWidget {
           '/chat': (context) => const ChatScreen(),
           '/gamechanger-callback': (context) =>
               const GameChangerCallbackScreen(),
+          '/browser': (context) => const BrowserScreen(),
         },
       ),
     );
