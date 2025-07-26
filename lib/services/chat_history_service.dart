@@ -170,12 +170,17 @@ class ChatHistoryService {
   Future<bool> canUserSendMessage() async {
     try {
       final user = _authService.currentUser;
-      if (user == null) return false;
+      if (user == null) {
+        print('🔍 DEBUG: No user found for can send message check');
+        return false;
+      }
 
+      print('🔍 DEBUG: Checking if user can send message: ${user.id}');
       // Check if user can send messages using database function
       final result = await _supabase
           .rpc('can_user_send_message', params: {'user_uuid': user.id});
 
+      print('🔍 DEBUG: Database returned can send message: $result');
       return result == true;
     } catch (e) {
       print('Error checking message limits: $e');
@@ -187,11 +192,16 @@ class ChatHistoryService {
   Future<int> getUserRemainingMessages() async {
     try {
       final user = _authService.currentUser;
-      if (user == null) return 0;
+      if (user == null) {
+        print('🔍 DEBUG: No user found for remaining messages check');
+        return 0;
+      }
 
+      print('🔍 DEBUG: Checking remaining messages for user: ${user.id}');
       final result = await _supabase
           .rpc('get_user_remaining_messages', params: {'user_uuid': user.id});
 
+      print('🔍 DEBUG: Database returned remaining messages: $result');
       return result ?? 0;
     } catch (e) {
       print('Error getting remaining messages: $e');
