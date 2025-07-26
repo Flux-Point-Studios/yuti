@@ -8,6 +8,7 @@ import '../widgets/glassmorphism_container.dart';
 import '../models/transaction.dart';
 import '../models/address_book_entry.dart';
 import 'address_book_screen.dart';
+import 'qr_scanner_screen.dart';
 
 class SendScreen extends StatefulWidget {
   final CardanoWalletService walletService;
@@ -56,7 +57,7 @@ class _SendScreenState extends State<SendScreen> {
       final tokens = await widget.walletService.getTokenHoldings();
       
       setState(() {
-        _maxAmount = double.tryParse(balance?['ada']?.toString() ?? '0') ?? 0.0;
+        _maxAmount = (double.tryParse(balance?['ada']?.toString() ?? '0') ?? 0.0) / 1000000;
         _availableTokens = tokens ?? [];
       });
     } catch (e) {
@@ -210,16 +211,29 @@ class _SendScreenState extends State<SendScreen> {
                   ),
                 )),
               ],
-              onChanged: (value) {
+              onChanged: (value) async {
                 setState(() {
                   _selectedAsset = value!;
-                  if (_selectedAsset == 'ADA') {
-                    _maxAmount = double.tryParse(widget.walletService.getWalletBalance().toString()) ?? 0.0;
-                  } else {
-                    final token = _availableTokens.firstWhere((t) => t['asset_name'] == _selectedAsset);
-                    _maxAmount = double.tryParse(token['quantity']?.toString() ?? '0') ?? 0.0;
-                  }
                 });
+                
+                if (_selectedAsset == 'ADA') {
+                  try {
+                    final balance = await widget.walletService.getWalletBalance();
+                    final adaBalance = (double.tryParse(balance['ada']?.toString() ?? '0') ?? 0.0) / 1000000;
+                    setState(() {
+                      _maxAmount = adaBalance;
+                    });
+                  } catch (e) {
+                    setState(() {
+                      _maxAmount = 0.0;
+                    });
+                  }
+                } else {
+                  final token = _availableTokens.firstWhere((t) => t['asset_name'] == _selectedAsset);
+                  setState(() {
+                    _maxAmount = double.tryParse(token['quantity']?.toString() ?? '0') ?? 0.0;
+                  });
+                }
               },
             ),
           ],
@@ -521,8 +535,16 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   void _scanQRCode() {
-    // Navigate to QR scanner
-    Navigator.pushNamed(context, '/qr_scanner').then((result) {
+    // Navigate to QR scanner with proper navigation
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const QRScannerScreen(
+          title: 'Scan Recipient Address',
+          hint: 'Scan the QR code of the recipient\'s wallet address',
+        ),
+      ),
+    ).then((result) {
       if (result != null && result is String) {
         _addressController.text = result;
       }
