@@ -18,7 +18,10 @@ class BlockfrostService {
   // Get headers with secure API key
   Future<Map<String, String>> _getHeaders() async {
     // Use cached key if available
-    _cachedApiKey ??= await _secureConfig.getBlockfrostApiKey();
+    if (_cachedApiKey == null) {
+      _cachedApiKey = await _secureConfig.getBlockfrostApiKey();
+      print('🔍 DEBUG: Blockfrost API key loaded successfully (${_cachedApiKey!.length} chars)');
+    }
 
     return {
       'project_id': _cachedApiKey!,
