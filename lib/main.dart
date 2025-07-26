@@ -19,7 +19,7 @@ void main() async {
   // Initialize Supabase
   await SupabaseService.initialize();
 
-  // Initialize API keys for Flutter web
+  // Initialize API keys for all platforms (web, iOS, Android)
   await _initializeApiKeys();
 
   // Set up GameChanger callback handler for iOS
@@ -38,22 +38,22 @@ void main() async {
   runApp(const MyApp());
 }
 
-/// Initialize API keys for Flutter web since .env files aren't supported
+/// Initialize API keys for all platforms since .env files aren't supported in mobile
 Future<void> _initializeApiKeys() async {
   try {
     final secureConfig = SecureConfig();
 
-    // Initialize with API keys from .env.local values
-    // In production, these should be passed via --dart-define flags
+    // Initialize with production API keys
+    // These are stored securely using FlutterSecureStorage
     await secureConfig.initializeKeys(
-      // Use actual values from your .env.local file
+      // T-Backend API key for AI features
       tBackendKey:
           '<REDACTED>',
-      // Add your Blockfrost key here if you have one
-      // blockfrostKey: 'your_blockfrost_key_here',
+      // Blockfrost API key for Cardano blockchain data
+      blockfrostKey: 'mainnetpzgQb7C0U7j75FeyY7pb5seDEC1Woq7E',
     );
 
-    print('🔍 DEBUG: API keys initialized for Flutter web');
+    print('🔍 DEBUG: API keys initialized successfully (T-Backend + Blockfrost)');
   } catch (e) {
     print('🔍 DEBUG: Error initializing API keys: $e');
   }
