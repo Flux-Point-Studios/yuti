@@ -366,7 +366,7 @@ class _WalletScreenState extends State<WalletScreen> {
             Expanded(
               child: _buildActionButton(
                 icon: Icons.receipt_long,
-                label: 'Transactions',
+                label: 'Txns',
                 onTap: _openTransactions,
                 color: AppColors.primaryBlue.withOpacity(0.8),
               ),
@@ -434,16 +434,18 @@ class _WalletScreenState extends State<WalletScreen> {
                 size: 24,
               ),
               const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
