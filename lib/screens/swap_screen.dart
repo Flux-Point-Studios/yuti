@@ -53,7 +53,7 @@ class _SwapScreenState extends State<SwapScreen> {
       final tokens = await widget.walletService.getTokenHoldings();
       
       setState(() {
-        _maxFromAmount = double.tryParse(balance?['ada']?.toString() ?? '0') ?? 0.0;
+        _maxFromAmount = (double.tryParse(balance?['ada']?.toString() ?? '0') ?? 0.0) / 1000000;
         _availableTokens = tokens ?? [];
       });
     } catch (e) {
@@ -310,19 +310,21 @@ class _SwapScreenState extends State<SwapScreen> {
         child: Row(
           children: [
             Container(
-              width: 24,
-              height: 24,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.primaryBlue.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                selectedAsset == 'ADA' ? Icons.account_balance_wallet : Icons.token,
-                color: AppColors.primaryBlue,
-                size: 16,
+              child: Text(
+                selectedAsset,
+                style: TextStyle(
+                  color: AppColors.primaryBlue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 selectedAsset,
@@ -580,16 +582,18 @@ class _SwapScreenState extends State<SwapScreen> {
             ),
             ..._popularTokens.map((asset) => ListTile(
               leading: Container(
-                width: 40,
-                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: AppColors.primaryBlue.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  asset == 'ADA' ? Icons.account_balance_wallet : Icons.token,
-                  color: AppColors.primaryBlue,
-                  size: 20,
+                child: Text(
+                  asset,
+                  style: TextStyle(
+                    color: AppColors.primaryBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               title: Text(
