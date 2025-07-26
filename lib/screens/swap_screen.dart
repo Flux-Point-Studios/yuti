@@ -48,6 +48,10 @@ class _SwapScreenState extends State<SwapScreen> {
   }
 
   Future<void> _loadAvailableAssets() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
       final balance = await widget.walletService.getWalletBalance();
       final tokens = await widget.walletService.getTokenHoldings();
@@ -55,9 +59,15 @@ class _SwapScreenState extends State<SwapScreen> {
       setState(() {
         _maxFromAmount = (double.tryParse(balance?['ada']?.toString() ?? '0') ?? 0.0) / 1000000;
         _availableTokens = tokens ?? [];
+        _isLoading = false;
+        print('Loaded balance: $_maxFromAmount ADA, Tokens: ${_availableTokens.length}');
       });
     } catch (e) {
       print('Error loading assets: $e');
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load wallet data: $e';
+      });
     }
   }
 
@@ -324,17 +334,7 @@ class _SwapScreenState extends State<SwapScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                selectedAsset,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            const Spacer(),
             Icon(
               Icons.keyboard_arrow_down,
               color: AppColors.textSecondary,
@@ -458,6 +458,22 @@ class _SwapScreenState extends State<SwapScreen> {
 
   Widget _buildSwapActionButton() {
     final isValid = _isFormValid();
+    final amount = double.tryParse(_fromAmountController.text);
+    final availableBalance = _getAvailableBalance(_fromAsset);
+    
+    String buttonText = 'Swap $_fromAsset to $_toAsset';
+    if (!isValid) {
+      if (amount == null || amount <= 0) {
+        buttonText = 'Enter amount';
+      } else if (availableBalance <= 0) {
+        buttonText = 'Insufficient balance';
+      } else if (amount > availableBalance) {
+        buttonText = 'Amount exceeds balance';
+      } else if (_fromAsset == _toAsset) {
+        buttonText = 'Select different assets';
+      }
+    }
+    
     return SizedBox(
       width: double.infinity,
       height: 56,
@@ -473,7 +489,7 @@ class _SwapScreenState extends State<SwapScreen> {
         child: _isLoading
             ? const CircularProgressIndicator(color: Colors.white)
             : Text(
-                'Swap $_fromAsset to $_toAsset',
+                buttonText,
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
       ),
@@ -505,9 +521,12 @@ class _SwapScreenState extends State<SwapScreen> {
 
   bool _isFormValid() {
     final amount = double.tryParse(_fromAmountController.text);
+    final availableBalance = _getAvailableBalance(_fromAsset);
+    
     return amount != null &&
            amount > 0 &&
-           amount <= _getAvailableBalance(_fromAsset) &&
+           availableBalance > 0 &&
+           amount <= availableBalance &&
            _fromAsset != _toAsset;
   }
 
