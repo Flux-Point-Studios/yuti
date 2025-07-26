@@ -287,7 +287,7 @@ class _WalletScreenState extends State<WalletScreen> {
               )
             else if (_walletBalance != null) ...[
               Text(
-                '${(_walletBalance!['ada'] ?? '0')} ADA',
+                '${((double.tryParse(_walletBalance!['ada']?.toString() ?? '0') ?? 0.0) / 1000000).toStringAsFixed(2)} ADA',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 28,
@@ -422,23 +422,28 @@ class _WalletScreenState extends State<WalletScreen> {
     return GestureDetector(
       onTap: onTap,
       child: GlassmorphismContainer(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Container(
+          height: 100,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
                 color: color ?? AppColors.primaryBlue,
-                size: 28,
+                size: 24,
               ),
               const SizedBox(height: 8),
               Text(
                 label,
                 style: TextStyle(
                   color: AppColors.textPrimary,
-                  fontSize: 14,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
