@@ -1,5 +1,5 @@
 -- Add daily message limit tracking for FREE users
--- FREE users are limited to 20 messages per day across all sessions
+-- FREE users are limited to 20 Agent T responses per day across all sessions
 
 -- Add message tracking fields to users table
 ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_message_count INTEGER DEFAULT 0;
@@ -48,7 +48,7 @@ BEGIN
         current_count := 0;
     END IF;
 
-    -- Check if FREE user is under the 20 message daily limit
+    -- Check if FREE user is under the 20 Agent T response daily limit
     RETURN current_count < 20;
 END;
 $$;
@@ -133,7 +133,7 @@ BEGIN
         RETURN daily_limit;
     END IF;
 
-    -- Return remaining messages for FREE users
+    -- Return remaining Agent T responses for FREE users
     RETURN GREATEST(daily_limit - current_count, 0);
 END;
 $$;
@@ -164,8 +164,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-    -- Only count user messages (not assistant messages)
-    IF NEW.role = 'user' THEN
+    -- Only count assistant messages (Agent T responses), not user messages
+    -- This is because we want to limit Agent T responses to 20 per day for FREE users
+    IF NEW.role = 'assistant' THEN
         -- Get the user_id from the chat
         DECLARE
             chat_user_id UUID;
@@ -174,7 +175,7 @@ BEGIN
             FROM chats
             WHERE id = NEW.chat_id;
             
-            -- Increment the user's message count
+            -- Increment the user's message count (counting Agent T responses)
             PERFORM increment_user_message_count(chat_user_id);
         END;
     END IF;
