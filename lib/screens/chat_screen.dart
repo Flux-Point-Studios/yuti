@@ -77,6 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _updateMessageLimits() async {
     try {
       final remaining = await _chatHistoryService.getUserRemainingMessages();
+      print('🔍 DEBUG: Message limits - Remaining: $remaining, IsLimitReached: ${remaining <= 0}');
       setState(() {
         _remainingMessages = remaining;
         _isLimitReached = remaining <= 0;
@@ -191,6 +192,15 @@ class _ChatScreenState extends State<ChatScreen> {
     print(
         '🔍 DEBUG: Adding welcome message. Current messages count: ${_messages.length}');
 
+    // Check if welcome message already exists
+    final hasWelcomeMessage = _messages.any((m) => 
+        !m.isUser && m.text.startsWith("Hello! I'm Agent T, your crypto concierge"));
+    
+    if (hasWelcomeMessage) {
+      print('🔍 DEBUG: Welcome message already exists, skipping');
+      return;
+    }
+
     final welcomeMessage = ChatMessage.text(
       text:
           "Hello! I'm Agent T, your crypto concierge. I can help you manage your digital assets, answer questions, and more. "
@@ -205,7 +215,7 @@ class _ChatScreenState extends State<ChatScreen> {
     print(
         '🔍 DEBUG: Welcome message added. New messages count: ${_messages.length}');
 
-    // Save to current session
+    // Save to current session (but it won't count towards limit as it's a greeting)
     if (_currentSession != null) {
       _chatHistoryService.addMessageToSession(
         _currentSession!.id,
@@ -322,9 +332,9 @@ class _ChatScreenState extends State<ChatScreen> {
           '🔍 DEBUG: Rendering message $i: "${_messages[i].text.substring(0, _messages[i].text.length > 50 ? 50 : _messages[i].text.length)}..."');
     }
 
-    // Count Agent T responses
-    final agentResponses = _messages.where((m) => !m.isUser).length;
-    final shouldShowWarning = agentResponses >= 15 && agentResponses < 20 && _remainingMessages <= 5;
+    // Show warning based on remaining messages from database, not local message count
+    // Local message count includes historical messages from all sessions
+    final shouldShowWarning = _remainingMessages <= 5 && _remainingMessages > 0;
     final shouldShowBlocked = _isLimitReached;
 
     return ListView.builder(
