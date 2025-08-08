@@ -79,8 +79,9 @@ class _ChatScreenState extends State<ChatScreen> {
       final remaining = await _chatHistoryService.getUserRemainingMessages();
       print('🔍 DEBUG: Message limits - Remaining: $remaining, IsLimitReached: ${remaining <= 0}');
       setState(() {
+        // -1 indicates unlimited (admin or premium via DB sentinel)
         _remainingMessages = remaining;
-        _isLimitReached = remaining <= 0;
+        _isLimitReached = remaining == -1 ? false : remaining <= 0;
       });
     } catch (e) {
       print('Error updating message limits: $e');
@@ -335,7 +336,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // Show warning based on remaining messages from database, not local message count
     // Local message count includes historical messages from all sessions
     final shouldShowWarning = _remainingMessages <= 5 && _remainingMessages > 0;
-    final shouldShowBlocked = _isLimitReached;
+    // Do not show blocked when unlimited (-1) or when not actually reached
+    final shouldShowBlocked = _isLimitReached && _remainingMessages != -1;
 
     return ListView.builder(
       controller: _scrollController,

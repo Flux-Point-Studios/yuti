@@ -175,6 +175,12 @@ class ChatHistoryService {
         return false;
       }
 
+      // Admin accounts bypass limits entirely
+      if (SupabaseService.isAdminEmail(user.email)) {
+        print('🔓 Admin bypass: can send message always true for ${user.email}');
+        return true;
+      }
+
       print('🔍 DEBUG: Checking if user can send message: ${user.id}');
       // Check if user can send messages using database function
       final result = await _supabase
@@ -195,6 +201,12 @@ class ChatHistoryService {
       if (user == null) {
         print('🔍 DEBUG: No user found for remaining messages check');
         return 0;
+      }
+
+      // Admin accounts have unlimited remaining
+      if (SupabaseService.isAdminEmail(user.email)) {
+        print('🔓 Admin bypass: unlimited remaining messages for ${user.email}');
+        return -1; // sentinel for unlimited
       }
 
       print('🔍 DEBUG: Checking remaining messages for user: ${user.id}');
