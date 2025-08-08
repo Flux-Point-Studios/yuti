@@ -43,16 +43,24 @@ jobs:
       
     - name: Configure API Keys
       env:
-        # Use GitHub Secrets for production, fallback to hardcoded for now
-        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY || '9d94b0e91c8bdebe6ee1fa7ada205bed276931895ed94aa05c7e245b99e599ee' }}
-        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL || 'https://api.fluxpointstudios.com' }}
+        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY }}
+        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL }}
       run: |
         echo "🔍 API Configuration for iOS Build:"
-        echo "- Backend URL: $T_BACKEND_URL"
+        if [ -z "$T_BACKEND_URL" ]; then
+          echo "- Backend URL secret not set; using default https://api.fluxpointstudios.com"
+          export T_BACKEND_URL="https://api.fluxpointstudios.com"
+        else
+          echo "- Backend URL: $T_BACKEND_URL"
+        fi
+        if [ -z "$T_BACKEND_API_KEY" ]; then
+          echo "❌ Missing T_BACKEND_API_KEY GitHub Secret" >&2
+          exit 1
+        fi
         echo "- API Key configured: ✅ (via dart-define)"
         echo "- Mainnet mode: ✅"
-        echo "- This should fix AI API calls in TestFlight builds"
-      
+        echo "- This ensures AI API calls in TestFlight builds"
+    
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1
       with:
@@ -184,10 +192,13 @@ jobs:
     - name: Build iOS app
       if: github.event.inputs.build_type == 'debug'
       env:
-        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY || '9d94b0e91c8bdebe6ee1fa7ada205bed276931895ed94aa05c7e245b99e599ee' }}
-        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL || 'https://api.fluxpointstudios.com' }}
+        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY }}
+        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL }}
       run: |
         echo "Building iOS app with type: ${{ github.event.inputs.build_type }}"
+        if [ -z "$T_BACKEND_URL" ]; then
+          export T_BACKEND_URL="https://api.fluxpointstudios.com"
+        fi
         flutter build ios --debug --no-codesign \
           --dart-define=T_BACKEND_API_KEY=$T_BACKEND_API_KEY \
           --dart-define=T_BACKEND_URL=$T_BACKEND_URL \
@@ -196,10 +207,13 @@ jobs:
     - name: Build IPA (if release)
       if: github.event.inputs.build_type == 'release'
       env:
-        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY || '9d94b0e91c8bdebe6ee1fa7ada205bed276931895ed94aa05c7e245b99e599ee' }}
-        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL || 'https://api.fluxpointstudios.com' }}
+        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY }}
+        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL }}
       run: |
         echo "Creating .ipa with export method: ${{ github.event.inputs.export_method }}"
+        if [ -z "$T_BACKEND_URL" ]; then
+          export T_BACKEND_URL="https://api.fluxpointstudios.com"
+        fi
         flutter build ipa --release --export-options-plist=ExportOptions.plist \
           --dart-define=T_BACKEND_API_KEY=$T_BACKEND_API_KEY \
           --dart-define=T_BACKEND_URL=$T_BACKEND_URL \
@@ -229,7 +243,7 @@ jobs:
         echo "- **Flutter Version**: 3.32.6" >> $GITHUB_STEP_SUMMARY
         echo "- **Bundle ID**: com.bluelight.wallet" >> $GITHUB_STEP_SUMMARY
         echo "- **Version**: 1.0.1+3" >> $GITHUB_STEP_SUMMARY
-        echo "- **API Keys**: ✅ Included (fixes TestFlight AI calls)" >> $GITHUB_STEP_SUMMARY
+        echo "- **API Keys**: ✅ Included (via GitHub Secrets)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
           echo "📦 Check the 'Artifacts' section below to download your .ipa file" >> $GITHUB_STEP_SUMMARY
