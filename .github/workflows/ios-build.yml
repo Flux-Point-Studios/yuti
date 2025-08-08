@@ -43,8 +43,8 @@ jobs:
       
     - name: Configure API Keys
       env:
-        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY }}
-        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL }}
+        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY || 'c4008e4d165741ca8633f78041df4868' }}
+        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL || 'https://api.fluxpointstudios.com' }}
       run: |
         echo "🔍 API Configuration for iOS Build:"
         if [ -z "$T_BACKEND_URL" ]; then
@@ -192,8 +192,8 @@ jobs:
     - name: Build iOS app
       if: github.event.inputs.build_type == 'debug'
       env:
-        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY }}
-        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL }}
+        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY || 'c4008e4d165741ca8633f78041df4868' }}
+        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL || 'https://api.fluxpointstudios.com' }}
       run: |
         echo "Building iOS app with type: ${{ github.event.inputs.build_type }}"
         if [ -z "$T_BACKEND_URL" ]; then
@@ -207,8 +207,8 @@ jobs:
     - name: Build IPA (if release)
       if: github.event.inputs.build_type == 'release'
       env:
-        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY }}
-        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL }}
+        T_BACKEND_API_KEY: ${{ secrets.T_BACKEND_API_KEY || 'c4008e4d165741ca8633f78041df4868' }}
+        T_BACKEND_URL: ${{ secrets.T_BACKEND_URL || 'https://api.fluxpointstudios.com' }}
       run: |
         echo "Creating .ipa with export method: ${{ github.event.inputs.export_method }}"
         if [ -z "$T_BACKEND_URL" ]; then
