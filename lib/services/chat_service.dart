@@ -87,7 +87,7 @@ class ChatService {
   
   // Session management
   late final String _sessionId;
-  SwapRequest? _pendingSwapRequest;
+  // Local swap orchestration removed; backend handles full swap flow
   
   // Singleton pattern
   static final ChatService _instance = ChatService._internal();
@@ -102,11 +102,7 @@ class ChatService {
     try {
       print('🔍 DEBUG: Starting processMessage with input: "$userInput"');
       
-      // Check if we're waiting for additional swap information
-      if (_pendingSwapRequest != null) {
-        return await _handlePendingSwapInput(userInput);
-      }
-      
+      // Swap orchestration handled by backend; no local pending state
       final intent = _detectIntent(userInput);
       print('🔍 DEBUG: Detected intent: $intent');
       
@@ -319,65 +315,14 @@ class ChatService {
     }
   }
   
-  // Enhanced swap command handling with intelligent parsing
+  // Enhanced swap command handling now delegated to backend orchestrator
   Future<ChatMessage> _handleSwapCommand(String input) async {
     try {
-      print('🔍 DEBUG: Processing swap command: "$input"');
-      
-      // Extract entities from natural language input
-      final entities = _extractSwapEntities(input);
-      print('🔍 DEBUG: Extracted entities: amount=${entities.amount}, from=${entities.fromCurrency}, to=${entities.toCurrency}, confidence=${entities.confidence}');
-      
-      // Create swap request from extracted entities
-      final swap = SwapRequest(platform: entities.platform ?? SwapPlatform.auto);
-      swap.amount = entities.amount;
-      swap.fromCurrency = entities.fromCurrency;
-      swap.toCurrency = entities.toCurrency;
-      swap.toAddress = entities.address;
-      
-      // If we couldn't extract enough information, ask for clarification
-      if (entities.confidence < 0.6 || swap.amount == null || swap.fromCurrency == null || swap.toCurrency == null) {
-        return await _askForSwapClarification(swap, input);
-      }
-      
-      // Normalize currencies
-      swap.fromCurrency = _normalizeCurrency(swap.fromCurrency!);
-      swap.toCurrency = _normalizeCurrency(swap.toCurrency!);
-      
-      // Check if we need to choose platform (Cardano-only vs cross-chain)
-      if (swap.needsPlatformChoice) {
-        _pendingSwapRequest = swap;
-        return _askForPlatformChoice(swap);
-      }
-      
-      // Determine platform automatically if cross-chain
-      if (swap.isCrossChain) {
-        swap.platform = SwapPlatform.uex;
-      } else {
-        swap.platform = SwapPlatform.saturnSwap;
-      }
-      
-      // Check if we need destination address
-      if (swap.toCurrency != 'ADA' && swap.toAddress == null) {
-        _pendingSwapRequest = swap;
-        swap.awaitingAddressFor = swap.toCurrency;
-        
-        return ChatMessage.text(
-          text: "Great! I'll help you swap **${swap.amount} ${swap.fromCurrency}** to **${swap.toCurrency}**.\n\n"
-                "What is your **${swap.toCurrency}** wallet address to receive the ${swap.toCurrency}?",
-          isUser: false,
-        );
-      }
-      
-      // If swapping to ADA, use our wallet address
-      if (swap.toCurrency == 'ADA') {
-        swap.toAddress = await _walletService.getReceiveAddress();
-      }
-      
-      // Create swap order
-      return await _createSwapOrder(swap);
+      print('🔍 DEBUG: Forwarding swap request to backend orchestrator: "$input"');
+      final reply = await _callTBackend(input);
+      return ChatMessage.text(text: reply, isUser: false);
     } catch (e) {
-      print('🔍 DEBUG: Error in _handleSwapCommand: $e');
+      print('🔍 DEBUG: Error in _handleSwapCommand (orchestrator): $e');
       return ChatMessage.text(
         text: "❌ Failed to process swap: ${e.toString()}",
         isUser: false,
@@ -385,407 +330,22 @@ class ChatService {
     }
   }
   
-  // Enhanced entity extraction with pattern matching and context
-  ExtractedEntities _extractSwapEntities(String input) {
-    final lower = input.toLowerCase();
-    String? amount;
-    String? fromCurrency;
-    String? toCurrency;
-    SwapPlatform? platform;
-    double confidence = 0.0;
-    
-    // Platform detection
-    if (lower.contains('saturn')) {
-      platform = SwapPlatform.saturnSwap;
-      confidence += 0.2;
-    } else if (lower.contains('uex') || lower.contains('cross') || lower.contains('bridge')) {
-      platform = SwapPlatform.uex;
-      confidence += 0.2;
-    }
-    
-    // Enhanced amount extraction
-    final amountPatterns = [
-      r'(\d+\.?\d*)\s*([a-zA-Z]+)',  // "1.5 ETH"
-      r'(\d+\.?\d*)',  // Just number
-      r'all\s+my\s+([a-zA-Z]+)',  // "all my ADA"
-      r'everything',  // "everything"
-    ];
-    
-    for (final pattern in amountPatterns) {
-      final regex = RegExp(pattern, caseSensitive: false);
-      final match = regex.firstMatch(input);
-      if (match != null) {
-        if (pattern.contains('all') || pattern.contains('everything')) {
-          amount = 'max';
-          if (match.groupCount > 0) {
-            fromCurrency = match.group(1);
-          }
-        } else {
-          amount = match.group(1);
-          if (match.groupCount > 1) {
-            fromCurrency = match.group(2);
-          }
-        }
-        confidence += 0.3;
-        break;
-      }
-    }
-    
-    // Enhanced currency extraction with multiple patterns
-    final currencyPatterns = [
-      r'swap\s+(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:to|for|into)\s+([a-zA-Z]+)',  // "swap 1 ETH to BTC"
-      r'(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:to|for|into)\s+([a-zA-Z]+)',  // "1 ETH to BTC"
-      r'exchange\s+(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:to|for|into)\s+([a-zA-Z]+)',  // "exchange ETH for BTC"
-      r'convert\s+(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:to|for|into)\s+([a-zA-Z]+)',  // "convert ETH to BTC"
-      r'trade\s+(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:to|for|into)\s+([a-zA-Z]+)',  // "trade ETH for BTC"
-      r'sell\s+(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:for|to)\s+([a-zA-Z]+)',  // "sell ETH for BTC"
-      r'buy\s+(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:with|using)\s+([a-zA-Z]+)',  // "buy BTC with ETH"
-      r'get\s+(\d+\.?\d*\s+)?([a-zA-Z]+)\s+(?:with|using|for)\s+([a-zA-Z]+)',  // "get BTC with ETH"
-      r'(?:from|using)\s+([a-zA-Z]+)\s+(?:to|for|into)\s+([a-zA-Z]+)',  // "from ETH to BTC"
-    ];
-    
-    for (final pattern in currencyPatterns) {
-      final regex = RegExp(pattern, caseSensitive: false);
-      final match = regex.firstMatch(input);
-      if (match != null) {
-        if (pattern.contains('buy') || pattern.contains('get')) {
-          // For "buy BTC with ETH" pattern, currencies are swapped
-          if (match.groupCount >= 3) {
-            fromCurrency = match.group(3);  // ETH
-            toCurrency = match.group(2);    // BTC
-            if (match.group(1) != null && amount == null) {
-              amount = match.group(1)?.trim().split(' ').first;
-            }
-          }
-        } else {
-          // Standard "sell/swap ETH for BTC" pattern
-          if (match.groupCount >= 3) {
-            fromCurrency = match.group(2);  // ETH
-            toCurrency = match.group(3);    // BTC
-            if (match.group(1) != null && amount == null) {
-              amount = match.group(1)?.trim().split(' ').first;
-            }
-          } else if (match.groupCount >= 2) {
-            fromCurrency = match.group(1);
-            toCurrency = match.group(2);
-          }
-        }
-        confidence += 0.4;
-        break;
-      }
-    }
-    
-    // Validate and normalize extracted data
-    if (fromCurrency != null) {
-      fromCurrency = _normalizeCurrency(fromCurrency);
-      confidence += 0.1;
-    }
-    
-    if (toCurrency != null) {
-      toCurrency = _normalizeCurrency(toCurrency);
-      confidence += 0.1;
-    }
-    
-    if (amount != null && amount != 'max') {
-      if (double.tryParse(amount) != null) {
-        confidence += 0.1;
-      } else {
-        amount = null;  // Invalid amount
-        confidence -= 0.2;
-      }
-    }
-    
-    print('🔍 DEBUG: Entity extraction - amount: $amount, from: $fromCurrency, to: $toCurrency, confidence: $confidence');
-    
-    return ExtractedEntities(
-      amount: amount,
-      fromCurrency: fromCurrency,
-      toCurrency: toCurrency,
-      platform: platform,
-      confidence: confidence,
-    );
-  }
-  
-  Future<ChatMessage> _askForSwapClarification(SwapRequest partialSwap, String originalInput) async {
-    String clarificationText = "I'd like to help you with that swap! ";
-    
-    List<String> missingInfo = [];
-    
-    if (partialSwap.amount == null) {
-      missingInfo.add("the amount");
-    }
-    
-    if (partialSwap.fromCurrency == null) {
-      missingInfo.add("which currency you want to swap from");
-    }
-    
-    if (partialSwap.toCurrency == null) {
-      missingInfo.add("which currency you want to swap to");
-    }
-    
-    if (missingInfo.isNotEmpty) {
-      clarificationText += "I need to know ${missingInfo.join(' and ')}.\n\n";
-      clarificationText += "Please tell me in a format like:\n";
-      clarificationText += "• \"Swap 1 ETH to BTC\"\n";
-      clarificationText += "• \"Exchange 100 ADA for USDT\"\n";
-      clarificationText += "• \"Convert 0.5 BTC to ETH\"";
-    } else {
-      clarificationText += "I understood you want to swap, but could you clarify the details?\n\n";
-      clarificationText += "For example: \"Swap 1 ETH to BTC\"";
-    }
-    
-    return ChatMessage.text(text: clarificationText, isUser: false);
-  }
-  
-  ChatMessage _askForPlatformChoice(SwapRequest swap) {
-    return ChatMessage.text(
-      text: "Perfect! I can help you swap **${swap.amount} ${swap.fromCurrency}** to **${swap.toCurrency}**.\n\n"
-            "Since both currencies are on Cardano, you have two options:\n\n"
-            "🔹 **SaturnSwap** - Cardano native DEX (lower fees, faster)\n"
-            "🔹 **UEX** - Cross-chain DEX (more liquidity options)\n\n"
-            "Which would you prefer? You can say \"Saturn\" or \"UEX\", or I can choose the best option for you.",
-      isUser: false,
-    );
-  }
-  
-  Future<ChatMessage> _handlePendingSwapInput(String input) async {
-    final lower = input.toLowerCase();
-    
-    // Handle platform choice
-    if (_pendingSwapRequest!.needsPlatformChoice) {
-      if (lower.contains('saturn')) {
-        _pendingSwapRequest!.platform = SwapPlatform.saturnSwap;
-      } else if (lower.contains('uex')) {
-        _pendingSwapRequest!.platform = SwapPlatform.uex;
-      } else if (lower.contains('best') || lower.contains('choose') || lower.contains('auto')) {
-        _pendingSwapRequest!.platform = SwapPlatform.saturnSwap; // Default to Saturn for Cardano pairs
-      } else {
-        return ChatMessage.text(
-          text: "Please choose either **SaturnSwap** or **UEX**, or say \"choose for me\" and I'll pick the best option.",
-          isUser: false,
-        );
-      }
-      
-      // Check if we need destination address
-      if (_pendingSwapRequest!.toCurrency != 'ADA' && _pendingSwapRequest!.toAddress == null) {
-        _pendingSwapRequest!.awaitingAddressFor = _pendingSwapRequest!.toCurrency;
-        
-        return ChatMessage.text(
-          text: "Great choice! Now what is your **${_pendingSwapRequest!.toCurrency}** wallet address to receive the ${_pendingSwapRequest!.toCurrency}?",
-          isUser: false,
-        );
-      }
-      
-      // If swapping to ADA, use our wallet address
-      if (_pendingSwapRequest!.toCurrency == 'ADA') {
-        _pendingSwapRequest!.toAddress = await _walletService.getReceiveAddress();
-      }
-      
-      final result = await _createSwapOrder(_pendingSwapRequest!);
-      _pendingSwapRequest = null;
-      return result;
-    }
-    
-    // Handle address input
-    if (_pendingSwapRequest!.awaitingAddressFor != null) {
-      return await _handleSwapAddressInput(input);
-    }
-    
-    // Try to parse as additional swap information
-    final entities = _extractSwapEntities(input);
-    
-    if (entities.confidence > 0.5) {
-      // Update pending request with new information
-      _pendingSwapRequest!.amount ??= entities.amount;
-      _pendingSwapRequest!.fromCurrency ??= entities.fromCurrency;
-      _pendingSwapRequest!.toCurrency ??= entities.toCurrency;
-      
-      if (_pendingSwapRequest!.isComplete) {
-        final result = await _createSwapOrder(_pendingSwapRequest!);
-        _pendingSwapRequest = null;
-        return result;
-      }
-    }
-    
-    return await _askForSwapClarification(_pendingSwapRequest!, input);
-  }
-  
-  Future<ChatMessage> _handleSwapAddressInput(String input) async {
-    final address = input.trim();
-    
-    // TODO: Validate address based on currency type
-    // For now, basic validation
-    if (address.length < 20) {
-      return ChatMessage.text(
-        text: "❌ That doesn't look like a valid ${_pendingSwapRequest!.awaitingAddressFor} address. "
-              "Please double-check and try again.",
-        isUser: false,
-      );
-    }
-    
-    _pendingSwapRequest!.toAddress = address;
-    _pendingSwapRequest!.awaitingAddressFor = null;
-    
-    final result = await _createSwapOrder(_pendingSwapRequest!);
-    _pendingSwapRequest = null;
-    
-    return result;
-  }
-  
-  Future<ChatMessage> _createSwapOrder(SwapRequest swap) async {
-    try {
-      String platformName = swap.platform == SwapPlatform.saturnSwap ? "SaturnSwap" : "UEX";
-      print('🔍 DEBUG: Creating swap order on $platformName: ${swap.amount} ${swap.fromCurrency} -> ${swap.toCurrency}');
-      
-      if (swap.platform == SwapPlatform.saturnSwap) {
-        return await _createSaturnSwapOrder(swap);
-      } else {
-        return await _createUEXSwapOrder(swap);
-      }
-    } catch (e) {
-      print('🔍 DEBUG: Error creating swap order: $e');
-      return ChatMessage.text(
-        text: "❌ **Swap Service Error**\n\n"
-              "I encountered an issue creating your swap order:\n"
-              "${e.toString()}\n\n"
-              "Please try again in a moment or contact support if the issue persists.",
-        isUser: false,
-      );
-    }
-  }
-  
-  Future<ChatMessage> _createSaturnSwapOrder(SwapRequest swap) async {
-    try {
-      // Get real quote from SaturnSwap
-      final quote = await _saturnSwapService.getSwapQuote(
-        fromToken: swap.fromCurrency!,
-        toToken: swap.toCurrency!,
-        amount: swap.amount!,
-        isFromAmount: true,
-      );
-      
-      // Create the swap transaction
-      final swapTx = await _saturnSwapService.createSwapTransaction(
-        fromToken: swap.fromCurrency!,
-        toToken: swap.toCurrency!,
-        fromAmount: swap.amount!,
-        toAmount: quote.toAmount,
-        userAddress: swap.toAddress!,
-        slippageTolerance: 0.5, // 0.5% slippage
-      );
-      
-      final orderId = swapTx['order_id'] ?? const Uuid().v4().substring(0, 8);
-      
-      return ChatMessage.swap(
-        text: "✅ **SaturnSwap Order Created Successfully!**\n\n"
-              "**Order ID:** `$orderId`\n"
-              "**Platform:** 🪐 SaturnSwap (Cardano DEX)\n\n"
-              "**Swap Details:**\n"
-              "📤 **Send:** ${swap.amount} ${swap.fromCurrency}\n"
-              "📥 **Receive:** ~${quote.toAmount} ${swap.toCurrency}\n"
-              "📍 **To Address:** `${swap.toAddress?.substring(0, 10)}...`\n"
-              "💱 **Rate:** 1 ${swap.fromCurrency} = ${quote.exchangeRate.toStringAsFixed(6)} ${swap.toCurrency}\n"
-              "📊 **Price Impact:** ${(quote.priceImpact * 100).toStringAsFixed(2)}%\n"
-              "⚡ **Network:** Cardano\n"
-              "💰 **Platform Fee:** ${quote.fee.toStringAsFixed(6)} ${swap.fromCurrency}\n"
-              "⏰ **Status:** ready_to_execute\n"
-              "⏳ **Quote Expires:** ${_formatTime(quote.expiresAt)}\n\n"
-              "💡 **Next Steps:**\n"
-              "1. Confirm the transaction in your wallet\n"
-              "2. Wait for network confirmation (~20 seconds)\n"
-              "3. Your ${swap.toCurrency} will be delivered automatically\n\n"
-              "*(Ask me \"What's the status of order $orderId?\" for updates)*\n\n"
-              "⚠️ **Note:** SaturnSwap integration includes simulated data for demo purposes.",
-        orderId: orderId,
-        fromAmount: swap.amount!,
-        fromCurrency: swap.fromCurrency!,
-        toAmount: quote.toAmount,
-        toCurrency: swap.toCurrency!,
-        depositAddress: await _walletService.getReceiveAddress(),
-      );
-    } catch (e) {
-      // Fallback to simulated response if SaturnSwap service fails
-      return ChatMessage.text(
-        text: "❌ **SaturnSwap Service Temporarily Unavailable**\n\n"
-              "I'm having trouble connecting to the SaturnSwap service right now. "
-              "This could be due to:\n"
-              "• Network connectivity issues\n"
-              "• Service maintenance\n"
-              "• Invalid token pair\n\n"
-              "For cross-chain swaps, you can try using UEX instead by saying:\n"
-              "\"Swap ${swap.amount} ${swap.fromCurrency} to ${swap.toCurrency} on UEX\"\n\n"
-              "*Error details: ${e.toString()}*",
-        isUser: false,
-      );
-    }
-  }
-  
-  Future<ChatMessage> _createUEXSwapOrder(SwapRequest swap) async {
-    try {
-      // Get real quote from UEX
-      final quote = await _uexService.getSwapQuote(
-        fromToken: swap.fromCurrency!,
-        toToken: swap.toCurrency!,
-        amount: swap.amount!,
-        isFromAmount: true,
-      );
-      
-      // Create the swap transaction
-      final swapTx = await _uexService.createSwapTransaction(
-        fromToken: swap.fromCurrency!,
-        toToken: swap.toCurrency!,
-        fromAmount: swap.amount!,
-        toAmount: quote.toAmount,
-        userAddress: swap.toAddress!,
-        slippageTolerance: 0.5, // 0.5% slippage
-      );
-      
-      final orderId = swapTx['order_id'] ?? const Uuid().v4().substring(0, 8);
-      final depositAddress = swapTx['deposit_address'] ?? 'Error: No deposit address';
-      
-      return ChatMessage.swap(
-        text: "✅ **UEX Cross-Chain Swap Created Successfully!**\n\n"
-              "**Order ID:** `$orderId`\n"
-              "**Platform:** 🌐 UEX (Cross-Chain DEX)\n\n"
-              "**Instructions:**\n"
-              "📤 **Send:** ${swap.amount} ${swap.fromCurrency}\n"
-              "📍 **To Address:** `$depositAddress`\n\n"
-              "📥 **You'll Receive:** ~${quote.toAmount} ${swap.toCurrency}\n"
-              "📍 **To Your Address:** `${swap.toAddress?.substring(0, 10)}...`\n"
-              "💱 **Rate:** 1 ${swap.fromCurrency} = ${quote.exchangeRate.toStringAsFixed(6)} ${swap.toCurrency}\n"
-              "📊 **Price Impact:** ${(quote.priceImpact * 100).toStringAsFixed(2)}%\n"
-              "💰 **Fee:** ${quote.fee.toStringAsFixed(6)} ${swap.fromCurrency}\n"
-              "⏰ **Status:** waiting_for_deposit\n"
-              "⏳ **Quote Expires:** ${_formatTime(quote.expiresAt)}\n\n"
-              "💡 **Next Steps:**\n"
-              "1. Send the exact amount to the deposit address above\n"
-              "2. Wait for network confirmations\n"
-              "3. Your ${swap.toCurrency} will be delivered automatically\n\n"
-              "*(You can ask me \"What's the status of order $orderId?\" anytime)*",
-        orderId: orderId,
-        fromAmount: swap.amount!,
-        fromCurrency: swap.fromCurrency!,
-        toAmount: quote.toAmount,
-        toCurrency: swap.toCurrency!,
-        depositAddress: depositAddress,
-      );
-    } catch (e) {
-      // Fallback to simulated response if UEX service fails
-      return ChatMessage.text(
-        text: "❌ **UEX Service Temporarily Unavailable**\n\n"
-              "I'm having trouble connecting to the UEX service right now. "
-              "This could be due to:\n"
-              "• Network connectivity issues\n"
-              "• Service maintenance\n"
-              "• Invalid token pair\n\n"
-              "For Cardano-to-Cardano swaps, you can try using SaturnSwap instead by saying:\n"
-              "\"Swap ${swap.amount} ${swap.fromCurrency} to ${swap.toCurrency} on Saturn\"\n\n"
-              "*Error details: ${e.toString()}*",
-        isUser: false,
-      );
-    }
-  }
-  
+  // Local swap entity extraction removed
+ 
+  // Local swap clarification removed
+ 
+  // Local platform choice prompt removed
+ 
+  // Local pending swap handling removed
+ 
+  // Local address capture removed
+ 
+  // Local order creation removed
+ 
+  // Removed Saturn flow
+ 
+  // Removed UEX flow
+ 
   Future<ChatMessage> _handleSwapStatus(String input) async {
     // Parse order ID from input
     final regex = RegExp(r'([a-f0-9-]{8,})');
