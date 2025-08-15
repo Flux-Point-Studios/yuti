@@ -8,6 +8,7 @@ import 'blockfrost_service.dart';
 import 'transaction_service.dart';
 import 'uex_service.dart';
 import 'saturn_swap_service.dart';
+import '../config/secure_config.dart';
 
 enum ChatIntent {
   balance,
@@ -461,13 +462,24 @@ class ChatService {
     final url = Uri.parse("${_config.tBackendUrl}/chat");
     print('🔍 DEBUG: API URL: $url');
     
+    // Resolve API key from environment first, then secure storage fallback
+    String apiKey = _config.tBackendApiKey;
+    if (apiKey.isEmpty) {
+      try {
+        apiKey = await SecureConfig().getTBackendApiKey();
+        print('🔍 DEBUG: Loaded API key from SecureConfig');
+      } catch (e) {
+        print('🔍 DEBUG: SecureConfig did not provide API key: $e');
+      }
+    }
+    
     final headers = {
       'Content-Type': 'application/json',
-      if (_config.tBackendApiKey.isNotEmpty) 'api-key': _config.tBackendApiKey,
+      if (apiKey.isNotEmpty) 'api-key': apiKey,
     };
     print('🔍 DEBUG: Headers: $headers');
-    print('🔍 DEBUG: API Key present: ${_config.tBackendApiKey.isNotEmpty}');
-    print('🔍 DEBUG: API Key value: ${_config.tBackendApiKey.isEmpty ? 'EMPTY' : '${_config.tBackendApiKey.substring(0, 10)}...'}');
+    print('🔍 DEBUG: API Key present: ${apiKey.isNotEmpty}');
+    print('🔍 DEBUG: API Key value: ${apiKey.isEmpty ? 'EMPTY' : '${apiKey.substring(0, 10)}...'}');
     
     final body = jsonEncode({
       'message': message,
