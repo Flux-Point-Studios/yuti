@@ -141,6 +141,27 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       print('🔍 DEBUG: Reloading messages for session $sessionId');
 
+      // If not authenticated, load from local storage immediately
+      if (!_authService.isAuthenticated) {
+        print('🔍 DEBUG: Not authenticated - loading messages from local storage');
+        final localSession = _chatHistoryService
+            .sessions
+            .where((s) => s.id == sessionId)
+            .cast<ChatSession?>()
+            .firstWhere((s) => s != null, orElse: () => null);
+
+        if (localSession != null) {
+          setState(() {
+            _messages = List<ChatMessage>.from(localSession.messages);
+          });
+          print('🔍 DEBUG: Loaded ${_messages.length} local messages for session $sessionId');
+          if (_messages.isEmpty) {
+            _addWelcomeMessage();
+          }
+          return;
+        }
+      }
+
       // Get fresh messages from Supabase for this session
       final messagesResponse = await SupabaseService.client
           .from('messages')
@@ -150,6 +171,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
       print(
           '🔍 DEBUG: Found ${messagesResponse.length} messages for session $sessionId');
+
+      // If server returned no messages, fallback to local storage
+      if (messagesResponse.isEmpty) {
+        print('🔍 DEBUG: Server returned no messages - falling back to local storage');
+        final localSession = _chatHistoryService
+            .sessions
+            .where((s) => s.id == sessionId)
+            .cast<ChatSession?>()
+            .firstWhere((s) => s != null, orElse: () => null);
+
+        if (localSession != null && localSession.messages.isNotEmpty) {
+          setState(() {
+            _messages = List<ChatMessage>.from(localSession.messages);
+          });
+          print('🔍 DEBUG: Loaded ${_messages.length} local messages for session $sessionId');
+          return;
+        }
+      }
 
       final messages = messagesResponse
           .map((m) => ChatMessage.fromJson({
@@ -177,14 +216,33 @@ class _ChatScreenState extends State<ChatScreen> {
       print(
           '🔍 DEBUG: Current _messages length after setState: ${_messages.length}');
 
-      // Add welcome message only if no messages were found from server
+      // Add welcome message only if no messages were found anywhere
       if (_messages.isEmpty) {
         print('🔍 DEBUG: No messages found, adding welcome message');
         _addWelcomeMessage();
       }
     } catch (e) {
       print('🔍 DEBUG: Error reloading messages: $e');
-      // On error, add welcome message
+      // On error, try local fallback
+      try {
+        final localSession = _chatHistoryService
+            .sessions
+            .where((s) => s.id == sessionId)
+            .cast<ChatSession?>()
+            .firstWhere((s) => s != null, orElse: () => null);
+        if (localSession != null) {
+          setState(() {
+            _messages = List<ChatMessage>.from(localSession.messages);
+          });
+          print('🔍 DEBUG: Fallback loaded ${_messages.length} local messages');
+          if (_messages.isEmpty) {
+            _addWelcomeMessage();
+          }
+          return;
+        }
+      } catch (_) {}
+
+      // If all else fails, add welcome message
       _addWelcomeMessage();
     }
   }
