@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import '../services/wallet_service.dart';
 import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
+import '../services/cardano_wallet_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -58,9 +59,12 @@ class _SplashScreenState extends State<SplashScreen> {
       final authService = AuthService();
       await authService.initialize();
       
-      // Initialize wallet service
+      // Initialize wallet services
       final walletService = context.read<WalletService>();
       await walletService.initialize();
+      // Restore Cardano wallet connection if previously connected
+      final cardano = CardanoWalletService();
+      await cardano.initialize();
 
       // Let video play for at least 2 seconds
       await Future.delayed(const Duration(seconds: 2));
@@ -93,9 +97,12 @@ class _SplashScreenState extends State<SplashScreen> {
       } else {
         // User not logged in, check if they have a wallet set up
         final walletService = context.read<WalletService>();
+        final cardano = CardanoWalletService();
         final hasWallet = walletService.hasWallet;
+        final hasWalletLoaded = walletService.isWalletLoaded;
+        final hasCardanoWallet = cardano.isConnected;
 
-        if (hasWallet && walletService.isWalletLoaded) {
+        if ((hasWallet && hasWalletLoaded) || hasCardanoWallet) {
           // Has wallet but not authenticated, go to chat
           Navigator.pushReplacementNamed(context, '/chat');
         } else {
