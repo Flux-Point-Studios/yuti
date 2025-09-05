@@ -8,6 +8,7 @@ import 'blockfrost_service.dart';
 import 'transaction_service.dart';
 import 'uex_service.dart';
 import 'saturn_swap_service.dart';
+import 'cardano_wallet_service.dart';
 
 enum ChatIntent {
   balance,
@@ -84,6 +85,12 @@ class ChatService {
   final UEXService _uexService = UEXService();
   final SaturnSwapService _saturnSwapService = SaturnSwapService();
   late final TransactionService _transactionService;
+  final CardanoWalletService _cardanoWalletService = CardanoWalletService();
+
+  // Wallet context cache to avoid excessive API calls
+  Map<String, dynamic>? _cachedWalletContext;
+  DateTime? _cachedWalletContextAt;
+  static const Duration _walletContextTtl = Duration(seconds: 30);
   
   // Session management
   late final String _sessionId;
@@ -469,9 +476,22 @@ class ChatService {
     print('🔍 DEBUG: API Key present: ${_config.tBackendApiKey.isNotEmpty}');
     print('🔍 DEBUG: API Key value: ${_config.tBackendApiKey.isEmpty ? 'EMPTY' : '${_config.tBackendApiKey.substring(0, 10)}...'}');
     
+    // Build wallet context snapshot (best-effort)
+    Map<String, dynamic>? walletContext;
+    try {
+      walletContext = await _getWalletContextSnapshot();
+    } catch (e) {
+      print('🔍 DEBUG: Failed to build wallet context: $e');
+    }
+
     final body = jsonEncode({
       'message': message,
       'session_id': _sessionId,
+      if (walletContext != null)
+        'context': {
+          'wallet': walletContext,
+          'hints': 'Use wallet.context to answer user questions about balance, transactions, and holdings. All values are public chain data; never request or expose private keys. If user requests actions like send/swap, ask for missing details and call appropriate tools.'
+        },
     });
     print('🔍 DEBUG: Request body: $body');
     
@@ -497,6 +517,78 @@ class ChatService {
       print('🔍 DEBUG: Exception in _callTBackend: $e');
       print('🔍 DEBUG: Exception type: ${e.runtimeType}');
       rethrow;
+    }
+  }
+  
+  // Build a short-lived snapshot of the user's wallet to provide context to T
+  Future<Map<String, dynamic>?> _getWalletContextSnapshot() async {
+    try {
+      // Check cache
+      final now = DateTime.now();
+      if (_cachedWalletContext != null &&
+          _cachedWalletContextAt != null &&
+          now.difference(_cachedWalletContextAt!) < _walletContextTtl) {
+        return _cachedWalletContext;
+      }
+
+      // Determine if wallet is available
+      final hasCardano = _cardanoWalletService.isConnected;
+      final hasLocalWallet = _walletService.hasWallet && _walletService.isWalletLoaded;
+      if (!hasCardano && !hasLocalWallet) {
+        return null;
+      }
+
+      // Resolve address
+      final address = await _walletService.getReceiveAddress();
+      final stakeAddr = _cardanoWalletService.stakeAddress;
+
+      // Fetch on-chain data
+      final balanceLovelace = await _blockfrostService.getAdaBalance(address);
+      final balanceAda = balanceLovelace.toDouble() / 1000000.0;
+
+      final assets = await _blockfrostService.getAssets(address);
+      // Reduce assets to a concise summary (top 20 by quantity)
+      final summarizedAssets = List<Map<String, dynamic>>.from(assets)
+          .map((a) => {
+                'unit': a['unit'],
+                'quantity': a['quantity'],
+              })
+          .take(20)
+          .toList();
+
+      final txs = await _blockfrostService.getTransactions(address, page: 1);
+      final summarizedTxs = txs
+          .map((t) => {
+                'tx_hash': t['tx_hash'],
+                'block_height': t['block_height'],
+                'tx_index': t['tx_index'],
+                'block_time': t['block_time'],
+              })
+          .take(10)
+          .toList();
+
+      final snapshot = {
+        'network': _config.isMainnet ? 'mainnet' : 'testnet',
+        'address': address,
+        if (stakeAddr != null) 'stake_address': stakeAddr,
+        'ada_balance': {
+          'lovelace': balanceLovelace.toString(),
+          'ada': balanceAda.toStringAsFixed(6),
+        },
+        'assets': summarizedAssets,
+        'recent_transactions': summarizedTxs,
+        'capabilities': {
+          'can_send': true,
+          'can_swap': true,
+        },
+      };
+
+      _cachedWalletContext = snapshot;
+      _cachedWalletContextAt = now;
+      return snapshot;
+    } catch (e) {
+      print('🔍 DEBUG: Error building wallet context snapshot: $e');
+      return null;
     }
   }
   
