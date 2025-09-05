@@ -767,14 +767,18 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Row(
                         children: [
                           // Slash command button
-                          IconButton(
-                            icon: Icon(
-                              Icons.slash, // Requires Material 3; fallback to text
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                            tooltip: 'Commands',
-                            onPressed: _showCommandPalette,
-                          ),
+                                                   IconButton(
+                           icon: Text(
+                             '/',
+                             style: TextStyle(
+                               color: Colors.white.withOpacity(0.8),
+                               fontSize: 18,
+                               fontWeight: FontWeight.bold,
+                             ),
+                           ),
+                           tooltip: 'Commands',
+                           onPressed: _showCommandPalette,
+                         ),
                           Expanded(
                             child: TextField(
                               controller: _inputController,
