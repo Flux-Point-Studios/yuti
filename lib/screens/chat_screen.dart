@@ -15,6 +15,7 @@ import '../widgets/chat_sidebar.dart';
 import '../widgets/glassmorphism_container.dart';
 import '../widgets/message_limit_widget.dart';
 import '../screens/pricing_screen.dart';
+import '../screens/browser_screen.dart'; // Added import for BrowserScreen
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -573,7 +574,14 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           onTapLink: (text, href, title) {
-            // TODO: Handle link taps
+            if (href == null || href.isEmpty) return;
+            // Open in in-app browser
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BrowserScreen(initialUrl: href),
+              ),
+            );
           },
         );
       case MessageType.qrCode:
@@ -758,6 +766,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       child: Row(
                         children: [
+                          // Slash command button
+                          IconButton(
+                            icon: Icon(
+                              Icons.slash, // Requires Material 3; fallback to text
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                            tooltip: 'Commands',
+                            onPressed: _showCommandPalette,
+                          ),
                           Expanded(
                             child: TextField(
                               controller: _inputController,
@@ -995,6 +1012,74 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
     }
+  }
+
+  void _showCommandPalette() {
+    final commands = [
+      {'label': '/search', 'insert': '/search '},
+      {'label': '/swap', 'insert': '/swap '},
+      {'label': '/send', 'insert': '/send '},
+      {'label': '/receive', 'insert': '/receive '},
+      {'label': '/balance', 'insert': '/balance'},
+      {'label': '/status', 'insert': '/status '},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: 360,
+          padding: const EdgeInsets.all(16),
+          child: GlassmorphismContainer(
+            glassType: GlassType.overlay,
+            borderRadius: BorderRadius.circular(16),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Commands',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: commands.length,
+                    separatorBuilder: (_, __) => const Divider(color: AppColors.glassBorder),
+                    itemBuilder: (context, index) {
+                      final cmd = commands[index];
+                      return ListTile(
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        leading: const Icon(Icons.chevron_right, color: AppColors.primaryBlue),
+                        title: Text(
+                          cmd['label']!,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          setState(() {
+                            _inputController.text = cmd['insert']!;
+                            _inputController.selection = TextSelection.fromPosition(
+                              TextPosition(offset: _inputController.text.length),
+                            );
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _onSessionSelected(ChatSession session) async {

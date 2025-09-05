@@ -28,10 +28,20 @@ class SpeechService {
   Future<bool> initialize() async {
     try {
       // Check and request microphone permission
-      final status = await Permission.microphone.status;
-      if (!status.isGranted) {
+      final micStatus = await Permission.microphone.status;
+      if (!micStatus.isGranted) {
         final result = await Permission.microphone.request();
         if (!result.isGranted) {
+          _statusController.add(SpeechStatus.permissionDenied);
+          return false;
+        }
+      }
+
+      // Check and request speech recognition permission (iOS)
+      final speechPerm = await Permission.speech.status;
+      if (!speechPerm.isGranted) {
+        final speechResult = await Permission.speech.request();
+        if (!speechResult.isGranted) {
           _statusController.add(SpeechStatus.permissionDenied);
           return false;
         }
