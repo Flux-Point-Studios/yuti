@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
@@ -9,6 +10,8 @@ import '../models/user.dart';
 import '../widgets/cardano_wallet_dialog.dart';
 import '../widgets/wallet_security_settings.dart';
 import '../services/gamification_service.dart';
+import '../services/wallet_service.dart';
+import '../services/cardano_wallet_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -1032,17 +1035,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _deleteLocalWallet() async {
+    final confirmed = await _showConfirmDialog(
+      'Delete Local Wallet',
+      'This will remove your locally created/restored wallet from this device. You can create/restore/connect a new one later.',
+    );
+
+    if (confirmed == true) {
+      setState(() => _isWalletLoading = true);
+      try {
+        final walletService = context.read<WalletService>();
+        await walletService.deleteWallet();
+        _showSuccess('Local wallet deleted');
+        await _loadUserData();
+      } catch (e) {
+        _showError('Failed to delete local wallet. Please try again.');
+      } finally {
+        setState(() => _isWalletLoading = false);
+      }
+    }
+  }
+
   Widget _buildWalletSection() {
-    final hasWallet = _currentUser?.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty;
+    // Consider any wallet presence (local or external link) as “has wallet”
+    final walletService = context.read<WalletService>();
+    final cardano = CardanoWalletService();
+    final hasLocalWallet = walletService.hasWallet;
+    final hasExternalWallet = (_currentUser?.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty) || cardano.isConnected;
+    final hasWallet = hasLocalWallet || hasExternalWallet;
 
     return _buildSection(
       title: 'Cardano Wallet',
       children: [
         if (hasWallet) ...[
           // Wallet connected info
-          _buildDetailRow('Wallet Address', '${_currentUser!.walletAddress!.substring(0, 10)}...${_currentUser!.walletAddress!.substring(_currentUser!.walletAddress!.length - 6)}'),
-          if (_currentUser!.stakeAddress != null)
+          if (_currentUser?.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty)
+            _buildDetailRow('Wallet Address', '${_currentUser!.walletAddress!.substring(0, 10)}...${_currentUser!.walletAddress!.substring(_currentUser!.walletAddress!.length - 6)}'),
+          if (_currentUser?.stakeAddress != null && _currentUser!.stakeAddress!.isNotEmpty)
             _buildDetailRow('Stake Address', '${_currentUser!.stakeAddress!.substring(0, 10)}...${_currentUser!.stakeAddress!.substring(_currentUser!.stakeAddress!.length - 6)}'),
+          if (_currentUser?.walletAddress == null || _currentUser!.walletAddress!.isEmpty)
+            _buildDetailRow('Local Wallet', walletService.walletName ?? 'Active'),
           
           // Wallet actions
           Container(
@@ -1064,32 +1096,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isWalletLoading ? null : _unlinkWallet,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.withOpacity(0.2),
-                      foregroundColor: Colors.red,
-                      side: BorderSide(color: Colors.red, width: 1),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                if (_currentUser?.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isWalletLoading ? null : _unlinkWallet,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.withOpacity(0.2),
+                        foregroundColor: Colors.red,
+                        side: BorderSide(color: Colors.red, width: 1),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
                       ),
-                      elevation: 0,
+                      child: _isWalletLoading 
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                            ),
+                          )
+                        : const Text('Unlink Wallet'),
                     ),
-                    child: _isWalletLoading 
-                      ? SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                          ),
-                        )
-                      : const Text('Unlink Wallet'),
                   ),
-                ),
+                if ((_currentUser?.walletAddress == null || _currentUser!.walletAddress!.isEmpty) && hasLocalWallet) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isWalletLoading ? null : _deleteLocalWallet,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.withOpacity(0.2),
+                        foregroundColor: Colors.red,
+                        side: BorderSide(color: Colors.red, width: 1),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _isWalletLoading 
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                            ),
+                          )
+                        : const Text('Delete Local Wallet'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
