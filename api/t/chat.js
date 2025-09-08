@@ -1,7 +1,6 @@
-// Ensure fetch is available (Node 16 fallback)
-const fetchCompat = globalThis.fetch || (async (...args) => (await import('node-fetch')).then(m => m.default(...args)));
+export const config = { runtime: 'nodejs18.x' };
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
     const baseUrl = process.env.T_BACKEND_URL || 'https://api.fluxpointstudios.com';
     const apiKey = process.env.T_BACKEND_API_KEY || '';
@@ -13,7 +12,7 @@ module.exports = async (req, res) => {
 
     const targetUrl = `${baseUrl.replace(/\/$/, '')}/chat`;
 
-    const upstream = await fetchCompat(targetUrl, {
+    const upstream = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,6 +26,6 @@ module.exports = async (req, res) => {
     res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
     res.send(text);
   } catch (err) {
-    res.status(500).json({ error: 'Proxy error', detail: String(err) });
+    res.status(500).json({ error: 'Proxy error', detail: String(err && err.stack || err) });
   }
-}; 
+} 
