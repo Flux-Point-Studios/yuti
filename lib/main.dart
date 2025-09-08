@@ -13,6 +13,7 @@ import 'screens/browser_screen.dart';
 import 'utils/app_colors.dart';
 import 'config/secure_config.dart';
 import 'screens/payment_callback_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,15 +48,17 @@ Future<void> _initializeApiKeys() async {
   try {
     final secureConfig = SecureConfig();
 
-    // Initialize with production API keys
-    // These are stored securely using FlutterSecureStorage
-    await secureConfig.initializeKeys(
-      // T-Backend API key for AI features
-      tBackendKey:
-          '***REMOVED***',
-      // Blockfrost API key for Cardano blockchain data
-      blockfrostKey: '***REMOVED***',
-    );
+    // Do not embed server secrets in the web bundle
+    if (!kIsWeb) {
+      // Initialize with production API keys (stored securely on device)
+      await secureConfig.initializeKeys(
+        // T-Backend API key for AI features
+        tBackendKey:
+            '***REMOVED***',
+        // Blockfrost API key for Cardano blockchain data
+        blockfrostKey: '***REMOVED***',
+      );
+    }
 
     print('🔍 DEBUG: API keys initialized successfully (T-Backend + Blockfrost)');
   } catch (e) {
@@ -89,7 +92,7 @@ void _setupGameChangerCallbackHandler() {
 /// Get and clear pending GameChanger callback data
 String? getPendingGameChangerCallback() {
   final data = _pendingGameChangerCallback;
-  _pendingGameChangerCallback = null; // Clear after reading
+  _pendingGameChangerCallback = null;
   return data;
 }
 
