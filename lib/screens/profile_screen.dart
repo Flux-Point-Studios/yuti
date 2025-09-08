@@ -741,7 +741,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        Text('Starter Tasks', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.w600)),
+        Text('Daily Quests', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         _buildTaskTile('task_add_wallet', s.completedTasks.contains('task_add_wallet')),
         _buildTaskTile('task_first_swap', s.completedTasks.contains('task_first_swap')),
@@ -753,11 +753,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildTaskTile(String taskId, bool done) {
     final label = GamificationService.taskIdToLabel[taskId] ?? taskId;
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
       leading: Icon(done ? Icons.check_circle : Icons.radio_button_unchecked, color: done ? Colors.greenAccent : Colors.white70),
       title: Text(label, style: const TextStyle(color: Colors.white)),
       subtitle: const Text('+10 XP', style: TextStyle(color: Colors.white70, fontSize: 12)),
       trailing: done ? const Text('Completed', style: TextStyle(color: Colors.greenAccent)) : const SizedBox.shrink(),
+      dense: true,
+      visualDensity: const VisualDensity(vertical: -1),
     );
   }
 
@@ -1247,7 +1249,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 1,
             ),
           ),
-          child: Column(children: children),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(children: children),
+          ),
         ),
       ],
     );
