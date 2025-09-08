@@ -27,7 +27,28 @@ class SpeechService {
   // Initialize speech recognition
   Future<bool> initialize() async {
     try {
-      // Check and request microphone permission
+      // On web: skip permission_handler checks (speech permission not implemented)
+      if (kIsWeb) {
+        _isAvailable = await _speech.initialize(
+          onStatus: (status) {
+            debugPrint('Speech status: $status');
+            _handleStatusChange(status);
+          },
+          onError: (error) {
+            debugPrint('Speech error: $error');
+            _statusController.add(SpeechStatus.error);
+            _isListening = false;
+          },
+        );
+        if (_isAvailable) {
+          _statusController.add(SpeechStatus.ready);
+        } else {
+          _statusController.add(SpeechStatus.unavailable);
+        }
+        return _isAvailable;
+      }
+
+      // Non-web platforms: check and request microphone permission
       final micStatus = await Permission.microphone.status;
       if (!micStatus.isGranted) {
         final result = await Permission.microphone.request();
@@ -37,14 +58,18 @@ class SpeechService {
         }
       }
 
-      // Check and request speech recognition permission (iOS)
-      final speechPerm = await Permission.speech.status;
-      if (!speechPerm.isGranted) {
-        final speechResult = await Permission.speech.request();
-        if (!speechResult.isGranted) {
-          _statusController.add(SpeechStatus.permissionDenied);
-          return false;
+      // iOS-specific speech recognition permission; wrap to avoid unimplemented errors
+      try {
+        final speechPerm = await Permission.speech.status;
+        if (!speechPerm.isGranted) {
+          final speechResult = await Permission.speech.request();
+          if (!speechResult.isGranted) {
+            _statusController.add(SpeechStatus.permissionDenied);
+            return false;
+          }
         }
+      } catch (_) {
+        // Permission.speech may be unavailable on some platforms; ignore safely
       }
       
       // Initialize speech recognition

@@ -602,20 +602,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 40),
 
-          // Usage Statistics section
-          _buildUsageStatsSection(),
+          // Usage Statistics section (hidden for now)
+          // _buildUsageStatsSection(),
 
-          const SizedBox(height: 32),
+          // const SizedBox(height: 32),
 
-          // Affiliate Program section
-          _buildAffiliateSection(),
+          // Affiliate Program section (hidden for now)
+          // _buildAffiliateSection(),
 
-          const SizedBox(height: 32),
+          // const SizedBox(height: 32),
 
-          // Activity Chart section
-          _buildActivityChartSection(),
+          // Activity Chart section (hidden for now)
+          // _buildActivityChartSection(),
 
-          const SizedBox(height: 32),
+          // const SizedBox(height: 32),
 
           // Security Settings section
           _buildSecuritySection(),
