@@ -759,7 +759,7 @@ class _ChatSidebarState extends State<ChatSidebar>
         return AlertDialog(
           backgroundColor: AppColors.backgroundCard,
           title: const Text(
-            'About bluelight',
+            'About Yuti',
             style: TextStyle(color: Colors.white),
           ),
           content: Column(

@@ -12,6 +12,7 @@ import 'screens/gamechanger_callback_screen.dart';
 import 'screens/browser_screen.dart';
 import 'utils/app_colors.dart';
 import 'config/secure_config.dart';
+import 'screens/payment_callback_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,9 @@ void main() async {
 
   // Set up GameChanger callback handler for iOS
   _setupGameChangerCallbackHandler();
+
+  // Set up Payment callback handler for iOS/Android
+  _setupPaymentCallbackHandler();
 
   // Set system UI overlay style for blue light theme
   SystemChrome.setSystemUIOverlayStyle(
@@ -61,10 +65,11 @@ Future<void> _initializeApiKeys() async {
 
 // Global variable to store GameChanger callback data for iOS
 String? _pendingGameChangerCallback;
+String? _pendingPaymentCallback;
 
 /// Set up method channel handler for GameChanger callbacks from iOS
 void _setupGameChangerCallbackHandler() {
-  const platform = MethodChannel('com.bluelight/gamechanger');
+  const platform = MethodChannel('com.yuti/gamechanger');
   
   platform.setMethodCallHandler((call) async {
     if (call.method == 'handleGameChangerCallback') {
@@ -88,6 +93,28 @@ String? getPendingGameChangerCallback() {
   return data;
 }
 
+/// Set up method channel handler for Payment success callbacks (parity with iOS/Android deep link)
+void _setupPaymentCallbackHandler() {
+  const platform = MethodChannel('com.yuti/payment');
+  
+  platform.setMethodCallHandler((call) async {
+    if (call.method == 'handlePaymentCallback') {
+      final String callbackData = call.arguments as String;
+      print('🔍 DEBUG: Received Payment callback data from iOS/Android: $callbackData');
+      _pendingPaymentCallback = callbackData;
+      print('🔍 DEBUG: Stored payment callback data for processing');
+    }
+  });
+  print('🔍 DEBUG: Payment method channel handler set up');
+}
+
+/// Get and clear pending Payment callback data
+String? getPendingPaymentCallback() {
+  final data = _pendingPaymentCallback;
+  _pendingPaymentCallback = null;
+  return data;
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
@@ -98,7 +125,7 @@ class MyApp extends StatelessWidget {
         Provider(create: (_) => WalletService()),
       ],
       child: MaterialApp(
-        title: 'bluelight',
+        title: 'Yuti',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.blue,
@@ -210,6 +237,7 @@ class MyApp extends StatelessWidget {
           '/chat': (context) => const ChatScreen(),
           '/gamechanger-callback': (context) =>
               const GameChangerCallbackScreen(),
+          '/payment-success': (context) => const PaymentCallbackScreen(),
           '/browser': (context) => const BrowserScreen(),
         },
       ),

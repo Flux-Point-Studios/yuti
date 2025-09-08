@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../config/app_config.dart';
 import '../widgets/cardano_wallet_dialog.dart';
 import '../widgets/glassmorphism_container.dart';
+import '../services/uex_service.dart';
 import 'chat_screen.dart';
 
 class PricingScreen extends StatefulWidget {
@@ -25,7 +26,7 @@ class _PricingScreenState extends State<PricingScreen>
   final AuthService _authService = AuthService();
   bool _isLoading = false;
   String? _selectedPlan;
-  String _paymentMethod = 'stripe';
+  String _paymentMethod = 'uex';
   int _currentPageIndex = 0;
 
   final List<PricingPlan> _plans = [
@@ -588,9 +589,9 @@ class _PricingScreenState extends State<PricingScreen>
               icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
               items: const [
                 DropdownMenuItem(
-                  value: 'stripe',
+                  value: 'uex',
                   child: Text(
-                    'Credit Card (Stripe)',
+                    'Credit Card (UEX)',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -604,7 +605,7 @@ class _PricingScreenState extends State<PricingScreen>
               ],
               onChanged: (value) {
                 setState(() {
-                  _paymentMethod = value ?? 'stripe';
+                  _paymentMethod = value ?? 'uex';
                 });
               },
             ),
@@ -706,8 +707,11 @@ class _PricingScreenState extends State<PricingScreen>
       } else if (_paymentMethod == 'ada') {
         // Handle Cardano wallet connection for token/NFT holders
         await _handleCardanoWalletConnection(plan);
+      } else if (_paymentMethod == 'uex') {
+        // New: Handle UEX payment via hosted checkout
+        await _handleUEXPayment(plan);
       } else {
-        // Handle traditional Stripe payment
+        // Handle traditional Stripe payment (kept for fallback/testing)
         await _handleStripePayment(plan);
       }
     } catch (e) {
@@ -717,6 +721,53 @@ class _PricingScreenState extends State<PricingScreen>
         _isLoading = false;
         _selectedPlan = null;
       });
+    }
+  }
+
+  Future<void> _handleUEXPayment(PricingPlan plan) async {
+    try {
+      final userId = _authService.currentUser?.id ?? 'anonymous';
+      final orderId = '${userId}_${plan.value}_${DateTime.now().millisecondsSinceEpoch}';
+      final itemName = '${plan.name} Subscription';
+
+      // Map plan to amount in cents
+      final int amountCents;
+      switch (plan.value) {
+        case 'BASIC':
+          amountCents = 3999; // $39.99
+          break;
+        case 'PREMIUM':
+          amountCents = 9999; // $99.99
+          break;
+        case 'VIP':
+          amountCents = 14999; // $149.99
+          break;
+        default:
+          amountCents = 0;
+      }
+
+      if (amountCents <= 0) {
+        throw Exception('Invalid plan amount');
+      }
+
+      // TODO: Replace with production webhook URLs or deep links
+      const String successUrl = 'https://api.fluxpointstudios.com/uex/success';
+      const String failureUrl = 'https://api.fluxpointstudios.com/uex/failed';
+
+      final redirectUrl = await UEXService().generatePaymentUrl(
+        orderId: orderId,
+        itemName: itemName,
+        amountCents: amountCents,
+        successUrl: successUrl,
+        failureUrl: failureUrl,
+      );
+
+      await _launchUrl(redirectUrl);
+
+      // Inform user that activation will follow after payment confirmation
+      _showSuccess('Complete payment in your browser. Subscription activates shortly after confirmation.');
+    } catch (e) {
+      _showError('Unable to start payment: $e');
     }
   }
 

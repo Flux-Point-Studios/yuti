@@ -20,7 +20,7 @@ import UIKit
     print("🔍 iOS AppDelegate: Received URL: \(url.absoluteString)")
     
     // Check if this is a GameChanger callback
-    if url.scheme == "bluelight" && url.host == "gamechanger-callback" {
+    if url.scheme == "yuti" && url.host == "gamechanger-callback" {
       print("🔍 iOS AppDelegate: GameChanger callback detected")
       
       // Extract the result parameter
@@ -34,7 +34,7 @@ import UIKit
         // Send the callback data to Flutter using MethodChannel
         if let controller = window?.rootViewController as? FlutterViewController {
           let channel = FlutterMethodChannel(
-            name: "com.bluelight/gamechanger",
+            name: "com.yuti/gamechanger",
             binaryMessenger: controller.binaryMessenger
           )
           
@@ -44,6 +44,20 @@ import UIKit
         
         return true
       }
+    }
+
+    // Payment success deep link: yuti://payment-success?status=success&order=...
+    if url.scheme == "yuti" && url.host == "payment-success" {
+      print("🔍 iOS AppDelegate: Payment success callback detected: \(url.absoluteString)")
+      if let controller = window?.rootViewController as? FlutterViewController {
+        let channel = FlutterMethodChannel(
+          name: "com.yuti/payment",
+          binaryMessenger: controller.binaryMessenger
+        )
+        channel.invokeMethod("handlePaymentCallback", arguments: url.absoluteString)
+        print("🔍 iOS AppDelegate: Sent payment callback data to Flutter")
+      }
+      return true
     }
     
     return super.application(app, open: url, options: options)

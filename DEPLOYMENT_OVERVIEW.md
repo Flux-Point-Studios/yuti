@@ -1,9 +1,7 @@
-# BlueLight Complete Deployment Pipeline
+# Yuti Complete Deployment Pipeline
 *Updated: July 17, 2025*
 
-## 🌟 Overview
-
-BlueLight operates a **dual-platform deployment system** with completely separate, non-conflicting pipelines for Web/PWA and iOS distribution.
+Yuti operates a **dual-platform deployment system** with completely separate, non-conflicting pipelines for Web/PWA and iOS distribution.
 
 ## 🏗️ Architecture
 
@@ -90,8 +88,8 @@ git push
 
 # 4. Download IPA and upload to App Store
 xcrun altool --upload-app --type ios -f bluelight.ipa \
-  --apiKey PMMG369C2M \
-  --apiIssuer 5be249f9-c023-40cf-b140-0f78caf40ed7
+  --apiKey $APP_STORE_CONNECT_KEY_ID \
+  --apiIssuer $APP_STORE_CONNECT_ISSUER_ID
 ```
 
 ## 🔄 Integrated Workflow
@@ -141,7 +139,7 @@ xcrun altool --upload-app --type ios -f bluelight.ipa \
 - ✅ **Zero-Conflict Architecture**: Web and iOS pipelines completely independent
 - ✅ **Automated Code Signing**: iOS builds with enterprise-grade security
 - ✅ **GameChanger Integration**: Cross-platform wallet connectivity fixed
-- ✅ **Professional Branding**: BlueLight icons across all platforms
+- ✅ **Professional Branding**: Yuti icons across all platforms
 - ✅ **App Store Ready**: Compliance, encryption, and review preparation complete
 
 ### Operational Excellence
@@ -181,4 +179,4 @@ xcrun altool --upload-app --type ios -f bluelight.ipa \
 
 ---
 
-*BlueLight now operates a world-class, enterprise-grade deployment pipeline capable of delivering updates to web and iOS platforms with zero manual intervention for builds and maximum reliability for users.* 
+*Yuti now operates a world-class, enterprise-grade deployment pipeline capable of delivering updates to web and iOS platforms with zero manual intervention for builds and maximum reliability for users.* 

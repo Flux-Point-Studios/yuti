@@ -1399,10 +1399,10 @@ The GameChanger connection failed because Chrome is your default browser.
 ✅ SOLUTION:
 1. Go to iOS Settings → Safari → Default Browser App
 2. Select "Safari" (temporarily)
-3. Return to BlueLight and try connecting again
-4. You should see "Return to BlueLight" instead of "Done"
+3. Return to Yuti and try connecting again
+4. You should see "Return to Yuti" instead of "Done"
 
-📱 WHY: iOS ASWebAuthenticationSession requires Safari for custom URL callbacks. Chrome blocks the return to BlueLight.
+📱 WHY: iOS ASWebAuthenticationSession requires Safari for custom URL callbacks. Chrome blocks the return to Yuti.
 
 After connecting, you can switch back to Chrome as default.''';
     }

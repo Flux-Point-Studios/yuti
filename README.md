@@ -1,12 +1,12 @@
-# BlueLight - Natural Language Crypto Hub 🚀
+# Yuti - Natural Language Crypto Hub 🚀
 
 **Your Intelligent Crypto Companion** 
 
-BlueLight is a revolutionary natural language crypto hub that transforms how you interact with blockchain technology. Using advanced AI and conversational interfaces, BlueLight makes complex crypto operations as simple as having a conversation.
+Yuti is a revolutionary natural language crypto hub that transforms how you interact with blockchain technology. Using advanced AI and conversational interfaces, Yuti makes complex crypto operations as simple as having a conversation.
 
-## 🌟 **What is BlueLight?**
+## 🌟 **What is Yuti?**
 
-BlueLight is more than just a wallet - it's your **intelligent crypto companion** that understands natural language and helps you navigate the entire Web3 ecosystem:
+Yuti is more than just a wallet - it's your **intelligent crypto companion** that understands natural language and helps you navigate the entire Web3 ecosystem:
 
 - **🗣️ Natural Language Interface** - Talk to your crypto like you would to a friend
 - **🤖 Agent T AI Assistant** - Intelligent guidance for all crypto operations  
@@ -90,4 +90,4 @@ Help us build the future of human-crypto interaction:
 
 ---
 
-**BlueLight** - *Making crypto conversational* 💙
+**Yuti** - *Making crypto conversational* 💙

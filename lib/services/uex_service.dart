@@ -17,6 +17,9 @@ class UEXService {
   // UEX API endpoints
   String get _baseUrl => _config.uexApiUrl;
   
+  // UEX Swap (DEX) API base
+  String get _swapApiBase => _config.uexSwapApiUrl;
+
   // Get available trading pairs
   Future<List<Map<String, dynamic>>> getAvailablePairs() async {
     try {
@@ -209,6 +212,165 @@ class UEXService {
       }
     } catch (e) {
       throw Exception('Error getting price history: $e');
+    }
+  }
+
+  /// Query UEXSwap DEX histories
+  /// filters example:
+  /// [
+  ///   {"filterType":"STATUS","values":["PENDING","LIMIT","MEMPOOL"]},
+  ///   {"filterType":"ADDRESS","values":["addr1..."]}
+  /// ]
+  Future<Map<String, dynamic>> getDexHistories({
+    required int page,
+    required String token,
+    required List<Map<String, dynamic>> filters,
+  }) async {
+    final url = Uri.parse('$_swapApiBase/dex/histories');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'page': page,
+        'token': token,
+        'filters': filters,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+
+    throw Exception('DEX histories failed: ${response.statusCode} - ${response.body}');
+  }
+
+  /// Poll swap status by watching a deposit or destination address on UEXSwap
+  /// Emits status updates until terminal state (COMPLETED/FAILED/CANCELED) or timeout
+  Stream<Map<String, dynamic>> watchSwapStatusByAddress({
+    required String watchAddress,
+    required String token,
+    Duration pollInterval = const Duration(seconds: 6),
+    Duration timeout = const Duration(minutes: 15),
+  }) async* {
+    final stopwatch = Stopwatch()..start();
+    String lastState = '';
+
+    while (stopwatch.elapsed < timeout) {
+      try {
+        final result = await getDexHistories(
+          page: 1,
+          token: token,
+          filters: [
+            { 'filterType': 'ADDRESS', 'values': [watchAddress] },
+          ],
+        );
+
+        // Expected shape: { data: { items: [...] } } (be tolerant to variations)
+        final data = result['data'] ?? result;
+        final List items = (data['items'] ?? data['histories'] ?? []) as List;
+
+        // Pick the most recent relevant item, if any
+        if (items.isNotEmpty) {
+          final Map<String, dynamic> latest = Map<String, dynamic>.from(items.first);
+          final String status = (latest['status'] ?? latest['state'] ?? 'UNKNOWN').toString().toUpperCase();
+
+          if (status != lastState) {
+            lastState = status;
+            yield {
+              'status': status, // e.g., PENDING, MEMPOOL, COMPLETED, FAILED
+              'item': latest,
+            };
+          }
+
+          if (status == 'COMPLETED' || status == 'SUCCESS' || status == 'FILLED') {
+            break;
+          }
+          if (status == 'FAILED' || status == 'CANCELED' || status == 'EXPIRED') {
+            break;
+          }
+        } else {
+          // Emit a heartbeat if no items found, once
+          if (lastState != 'NO_DATA') {
+            lastState = 'NO_DATA';
+            yield { 'status': 'NO_DATA' };
+          }
+        }
+      } catch (e) {
+        // Emit error once, then continue polling
+        if (lastState != 'ERROR') {
+          lastState = 'ERROR';
+          yield { 'status': 'ERROR', 'error': e.toString() };
+        }
+      }
+
+      await Future.delayed(pollInterval);
+    }
+
+    stopwatch.stop();
+  }
+
+  // Merchant API: Obtain OAuth2 access token for payments
+  Future<String> _fetchPaymentToken() async {
+    final creds = await _secureConfig.getUEXCredentials();
+    final url = Uri.parse('$_baseUrl/merchant/oauth2/token');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'client_id': creds['clientId'],
+        'secret_key': creds['secretKey'],
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final token = data['data']?['access_token'];
+      if (token is String && token.isNotEmpty) {
+        return token;
+      }
+      throw Exception('Token not found in response');
+    } else {
+      throw Exception('Failed to get UEX token: ${response.statusCode}');
+    }
+  }
+
+  // Merchant API: Generate checkout/payment URL
+  Future<String> generatePaymentUrl({
+    required String orderId,
+    required String itemName,
+    required int amountCents,
+    required String successUrl,
+    required String failureUrl,
+  }) async {
+    final token = await _fetchPaymentToken();
+    final url = Uri.parse('$_baseUrl/merchant/generate-payment-url');
+
+    final body = {
+      'order': orderId,
+      'item_name': itemName,
+      'amount': amountCents.toString(),
+      'success_url': successUrl,
+      'failure_url': failureUrl,
+    };
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode(body),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final redirectUrl = data['data']?['redirect_url'];
+      if (redirectUrl is String && redirectUrl.isNotEmpty) {
+        return redirectUrl;
+      }
+      throw Exception('No redirect_url in response');
+    } else {
+      throw Exception('Payment URL generation failed: ${response.statusCode} - ${response.body}');
     }
   }
 }

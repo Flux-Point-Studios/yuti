@@ -169,7 +169,7 @@ class _SignupScreenState extends State<SignupScreen>
             ],
           ).createShader(bounds),
           child: const Text(
-            'Join bluelight',
+            'Join Yuti',
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,

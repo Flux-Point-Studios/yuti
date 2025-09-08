@@ -1,31 +1,14 @@
-# Supabase Auth & RLS Fixes for BlueLight
+# Supabase Auth & RLS Fixes for Yuti
 
-## Issue 2: Email Confirmation Redirects to Wrong Domain
+**Problem**: Email confirmations redirect to `cardevia.ai` instead of Yuti app
 
-**Problem**: Email confirmations redirect to `cardevia.ai` instead of BlueLight app
+Update your Supabase Site URL and Redirect URLs to point to your deployed app. Example (keep actual deployed URLs as-is):
 
-**Root Cause**: Supabase Auth configuration has wrong redirect URL
-
-**Fix Steps**:
-
-1. **Go to Supabase Dashboard**:
-   - Navigate to: https://supabase.com/dashboard/project/zlvcevggynsrmvyiaxru
-   - Go to Authentication → Settings → URL Configuration
-
-2. **Update Redirect URLs**:
-   ```
-   Site URL: https://bluelight-dmom0ulto-decimalists-projects.vercel.app
-   
-   Additional Redirect URLs:
-   - https://bluelight-dmom0ulto-decimalists-projects.vercel.app/auth/callback
-   - https://bluelight-dmom0ulto-decimalists-projects.vercel.app/gamechanger-callback
-   - bluelight://auth/callback (for native apps)
-   ```
-
-3. **Update Email Templates**:
-   - Go to Authentication → Email Templates
-   - In "Confirm signup" template, change any hardcoded domains from `cardevia.ai` to your actual domain
-   - Ensure `{{ .SiteURL }}` is used for dynamic redirects
+- Site URL: https://bluelight-dmom0ulto-decimalists-projects.vercel.app
+- Redirect URLs:
+  - https://bluelight-dmom0ulto-decimalists-projects.vercel.app/auth/callback
+  - https://bluelight-dmom0ulto-decimalists-projects.vercel.app/gamechanger-callback
+  - yuti://auth/callback (for native apps)
 
 ## Issue 3: Supabase RLS Policy Error (PostgreSQL 42501)
 
