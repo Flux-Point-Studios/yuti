@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "echo 'Serving pre-built Flutter web files from build/web directory'",
+    "build": "sh -c 'git clone --depth 1 -b stable https://github.com/flutter/flutter.git /tmp/flutter && export PATH=/tmp/flutter/bin:$PATH && flutter config --enable-web && flutter --version && flutter pub get && flutter build web --release --pwa-strategy offline-first'",
     "start": "echo 'Static files ready'",
     "test": "echo 'No tests configured'"
   },
