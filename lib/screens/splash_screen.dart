@@ -31,6 +31,10 @@ class _SplashScreenState extends State<SplashScreen> {
           VideoPlayerController.asset('assets/loading_loop_fast.mp4');
       await _videoController.initialize();
 
+      // Ensure autoplay on web by muting
+      // (Browsers block autoplay with sound)
+      try { _videoController.setVolume(0); } catch (_) {}
+
       if (mounted) {
         setState(() {
           _isVideoInitialized = true;
@@ -198,7 +202,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       ],
                     ),
                     child: const Text(
-                      'bluelight',
+                      'Yuti',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w300,
