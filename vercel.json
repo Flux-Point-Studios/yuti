@@ -4,6 +4,7 @@
   },
   "outputDirectory": "build/web",
   "rewrites": [
+    { "source": "/api/t/chat", "destination": "/api/t/chat" },
     {
       "source": "/(.*)",
       "destination": "/index.html"
