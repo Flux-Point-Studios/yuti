@@ -223,6 +223,11 @@ class _WalletScreenState extends State<WalletScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _showRenameDialog,
+                  child: Icon(Icons.edit, size: 16, color: AppColors.textSecondary),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -259,6 +264,60 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showRenameDialog() {
+    final controller = TextEditingController(text: _walletService.walletName ?? 'Generated Wallet');
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundDark,
+        title: const Text('Rename Wallet', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Enter wallet name',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.primaryBlue)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () {
+                  final random = _walletService.generateRandomWalletName();
+                  controller.text = random;
+                },
+                icon: const Icon(Icons.shuffle, color: AppColors.primaryBlue, size: 16),
+                label: const Text('Random name', style: TextStyle(color: AppColors.primaryBlue)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await _walletService.renameWallet(controller.text);
+              if (mounted) setState(() {});
+              Navigator.pop(context);
+              _showCopyConfirmation('Wallet name updated');
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, foregroundColor: Colors.white),
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }
