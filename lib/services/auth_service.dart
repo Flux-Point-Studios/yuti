@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import '../models/user.dart';
 import 'supabase_service.dart';
 import 'cardano_wallet_service.dart';
+import 'gamification_service.dart';
 
 class AuthService {
   static const String _userKey = 'current_user';
@@ -364,6 +365,13 @@ class AuthService {
 
       await _saveUserSession();
       await _updateUserInDatabase(); // Save wallet data to database
+
+      // Award XP for 'Add a wallet'
+      try {
+        final gami = GamificationService();
+        await gami.awardTask('task_add_wallet');
+      } catch (_) {}
+
       return true;
     } catch (e) {
       print('Error connecting Cardano wallet: $e');
@@ -408,6 +416,13 @@ class AuthService {
 
       await _saveUserSession();
       await _updateUserInDatabase(); // Save wallet data to database
+
+      // Award XP for 'Add a wallet'
+      try {
+        final gami = GamificationService();
+        await gami.awardTask('task_add_wallet');
+      } catch (_) {}
+
       print('External Cardano wallet connected successfully: $walletName');
       return true;
     } catch (e) {

@@ -1,11 +1,11 @@
-# BlueLight CI/CD Deployment Guide
+# Yuti CI/CD Deployment Guide
 
 **Last Updated:** 7/16/2025 10:24 MST  
 **Status:** Production Ready ✅
 
 ## 🎯 **Deployment Strategy Overview**
 
-BlueLight uses a **Local Build + Static Serving** deployment strategy due to Vercel's limitations with Flutter web apps.
+Yuti uses a **Local Build + Static Serving** deployment strategy due to Vercel's limitations with Flutter web apps.
 
 ```
 Local Development → Flutter Build → Git Commit → Vercel Static Hosting
@@ -322,4 +322,4 @@ A successful deployment should:
 
 **🎉 Happy Deploying!**
 
-*This guide documents the lessons learned from resolving dual deployment conflicts and establishing a reliable Flutter web deployment pipeline for BlueLight.* 
+*This guide documents the lessons learned from resolving dual deployment conflicts and establishing a reliable Flutter web deployment pipeline for Yuti.* 

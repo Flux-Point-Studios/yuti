@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="BlueLight - Natural language crypto hub. Intelligent AI assistant for blockchain, DeFi, trading, and Web3 interactions.">
+  <meta name="description" content="Yuti - Natural language crypto hub. Intelligent AI assistant for blockchain, DeFi, trading, and Web3 interactions.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- PWA Manifest and Theme Color -->
@@ -35,11 +35,11 @@
   <!-- iOS specific meta tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="BlueLight">
+  <meta name="apple-mobile-web-app-title" content="Yuti">
 
   <!-- Additional PWA meta tags -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="application-name" content="BlueLight">
+  <meta name="application-name" content="Yuti">
   <meta name="msapplication-TileColor" content="#0175C2">
   <meta name="msapplication-TileImage" content="/icons/bluelight-512.png?v=3">
 
@@ -47,7 +47,18 @@
   <link rel="icon" type="image/png" href="/bluelight.png?v=3"/>
   <link rel="shortcut icon" type="image/png" href="/bluelight.png?v=3"/>
 
-  <title>BlueLight - Natural Language Crypto Hub</title>
+  <title>Yuti - Natural Language Crypto Hub</title>
+
+  <!-- Open Graph / Twitter Cards -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Yuti - Natural Language Crypto Hub">
+  <meta property="og:description" content="Your intelligent crypto companion. Natural language interface for blockchain, DeFi, trading, and Web3 services.">
+  <meta property="og:image" content="/icons/bluelight-512.png?v=3">
+  <meta property="og:url" content="https://yuti.app/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Yuti - Natural Language Crypto Hub">
+  <meta name="twitter:description" content="Your intelligent crypto companion. Natural language interface for blockchain, DeFi, trading, and Web3 services.">
+  <meta name="twitter:image" content="/icons/bluelight-512.png?v=3">
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
@@ -107,15 +118,8 @@
       });
     }
     
-    // Force clear all caches on page load for immediate fix
-    if ('caches' in window) {
-      caches.keys().then(function(cacheNames) {
-        cacheNames.forEach(function(cacheName) {
-          caches.delete(cacheName);
-          console.log('Cleared cache:', cacheName);
-        });
-      });
-    }
+    // Production: keep service worker caches for offline functionality.
+    // If you need to force clear caches during debugging, use DevTools > Application > Clear storage.
     
     // Detect if running as PWA (standalone mode)
     function isPWA() {

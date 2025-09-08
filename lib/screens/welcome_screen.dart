@@ -223,7 +223,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         stops: [0.0, 0.5, 1.0],
       ).createShader(bounds),
       child: const Text(
-        'Welcome to bluelight',
+        'Welcome to Yuti',
         style: TextStyle(
           fontSize: 36,
           fontWeight: FontWeight.w300,
@@ -476,7 +476,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            'By using bluelight, you agree to our Privacy Policy and Terms of Service.',
+            'By using Yuti, you agree to our Privacy Policy and Terms of Service.',
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
               fontSize: 12,

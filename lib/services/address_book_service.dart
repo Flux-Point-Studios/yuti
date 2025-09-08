@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/address_book_entry.dart';
+import 'ada_handle_service.dart';
 
 class AddressBookService {
   static const _storage = FlutterSecureStorage();
@@ -10,6 +11,8 @@ class AddressBookService {
   static final AddressBookService _instance = AddressBookService._internal();
   factory AddressBookService() => _instance;
   AddressBookService._internal();
+
+  final AdaHandleService _handleService = AdaHandleService();
 
   List<AddressBookEntry> _entries = [];
   
@@ -49,6 +52,18 @@ class AddressBookService {
     } catch (e) {
       print('Error saving address book entries: $e');
     }
+  }
+
+  /// Resolve input if it is an ADA Handle; otherwise return input as-is
+  Future<Map<String, String>> resolveIfHandle(String input) async {
+    final trimmed = input.trim();
+    if (_handleService.isHandle(trimmed)) {
+      final res = await _handleService.resolveHandle(trimmed);
+      if (res != null) {
+        return {'address': res.adaAddress, 'handle': res.handle.startsWith('@') ? '@${res.handle}' : '@${res.handle}'};
+      }
+    }
+    return {'address': trimmed};
   }
 
   /// Add a new entry
@@ -161,8 +176,6 @@ class AddressBookService {
   /// Check if address is valid Cardano address
   bool isValidCardanoAddress(String address) {
     // Basic Cardano address validation
-    // Mainnet addresses start with addr1
-    // Testnet addresses start with addr_test1
     return address.startsWith('addr1') || address.startsWith('addr_test1');
   }
 }
