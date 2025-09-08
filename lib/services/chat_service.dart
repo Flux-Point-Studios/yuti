@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/chat_message.dart';
 import '../config/app_config.dart';
+import '../config/secure_config.dart';
 import 'wallet_service.dart';
 import 'blockfrost_service.dart';
 import 'transaction_service.dart';
@@ -559,13 +560,26 @@ class ChatService {
     final url = Uri.parse("${_config.tBackendUrl}/chat");
     print('🔍 DEBUG: API URL: $url');
     
+    // Load API key from secure storage first; fallback to env/AppConfig
+    String apiKey = '';
+    try {
+      apiKey = await SecureConfig().getTBackendApiKey();
+    } catch (_) {
+      apiKey = _config.tBackendApiKey;
+    }
+    
     final headers = {
       'Content-Type': 'application/json',
-      if (_config.tBackendApiKey.isNotEmpty) 'api-key': _config.tBackendApiKey,
+      if (apiKey.isNotEmpty) 'api-key': apiKey,
     };
     print('🔍 DEBUG: Headers: $headers');
-    print('🔍 DEBUG: API Key present: ${_config.tBackendApiKey.isNotEmpty}');
-    print('🔍 DEBUG: API Key value: ${_config.tBackendApiKey.isEmpty ? 'EMPTY' : '${_config.tBackendApiKey.substring(0, 10)}...'}');
+    print('🔍 DEBUG: API Key present: ${apiKey.isNotEmpty}');
+    if (apiKey.isNotEmpty) {
+      final masked = apiKey.length > 10 ? '${apiKey.substring(0, 10)}...' : 'SET';
+      print('🔍 DEBUG: API Key value (masked): $masked');
+    } else {
+      print('🔍 DEBUG: API Key value: EMPTY');
+    }
     
     // Build wallet context snapshot (best-effort)
     Map<String, dynamic>? walletContext;
