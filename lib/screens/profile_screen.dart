@@ -681,7 +681,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               children: [
                 Text(
-                  'BlueLight',
+                  'Yuti',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 14,
@@ -868,7 +868,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Earn rewards by referring friends to BlueLight!',
+                  'Earn rewards by referring friends to Yuti!',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 14,
