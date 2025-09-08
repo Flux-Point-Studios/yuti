@@ -8,6 +8,7 @@ class SpeechService {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   bool _isAvailable = false;
+  bool _disposed = false;
   
   // Stream controllers
   final _transcriptionController = StreamController<String>.broadcast();
@@ -26,15 +27,18 @@ class SpeechService {
   
   // Initialize speech recognition
   Future<bool> initialize() async {
+    if (_disposed) return false;
     try {
       // On web: skip permission_handler checks (speech permission not implemented)
       if (kIsWeb) {
         _isAvailable = await _speech.initialize(
           onStatus: (status) {
+            if (_disposed) return;
             debugPrint('Speech status: $status');
             _handleStatusChange(status);
           },
           onError: (error) {
+            if (_disposed) return;
             debugPrint('Speech error: $error');
             _statusController.add(SpeechStatus.error);
             _isListening = false;
@@ -75,10 +79,12 @@ class SpeechService {
       // Initialize speech recognition
       _isAvailable = await _speech.initialize(
         onStatus: (status) {
+          if (_disposed) return;
           debugPrint('Speech status: $status');
           _handleStatusChange(status);
         },
         onError: (error) {
+          if (_disposed) return;
           debugPrint('Speech error: $error');
           _statusController.add(SpeechStatus.error);
           _isListening = false;
@@ -93,6 +99,7 @@ class SpeechService {
       
       return _isAvailable;
     } catch (e) {
+      if (_disposed) return false;
       debugPrint('Failed to initialize speech: $e');
       _statusController.add(SpeechStatus.error);
       return false;
@@ -104,7 +111,7 @@ class SpeechService {
     Duration? pauseFor,
     void Function(String)? onResult,
   }) async {
-    if (!_isAvailable || _isListening) return;
+    if (_disposed || !_isAvailable || _isListening) return;
     
     try {
       _isListening = true;
@@ -112,14 +119,14 @@ class SpeechService {
       
       await _speech.listen(
         onResult: (result) {
+          if (_disposed) return;
           final transcript = result.recognizedWords;
-          _transcriptionController.add(transcript);
-          
+          if (!_transcriptionController.isClosed) {
+            _transcriptionController.add(transcript);
+          }
           if (onResult != null) {
             onResult(transcript);
           }
-          
-          // Check if final result
           if (result.finalResult) {
             stopListening();
           }
@@ -130,6 +137,7 @@ class SpeechService {
         listenMode: stt.ListenMode.confirmation,
       );
     } catch (e) {
+      if (_disposed) return;
       debugPrint('Error starting speech recognition: $e');
       _isListening = false;
       _statusController.add(SpeechStatus.error);
@@ -138,12 +146,14 @@ class SpeechService {
   
   // Stop listening
   Future<void> stopListening() async {
-    if (!_isListening) return;
+    if (_disposed || !_isListening) return;
     
     try {
       await _speech.stop();
       _isListening = false;
-      _statusController.add(SpeechStatus.ready);
+      if (!_statusController.isClosed) {
+        _statusController.add(SpeechStatus.ready);
+      }
     } catch (e) {
       debugPrint('Error stopping speech recognition: $e');
       _isListening = false;
@@ -152,12 +162,14 @@ class SpeechService {
   
   // Cancel listening
   Future<void> cancelListening() async {
-    if (!_isListening) return;
+    if (_disposed || !_isListening) return;
     
     try {
       await _speech.cancel();
       _isListening = false;
-      _statusController.add(SpeechStatus.ready);
+      if (!_statusController.isClosed) {
+        _statusController.add(SpeechStatus.ready);
+      }
     } catch (e) {
       debugPrint('Error cancelling speech recognition: $e');
       _isListening = false;
@@ -166,17 +178,24 @@ class SpeechService {
   
   // Handle status changes
   void _handleStatusChange(String status) {
+    if (_disposed) return;
     switch (status) {
       case 'listening':
-        _statusController.add(SpeechStatus.listening);
+        if (!_statusController.isClosed) {
+          _statusController.add(SpeechStatus.listening);
+        }
         break;
       case 'notListening':
         _isListening = false;
-        _statusController.add(SpeechStatus.ready);
+        if (!_statusController.isClosed) {
+          _statusController.add(SpeechStatus.ready);
+        }
         break;
       case 'done':
         _isListening = false;
-        _statusController.add(SpeechStatus.ready);
+        if (!_statusController.isClosed) {
+          _statusController.add(SpeechStatus.ready);
+        }
         break;
       default:
         break;
@@ -185,7 +204,7 @@ class SpeechService {
   
   // Get available locales
   Future<List<stt.LocaleName>> getAvailableLocales() async {
-    if (!_isAvailable) return [];
+    if (_disposed || !_isAvailable) return [];
     
     try {
       return await _speech.locales();
@@ -198,14 +217,19 @@ class SpeechService {
   // Set language/locale
   Future<void> setLocale(String localeId) async {
     // Implementation depends on your requirements
-    // You might need to reinitialize with a specific locale
   }
   
   // Clean up resources
   void dispose() {
-    stopListening();
-    _transcriptionController.close();
-    _statusController.close();
+    if (_disposed) return;
+    _disposed = true;
+    try { stopListening(); } catch (_) {}
+    if (!_transcriptionController.isClosed) {
+      _transcriptionController.close();
+    }
+    if (!_statusController.isClosed) {
+      _statusController.close();
+    }
   }
 }
 

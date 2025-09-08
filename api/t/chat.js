@@ -1,6 +1,7 @@
-export const config = { runtime: 'nodejs18.x' };
+// Ensure fetch is available (Node <18 fallback)
+const fetchCompat = globalThis.fetch || (async (...args) => (await import('node-fetch')).then(m => m.default(...args)));
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   try {
     const baseUrl = process.env.T_BACKEND_URL || 'https://api.fluxpointstudios.com';
     const apiKey = process.env.T_BACKEND_API_KEY || '';
@@ -12,7 +13,7 @@ export default async function handler(req, res) {
 
     const targetUrl = `${baseUrl.replace(/\/$/, '')}/chat`;
 
-    const upstream = await fetch(targetUrl, {
+    const upstream = await fetchCompat(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -26,6 +27,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
     res.send(text);
   } catch (err) {
+    console.error('Proxy error /api/t/chat:', err);
     res.status(500).json({ error: 'Proxy error', detail: String(err && err.stack || err) });
   }
-} 
+}; 
