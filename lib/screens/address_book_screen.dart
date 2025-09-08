@@ -585,7 +585,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
               TextFormField(
                 controller: handleController,
                 decoration: InputDecoration(
-                  labelText: 'ADA Handle (optional, e.g. $yuti)',
+                  labelText: 'ADA Handle (optional, e.g. \$yuti)',
                   labelStyle: TextStyle(color: AppColors.textSecondary),
                   filled: true,
                   fillColor: AppColors.backgroundLight.withOpacity(0.1),
