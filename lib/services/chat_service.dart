@@ -12,6 +12,7 @@ import 'uex_service.dart';
 import 'saturn_swap_service.dart';
 import 'cardano_wallet_service.dart';
 import 'address_book_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 enum ChatIntent {
   balance,
@@ -557,7 +558,11 @@ class ChatService {
   Future<String> _callTBackend(String message) async {
     print('🔍 DEBUG: _callTBackend called with message: "$message"');
     
-    final url = Uri.parse("${_config.tBackendUrl}/chat");
+    // Use serverless proxy on web to avoid CORS and expose no secrets
+    final String endpoint = kIsWeb
+        ? '/api/t/chat'
+        : "${_config.tBackendUrl}/chat";
+    final url = kIsWeb ? Uri.parse(endpoint) : Uri.parse(endpoint);
     print('🔍 DEBUG: API URL: $url');
     
     // Load API key from secure storage first; fallback to env/AppConfig
@@ -570,13 +575,16 @@ class ChatService {
     
     final headers = {
       'Content-Type': 'application/json',
-      if (apiKey.isNotEmpty) 'api-key': apiKey,
+      // For web via proxy, do not send api-key from browser
+      if (!kIsWeb && apiKey.isNotEmpty) 'api-key': apiKey,
     };
     print('🔍 DEBUG: Headers: $headers');
-    print('🔍 DEBUG: API Key present: ${apiKey.isNotEmpty}');
-    if (apiKey.isNotEmpty) {
+    print('🔍 DEBUG: API Key present: ${(!kIsWeb && apiKey.isNotEmpty)}');
+    if (!kIsWeb && apiKey.isNotEmpty) {
       final masked = apiKey.length > 10 ? '${apiKey.substring(0, 10)}...' : 'SET';
       print('🔍 DEBUG: API Key value (masked): $masked');
+    } else if (kIsWeb) {
+      print('🔍 DEBUG: Using serverless proxy; API key not sent from browser');
     } else {
       print('🔍 DEBUG: API Key value: EMPTY');
     }
