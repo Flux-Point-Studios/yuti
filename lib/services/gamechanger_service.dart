@@ -76,9 +76,9 @@ class GameChangerService {
 
     final script = {
       "type": "script",
-      "title": "🚀 Connect with Bluelight?",
+      "title": "🚀 Connect with Yuti?",
       "description":
-          "About to share your basic public wallet information with Bluelight app",
+          "About to share your basic public wallet information with Yuti app",
       "exportAs": "connect",
       "returnURLPattern": callbackUrl,
       "run": {
@@ -301,7 +301,9 @@ class GameChangerService {
       final currentUri = Uri.base;
       
       print('🔍 DEBUG: Platform detection - kIsWeb: $kIsWeb, currentUri: $currentUri');
-      print('🔍 DEBUG: Platform.isIOS: ${Platform.isIOS}, Platform.isAndroid: ${Platform.isAndroid}');
+      if (!kIsWeb) {
+        print('🔍 DEBUG: Platform.isIOS: ${Platform.isIOS}, Platform.isAndroid: ${Platform.isAndroid}');
+      }
 
       if (kIsWeb) {
         // For web, flutter_web_auth expects the web protocol (https)
@@ -315,7 +317,7 @@ class GameChangerService {
         
         if (Platform.isIOS) {
           print('🔍 DEBUG: iOS will use ASWebAuthenticationSession for in-app browser session');
-          print('🔍 DEBUG: This should show "Return to BlueLight" instead of "Done"');
+          print('🔍 DEBUG: This should show "Return to Yuti" instead of "Done"');
         }
       }
 
