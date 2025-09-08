@@ -131,6 +131,28 @@ class WalletService {
     }
   }
 
+  // Random friendly wallet name generator
+  String generateRandomWalletName() {
+    const adjectives = [
+      'Silver','Azure','Crimson','Golden','Quantum','Luminous','Nebula','Silent','Swift','Shadow',
+    ];
+    const nouns = [
+      'Falcon','Vertex','Aurora','Comet','Sentinel','Harbor','Forge','Beacon','Atlas','Nova',
+    ];
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final adj = adjectives[now % adjectives.length];
+    final noun = nouns[(now ~/ 7) % nouns.length];
+    return '$adj $noun';
+  }
+
+  Future<void> renameWallet(String newName) async {
+    if (_wallets.isEmpty) return;
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+    _wallets[0] = _wallets[0].copyWith(name: trimmed);
+    await _saveWallets();
+  }
+
   // Note: Dummy address generation removed - now using real Cardano SDK addresses
 
   Future<String> getReceiveAddress() async {
