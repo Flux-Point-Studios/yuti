@@ -9,6 +9,7 @@ import '../models/transaction.dart';
 import '../models/address_book_entry.dart';
 import 'address_book_screen.dart';
 import 'qr_scanner_screen.dart';
+import '../services/gamification_service.dart';
 
 class SendScreen extends StatefulWidget {
   final CardanoWalletService walletService;
@@ -574,7 +575,14 @@ class _SendScreenState extends State<SendScreen> {
     });
 
     try {
-      final address = _addressController.text.trim();
+      String address = _addressController.text.trim();
+      // Resolve ADA Handle if entered
+      if (!widget.walletService.validateAddress(address)) {
+        try {
+          final res = await AddressBookService().resolveIfHandle(address);
+          address = res['address'] ?? address;
+        } catch (_) {}
+      }
       final amount = double.parse(_amountController.text);
       final description = _descriptionController.text.trim();
 
@@ -610,6 +618,11 @@ class _SendScreenState extends State<SendScreen> {
         'confirmed',
         txHash: 'mock_tx_${DateTime.now().millisecondsSinceEpoch}',
       );
+
+      // Award XP for 'Send an asset'
+      try {
+        await GamificationService().awardTask('task_first_send');
+      } catch (_) {}
 
       // Show success and navigate back
       _showSuccessDialog();

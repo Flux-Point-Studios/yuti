@@ -6,6 +6,10 @@
     <!-- Microphone permission for speech-to-text -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
+    <!-- Biometric auth (fingerprint/face) to mirror iOS Face ID capability -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    
     <!-- Internet permission (usually included by default) -->
     <uses-permission android:name="android.permission.INTERNET" />
     
@@ -13,7 +17,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     
     <application
-        android:label="bluelight"
+        android:label="Yuti"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -42,7 +46,14 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="bluelight" android:host="gamechanger-callback" />
+                <data android:scheme="yuti" android:host="gamechanger-callback" />
+            </intent-filter>
+            <!-- Optional: Payment success deep link parity (reserved for future use) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="yuti" android:host="payment-success" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

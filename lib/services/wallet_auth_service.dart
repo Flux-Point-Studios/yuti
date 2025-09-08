@@ -165,7 +165,7 @@ class WalletAuthService {
   Future<User> _createWalletUser(GameChangerWalletData walletData) async {
     try {
       // Generate a unique email based on wallet address
-      final walletEmail = '${walletData.address.substring(0, 10).toLowerCase()}@wallet.bluelight';
+      final walletEmail = '${walletData.address.substring(0, 10).toLowerCase()}@wallet.yuti';
       
       // Generate a secure random password (user won't need it since they use wallet auth)
       final walletPassword = 'wallet_${DateTime.now().millisecondsSinceEpoch}_${walletData.address.substring(0, 8)}';

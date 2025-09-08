@@ -10,7 +10,7 @@ class GameChangerService {
   static const String _webCallbackPath = '/gamechanger-callback';
 
   // For native apps (if needed in future)
-  static const String _callbackScheme = 'bluelight';
+  static const String _callbackScheme = 'yuti';
   static const String _callbackHost = 'gamechanger-callback';
 
   // GameChanger URL endpoints
@@ -61,7 +61,7 @@ class GameChangerService {
     } else {
       // For native apps, use custom scheme
       final customSchemeUrl =
-          'bluelight://gamechanger-callback?result={result}';
+          'yuti://gamechanger-callback?result={result}';
       print('🔍 DEBUG: Generated custom scheme URL for iOS/Android: $customSchemeUrl');
       print('🔍 DEBUG: This should match the URL scheme configured in Info.plist/AndroidManifest.xml');
       return customSchemeUrl;
@@ -229,9 +229,9 @@ class GameChangerService {
       final callbackUrl = script['returnURLPattern'] as String;
       print('🔍 DEBUG: Callback URL pattern: $callbackUrl');
       
-      if (!callbackUrl.contains('bluelight://gamechanger-callback')) {
+      if (!callbackUrl.contains('yuti://gamechanger-callback')) {
         throw GameChangerException(
-            'Invalid callback URL for Android. Expected bluelight:// scheme.');
+            'Invalid callback URL for Android. Expected yuti:// scheme.');
       }
       
       // Launch GameChanger using url_launcher  

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../services/cardano_wallet_service.dart';
 import '../services/transaction_history_service.dart';
+import '../services/uex_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/glassmorphism_container.dart';
 import '../models/transaction.dart';
+import '../services/gamification_service.dart';
 
 class SwapScreen extends StatefulWidget {
   final CardanoWalletService walletService;
@@ -21,6 +24,8 @@ class SwapScreen extends StatefulWidget {
 class _SwapScreenState extends State<SwapScreen> {
   final _fromAmountController = TextEditingController();
   final _transactionHistoryService = TransactionHistoryService();
+  final UEXService _uexService = UEXService();
+  StreamSubscription<Map<String, dynamic>>? _uexWatchSubscription;
 
   String _fromAsset = 'ADA';
   String _toAsset = 'USDC';
@@ -44,6 +49,7 @@ class _SwapScreenState extends State<SwapScreen> {
   @override
   void dispose() {
     _fromAmountController.dispose();
+    _uexWatchSubscription?.cancel();
     super.dispose();
   }
 
@@ -651,7 +657,7 @@ class _SwapScreenState extends State<SwapScreen> {
     try {
       final amount = double.parse(_fromAmountController.text);
 
-      // Create transaction record
+      // Create a local transaction record (pending)
       final transaction = Transaction(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         type: 'swap',
@@ -662,24 +668,46 @@ class _SwapScreenState extends State<SwapScreen> {
         fee: _estimatedFee,
         status: 'pending',
         timestamp: DateTime.now(),
-        description: 'Swapped ${amount.toStringAsFixed(_fromAsset == 'ADA' ? 2 : 0)} $_fromAsset to ${_estimatedToAmount.toStringAsFixed(_toAsset == 'ADA' ? 2 : 6)} $_toAsset',
+        description: 'Swapping ${amount.toStringAsFixed(_fromAsset == 'ADA' ? 2 : 0)} $_fromAsset to ${_estimatedToAmount.toStringAsFixed(_toAsset == 'ADA' ? 2 : 6)} $_toAsset',
       );
-
-      // Add to transaction history
       await _transactionHistoryService.addTransaction(transaction);
 
-      // Simulate swap execution
-      await Future.delayed(const Duration(seconds: 3));
-
-      // Update transaction status
-      await _transactionHistoryService.updateTransactionStatus(
-        transaction.id,
-        'confirmed',
-        txHash: 'swap_tx_${DateTime.now().millisecondsSinceEpoch}',
+      // Attempt to create UEX swap session
+      final createResp = await _uexService.createSwapTransaction(
+        fromToken: _fromAsset,
+        toToken: _toAsset,
+        fromAmount: amount.toString(),
+        toAmount: _estimatedToAmount.toString(),
+        userAddress: widget.walletService.currentAddress ?? '',
+        slippageTolerance: 0.01,
       );
 
-      // Show success and navigate back
-      _showSuccessDialog();
+      // Extract watch address and histories token from response (be tolerant to key names)
+      final String? watchAddress =
+          (createResp['deposit_address'] ?? createResp['destination_address'] ??
+           createResp['depositAddress'] ?? createResp['destinationAddress'] ??
+           createResp['to_address'] ?? createResp['toAddress']) as String?;
+      final String? historiesToken =
+          (createResp['token'] ?? createResp['session_token'] ?? createResp['histories_token']) as String?;
+
+      if (watchAddress != null && historiesToken != null) {
+        // Notify user and start watching
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Started watching swap status for ${watchAddress.substring(0, 12)}...')),
+        );
+        _startWatchingUex(watchAddress, historiesToken, transaction.id);
+      } else {
+        // Missing fields to watch – keep transaction pending and inform user
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Swap created. Send to the provided deposit address and check status later.')),
+        );
+      }
+
+      // Optionally display deposit address to the user if present
+      if (watchAddress != null) {
+        _showDepositAddressDialog(watchAddress);
+      }
+
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to execute swap: $e';
@@ -689,6 +717,65 @@ class _SwapScreenState extends State<SwapScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _startWatchingUex(String address, String token, String transactionId) {
+    _uexWatchSubscription?.cancel();
+    _uexWatchSubscription = _uexService
+        .watchSwapStatusByAddress(watchAddress: address, token: token)
+        .listen((event) async {
+      final status = (event['status'] ?? '').toString().toUpperCase();
+      if (status.isEmpty) return;
+
+      // Surface status to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Swap status: $status')),
+      );
+
+      if (status == 'COMPLETED' || status == 'SUCCESS' || status == 'FILLED') {
+        await _transactionHistoryService.updateTransactionStatus(transactionId, 'confirmed');
+        _uexWatchSubscription?.cancel();
+        _uexWatchSubscription = null;
+        try {
+          await GamificationService().awardTask('task_first_swap');
+        } catch (_) {}
+        _showSuccessDialog();
+      } else if (status == 'FAILED' || status == 'CANCELED' || status == 'EXPIRED' || status == 'ERROR') {
+        await _transactionHistoryService.updateTransactionStatus(transactionId, 'failed');
+        _uexWatchSubscription?.cancel();
+        _uexWatchSubscription = null;
+        setState(() {
+          _errorMessage = 'Swap $status.';
+        });
+      }
+    });
+  }
+
+  void _showDepositAddressDialog(String address) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundDark,
+        title: Text('Deposit Address', style: TextStyle(color: AppColors.textPrimary)),
+        content: SelectableText(address, style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: address));
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Address copied')),
+              );
+            },
+            child: const Text('Copy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSuccessDialog() {

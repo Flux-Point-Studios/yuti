@@ -1,4 +1,4 @@
-# Cardevia PWA Website Integration Guide
+# Website Integration Guide for Yuti
 
 This guide shows how to deploy your Cardevia PWA to **fluxpointstudios.com** and add promotional elements for easy user access.
 
@@ -6,7 +6,7 @@ This guide shows how to deploy your Cardevia PWA to **fluxpointstudios.com** and
 
 ### **Option 1: Subdomain Deployment (Recommended)**
 
-Deploy as `bluelight.fluxpointstudios.com`
+Deploy as `bluelight.fluxpointstudios.com` (domain kept for existing infra).
 
 **Advantages:**
 - Clean separation from main site
@@ -95,15 +95,13 @@ Add this to your main website pages:
 <div class="pwa-promotion">
   <div class="pwa-card">
     <div class="pwa-icon">
-      <img src="https://bluelight.fluxpointstudios.com/icons/Icon-192.png" alt="BlueLight App" width="64" height="64">
+      <img src="https://bluelight.fluxpointstudios.com/icons/Icon-192.png" alt="Yuti App" width="64" height="64">
     </div>
     <div class="pwa-content">
       <h3>Launch Cardevia Wallet</h3>
       <p>Your conversational Cardano wallet with AI assistant</p>
       <div class="pwa-buttons">
-        <a href="https://bluelight.fluxpointstudios.com" class="pwa-button primary" target="_blank">
-          📱 Open App
-        </a>
+        <a href="https://bluelight.fluxpointstudios.com" class="pwa-button primary" target="_blank">Open Yuti</a>
         <button class="pwa-button secondary" onclick="showQRCode()">
           📱 Scan QR Code
         </button>
@@ -345,8 +343,8 @@ For mobile users visiting your main site:
 
 ```html
 <!-- Mobile FAB -->
-  <div class="mobile-fab" onclick="openBlueLight()">
-  <img src="https://bluelight.fluxpointstudios.com/icons/Icon-192.png" alt="BlueLight" width="24" height="24">
+  <div class="mobile-fab" onclick="openYuti()">
+  <img src="https://bluelight.fluxpointstudios.com/icons/Icon-192.png" alt="Yuti" width="24" height="24">
   <span>Wallet</span>
 </div>
 
@@ -385,134 +383,8 @@ For mobile users visiting your main site:
 </style>
 
 <script>
-function openBlueLight() {
+function openYuti() {
   window.open('https://bluelight.fluxpointstudios.com', '_blank');
 }
 </script>
 ```
-
----
-
-## 🔧 **Server Configuration**
-
-### **Apache (.htaccess)**
-
-```apache
-# Place in your app directory
-RewriteEngine On
-RewriteBase /app/
-
-# Handle Angular and other front-end framework routes
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /app/index.html [L]
-
-# Security headers
-Header always set X-Frame-Options DENY
-Header always set X-Content-Type-Options nosniff
-Header always set Referrer-Policy "strict-origin-when-cross-origin"
-
-# Cache headers
-<FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
-    ExpiresActive On
-    ExpiresDefault "access plus 1 year"
-</FilesMatch>
-
-<FilesMatch "\.html$">
-    ExpiresActive On
-    ExpiresDefault "access plus 1 hour"
-</FilesMatch>
-```
-
-### **Nginx Configuration**
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name bluelight.fluxpointstudios.com;
-    
-    ssl_certificate /path/to/ssl/cert.pem;
-    ssl_certificate_key /path/to/ssl/private.key;
-    
-    root /var/www/cardevia-app;
-    index index.html;
-    
-    # Handle Flutter routing
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # Security headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header Referrer-Policy "strict-origin-when-cross-origin";
-}
-```
-
----
-
-## 📊 **Analytics & Monitoring**
-
-### **Google Analytics Integration**
-
-Add to your main site to track PWA clicks:
-
-```html
-<!-- Google Analytics Event Tracking -->
-<script>
-function trackPWAClick(action) {
-  if (typeof gtag !== 'undefined') {
-    gtag('event', action, {
-      'event_category': 'PWA',
-      'event_label': 'Cardevia Wallet'
-    });
-  }
-}
-
-// Update button onclick events
-document.querySelector('.pwa-button.primary').onclick = function() {
-  trackPWAClick('pwa_open');
-  window.open('https://bluelight.fluxpointstudios.com', '_blank');
-};
-</script>
-```
-
----
-
-## ✅ **Deployment Checklist**
-
-- [ ] Choose deployment strategy (subdomain/subdirectory)
-- [ ] Configure DNS settings
-- [ ] Deploy PWA files to hosting
-- [ ] Verify HTTPS is working
-- [ ] Test PWA installation on mobile
-- [ ] Add promotional elements to main website
-- [ ] Test QR code functionality
-- [ ] Configure analytics tracking
-- [ ] Set up monitoring/alerts
-- [ ] Update main website navigation (optional)
-
----
-
-## 🎯 **Quick Deploy Commands**
-
-```bash
-# Deploy to Firebase with custom domain
-firebase deploy
-# Then configure bluelight.fluxpointstudios.com in Firebase Console
-
-# Deploy to Vercel with custom domain  
-vercel --prod
-# Then add custom domain in Vercel dashboard
-
-# Upload to traditional hosting
-# Copy contents of build/web to your server directory
-```
-
-Your PWA is **production-ready** and can be deployed immediately! 🚀 

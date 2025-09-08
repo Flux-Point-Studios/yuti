@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/chat_message.dart';
@@ -9,6 +10,7 @@ import 'transaction_service.dart';
 import 'uex_service.dart';
 import 'saturn_swap_service.dart';
 import 'cardano_wallet_service.dart';
+import 'address_book_service.dart';
 
 enum ChatIntent {
   balance,
@@ -104,6 +106,76 @@ class ChatService {
     _transactionService = TransactionService(_walletService, _blockfrostService);
   }
   
+  // System messages stream for background notifications (e.g., swap status updates)
+  final StreamController<ChatMessage> _systemMessagesController = StreamController<ChatMessage>.broadcast();
+  Stream<ChatMessage> get systemMessages => _systemMessagesController.stream;
+
+  // Track active UEX watchers by address
+  final Map<String, StreamSubscription> _uexWatchSubscriptions = {};
+
+  // Start watching a UEX swap by deposit/destination address
+  void startWatchingUexAddress({
+    required String watchAddress,
+    required String token,
+  }) {
+    // Cancel any existing watcher on the same address
+    _uexWatchSubscriptions[watchAddress]?.cancel();
+
+    final Stream<Map<String, dynamic>> stream = _uexService.watchSwapStatusByAddress(
+      watchAddress: watchAddress,
+      token: token,
+    );
+
+    final sub = stream.listen((event) {
+      final status = (event['status'] ?? '').toString();
+
+      String emoji;
+      switch (status) {
+        case 'PENDING':
+        case 'MEMPOOL':
+        case 'NO_DATA':
+          emoji = '⏳';
+          break;
+        case 'COMPLETED':
+        case 'SUCCESS':
+        case 'FILLED':
+          emoji = '✅';
+          break;
+        case 'FAILED':
+        case 'CANCELED':
+        case 'EXPIRED':
+        case 'ERROR':
+          emoji = '❌';
+          break;
+        default:
+          emoji = 'ℹ️';
+      }
+
+      final item = event['item'] as Map<String, dynamic>?;
+      final txDesc = item != null && item.containsKey('txHash')
+          ? " tx: `${(item['txHash'] as String).substring(0, 10)}...`"
+          : '';
+
+      final text = "UEX swap status for `${watchAddress.substring(0, 12)}...` → $emoji $status.$txDesc";
+      _systemMessagesController.add(ChatMessage.text(text: text, isUser: false));
+
+      // Stop on terminal states
+      if (status == 'COMPLETED' || status == 'SUCCESS' || status == 'FILLED' ||
+          status == 'FAILED' || status == 'CANCELED' || status == 'EXPIRED') {
+        _uexWatchSubscriptions[watchAddress]?.cancel();
+        _uexWatchSubscriptions.remove(watchAddress);
+      }
+    });
+
+    _uexWatchSubscriptions[watchAddress] = sub;
+
+    // Immediate feedback to UI
+    _systemMessagesController.add(ChatMessage.text(
+      text: "Started watching UEX swap for `${watchAddress.substring(0, 12)}...`.",
+      isUser: false,
+    ));
+  }
+
   // Main entry point for processing user messages
   Future<ChatMessage> processMessage(String userInput) async {
     try {
@@ -264,7 +336,15 @@ class ChatService {
       }
       
       final amount = parsed['amount'] as double;
-      final address = parsed['address'] as String;
+      String address = parsed['address'] as String;
+
+      // Resolve ADA Handle if provided
+      if (!_walletService.validateAddress(address)) {
+        try {
+          final res = await AddressBookService().resolveIfHandle(address);
+          address = res['address'] ?? address;
+        } catch (_) {}
+      }
       
       // Validate address
       if (!_walletService.validateAddress(address)) {
@@ -299,7 +379,7 @@ class ChatService {
       // );
     } catch (e) {
       return ChatMessage.text(
-        text: "❌ Failed to send transaction: ${e.toString()}",
+        text: "❌ I couldn't process your send request. Please try again.",
         isUser: false,
       );
     }
@@ -354,26 +434,44 @@ class ChatService {
   // Removed UEX flow
  
   Future<ChatMessage> _handleSwapStatus(String input) async {
-    // Parse order ID from input
-    final regex = RegExp(r'([a-f0-9-]{8,})');
-    final match = regex.firstMatch(input.toLowerCase());
-    
-    if (match == null) {
+    // New behavior: allow watching by deposit/destination address with an optional token
+    // Usage examples:
+    // "watch addr1... token:ABCDEF..."
+    // "swap status addr1... token:ABCDEF..."
+    final addressMatch = RegExp(r'(addr1[0-9a-z]+)', caseSensitive: false).firstMatch(input);
+    final tokenMatch = RegExp(r'token\s*:\s*([A-Za-z0-9]+)', caseSensitive: false).firstMatch(input);
+
+    if (addressMatch != null && tokenMatch != null) {
+      final address = addressMatch.group(1)!;
+      final token = tokenMatch.group(1)!;
+      startWatchingUexAddress(watchAddress: address, token: token);
       return ChatMessage.text(
-        text: "❌ I couldn't find an order ID. Please include the order ID in your query.",
+        text: "Okay, I'll watch the swap at `${address.substring(0, 12)}...` and keep you posted.",
         isUser: false,
       );
     }
-    
-    final orderId = match.group(1)!;
-    
+
+    if (addressMatch != null && tokenMatch == null) {
+      return ChatMessage.text(
+        text: "Please include the UEX token for histories API, e.g. `token:YOURTOKEN`.",
+        isUser: false,
+      );
+    }
+
+    // Fallback: retain old behavior expecting an order id
+    final orderMatch = RegExp(r'([a-f0-9-]{8,})').firstMatch(input.toLowerCase());
+    if (orderMatch == null) {
+      return ChatMessage.text(
+        text: "❌ I couldn't find a deposit address or order ID. Provide `addr1...` and `token:...`, or an order ID.",
+        isUser: false,
+      );
+    }
+
+    final orderId = orderMatch.group(1)!;
     try {
-      // Use real UEX service to get swap status
       final status = await _uexService.getSwapStatus(orderId);
-      
       String statusEmoji = '';
       String statusText = '';
-      
       switch (status.status.toLowerCase()) {
         case 'pending':
           statusEmoji = '⏳';
@@ -392,25 +490,18 @@ class ChatService {
           statusEmoji = '❓';
           statusText = status.status;
       }
-      
       String response = "**Order $orderId Status:** $statusEmoji **$statusText**\n\n";
-      
       if (status.confirmations != null) {
         response += "**Confirmations:** ${status.confirmations}\n";
       }
-      
       if (status.errorMessage != null) {
         response += "**Error:** ${status.errorMessage}\n";
       }
-      
       response += "**Last Updated:** ${_formatTime(status.timestamp)}";
-      
       return ChatMessage.text(text: response, isUser: false);
     } catch (e) {
       return ChatMessage.text(
-        text: "❌ Unable to fetch status for order $orderId.\n\n"
-              "Please check the order ID or try again later.\n\n"
-              "*Error: ${e.toString()}*",
+        text: "❌ Unable to fetch status for order $orderId.\n\nPlease check the order ID or try again later.\n\n*Error: ${e.toString()}*",
         isUser: false,
       );
     }

@@ -1,4 +1,4 @@
-# iOS Deployment Guide for BlueLight
+# iOS Deployment Guide for Yuti
 *Created: July 17, 2025*
 
 ## Overview

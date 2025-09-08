@@ -1,0 +1,3 @@
+[submodule "external/ShardSwap"]
+	path = external/ShardSwap
+	url = https://github.com/Flux-Point-Studios/ShardSwap.git

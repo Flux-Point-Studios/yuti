@@ -8,6 +8,7 @@ import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../widgets/cardano_wallet_dialog.dart';
 import '../widgets/wallet_security_settings.dart';
+import '../services/gamification_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -18,9 +19,11 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
+  final GamificationService _gami = GamificationService();
   User? _currentUser;
   bool _isLoading = true;
   bool _isWalletLoading = false;
+  GamificationState? _gamiState;
   
   // Usage statistics
   int _chatCount = 0;
@@ -42,6 +45,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _loadGamification();
+  }
+
+  Future<void> _loadGamification() async {
+    final s = await _gami.getState();
+    setState(() {
+      _gamiState = s;
+    });
   }
 
   Future<void> _loadUserData() async {
@@ -55,6 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loadUserStats(),
       _loadReferralLink(),
       _loadActivityChartData(),
+      _loadGamification(),
     ]);
   }
 
@@ -585,6 +597,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
 
+          const SizedBox(height: 24),
+          _buildGamificationSection(),
+
           const SizedBox(height: 40),
 
           // Usage Statistics section
@@ -637,33 +652,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildSection(
             title: 'Settings',
             children: [
-              _buildSettingsTile(
-                icon: Icons.security,
-                title: 'Security',
-                subtitle: 'Password and authentication',
-                onTap: () {
-                  // TODO: Navigate to security settings
-                  _showComingSoon();
-                },
-              ),
-              _buildSettingsTile(
-                icon: Icons.notifications,
-                title: 'Notifications',
-                subtitle: 'Manage your notifications',
-                onTap: () {
-                  // TODO: Navigate to notification settings
-                  _showComingSoon();
-                },
-              ),
-              _buildSettingsTile(
-                icon: Icons.help_outline,
-                title: 'Help & Support',
-                subtitle: 'Get help and contact support',
-                onTap: () {
-                  // TODO: Navigate to help screen
-                  _showComingSoon();
-                },
-              ),
+              _buildDetailRow('App Version', '1.0.0'),
             ],
           ),
 
@@ -709,6 +698,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildGamificationSection() {
+    final s = _gamiState;
+    if (s == null) {
+      return const SizedBox.shrink();
+    }
+
+    final progress = s.xpForNextLevel == 0 ? 0.0 : (s.xpIntoLevel / s.xpForNextLevel).clamp(0.0, 1.0);
+
+    return _buildSection(
+      title: 'Progress',
+      children: [
+        Row(
+          children: [
+            _buildBadgeRow(s.level),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Level ${s.level}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 10,
+                      backgroundColor: Colors.white.withOpacity(0.1),
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('${s.xpIntoLevel} / ${s.xpForNextLevel} XP', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text('Starter Tasks', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        _buildTaskTile('task_add_wallet', s.completedTasks.contains('task_add_wallet')),
+        _buildTaskTile('task_first_swap', s.completedTasks.contains('task_first_swap')),
+        _buildTaskTile('task_first_send', s.completedTasks.contains('task_first_send')),
+      ],
+    );
+  }
+
+  Widget _buildTaskTile(String taskId, bool done) {
+    final label = GamificationService.taskIdToLabel[taskId] ?? taskId;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      leading: Icon(done ? Icons.check_circle : Icons.radio_button_unchecked, color: done ? Colors.greenAccent : Colors.white70),
+      title: Text(label, style: const TextStyle(color: Colors.white)),
+      subtitle: const Text('+10 XP', style: TextStyle(color: Colors.white70, fontSize: 12)),
+      trailing: done ? const Text('Completed', style: TextStyle(color: Colors.greenAccent)) : const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildBadgeRow(int level) {
+    // Show up to 5 badges
+    final icons = <IconData>[Icons.star_border, Icons.star_half, Icons.star, Icons.emoji_events, Icons.military_tech];
+    final widgets = <Widget>[];
+    for (int i = 1; i <= 5; i++) {
+      final active = level >= i;
+      widgets.add(Icon(
+        icons[i - 1],
+        color: active ? AppColors.primaryBlue : Colors.white24,
+      ));
+      if (i < 5) widgets.add(const SizedBox(width: 4));
+    }
+    return Row(children: widgets);
   }
 
   Widget _buildUsageStatsSection() {

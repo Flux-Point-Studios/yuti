@@ -440,6 +440,11 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 ),
               ),
               
+              if (entry.handle != null) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Handle', entry.handle!),
+              ],
+
               if (entry.description != null) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -540,6 +545,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   void _showEntryDialog({AddressBookEntry? entry}) {
     final nameController = TextEditingController(text: entry?.name ?? '');
     final addressController = TextEditingController(text: entry?.address ?? '');
+    final handleController = TextEditingController(text: entry?.handle ?? '');
     final descriptionController = TextEditingController(text: entry?.description ?? '');
     final formKey = GlobalKey<FormState>();
 
@@ -577,6 +583,20 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
               ),
               const SizedBox(height: 16),
               TextFormField(
+                controller: handleController,
+                decoration: InputDecoration(
+                  labelText: 'ADA Handle (optional, e.g. $yuti)',
+                  labelStyle: TextStyle(color: AppColors.textSecondary),
+                  filled: true,
+                  fillColor: AppColors.backgroundLight.withOpacity(0.1),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
                 controller: addressController,
                 decoration: InputDecoration(
                   labelText: 'Address',
@@ -599,10 +619,10 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 style: TextStyle(color: AppColors.textPrimary, fontSize: 12),
                 maxLines: 3,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter an address';
+                  if ((value == null || value.trim().isEmpty) && handleController.text.trim().isEmpty) {
+                    return 'Enter an address or ADA Handle';
                   }
-                  if (!_addressBookService.isValidCardanoAddress(value.trim())) {
+                  if (value != null && value.trim().isNotEmpty && !_addressBookService.isValidCardanoAddress(value.trim())) {
                     return 'Invalid Cardano address';
                   }
                   return null;
@@ -637,10 +657,29 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
+                // Resolve handle if provided and no address entered
+                String resolvedAddress = addressController.text.trim();
+                String? savedHandle = handleController.text.trim().isEmpty ? null : handleController.text.trim();
+                if (resolvedAddress.isEmpty && savedHandle != null) {
+                  try {
+                    final res = await _addressBookService.resolveIfHandle(savedHandle);
+                    resolvedAddress = res['address']!;
+                    savedHandle = res['handle'] ?? savedHandle;
+                  } catch (_) {}
+                }
+
+                if (!_addressBookService.isValidCardanoAddress(resolvedAddress)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: const Text('Failed to resolve handle to address'), backgroundColor: AppColors.error),
+                  );
+                  return;
+                }
+
                 final newEntry = AddressBookEntry(
                   id: entry?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                   name: nameController.text.trim(),
-                  address: addressController.text.trim(),
+                  address: resolvedAddress,
+                  handle: savedHandle,
                   description: descriptionController.text.trim().isEmpty 
                       ? null 
                       : descriptionController.text.trim(),

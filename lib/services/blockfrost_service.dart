@@ -7,6 +7,10 @@ class BlockfrostService {
   final AppConfig _config = AppConfig();
   final SecureConfig _secureConfig = SecureConfig();
 
+  // Simple in-memory cache for aggregated stake assets
+  final Map<String, _StakeAssetsCacheEntry> _stakeAssetsCache = {};
+  static const Duration _stakeAssetsTtl = Duration(seconds: 45);
+
   // Cache API key after first fetch
   String? _cachedApiKey;
 
@@ -290,27 +294,20 @@ class BlockfrostService {
         return result;
       }
 
-      // Get address associated with this stake address for token checks
-      final addressInfo = await _getAddressFromStakeAddress(stakeAddress);
-      if (addressInfo == null) {
-        result['reason'] = 'No address found for stake address';
-        return result;
-      }
-
-      // Get assets for the address
-      final assets = await getAssets(addressInfo);
+      // Aggregate all assets across every address controlled by this stake key
+      final aggregatedAssets = await getAggregatedAssetsForStakeAddress(stakeAddress);
 
       // Check for T1 ADAM Launch Pass NFT
       const adamNftPolicy =
           'b46891456b77dbc77c16090fd92a37f087f9a68e953c56b00a20332f';
-      final adamNft = assets
+      final adamNft = aggregatedAssets
           .where((asset) => asset['unit'].toString().startsWith(adamNftPolicy))
           .toList();
 
       if (adamNft.isNotEmpty) {
         result['hasAccess'] = true;
         result['accessLevel'] = 't1_adam_nft';
-        result['reason'] = 'Holds T1 ADAM Launch Pass NFT';
+        result['reason'] = 'Holds T1 ADAM Launch Pass NFT (stake-wide)';
         result['details'] = {
           'nftCount': adamNft.length,
           'nfts': adamNft,
@@ -321,7 +318,7 @@ class BlockfrostService {
       // Check for $SHARDS tokens (6 decimals, requires 3,500 tokens = 3,500,000,000 base units)
       const shardsPolicy =
           'ea153b5d4864af15a1079a94a0e2486d6376fa28aafad272d15b243a';
-      final shardsTokens = assets
+      final shardsTokens = aggregatedAssets
           .where((asset) => asset['unit'].toString().startsWith(shardsPolicy))
           .toList();
 
@@ -335,7 +332,7 @@ class BlockfrostService {
         if (shardsBalance >= requiredShards) {
           result['hasAccess'] = true;
           result['accessLevel'] = 'shards_tokens';
-          result['reason'] = 'Holds sufficient \$SHARDS tokens';
+          result['reason'] = 'Holds sufficient \$SHARDS tokens (stake-wide)';
           result['details'] = {
             'tokenBalance': shardsBalance.toString(),
             'tokenBalanceFormatted':
@@ -349,7 +346,7 @@ class BlockfrostService {
       // Check for $AGENT tokens (0 decimals, requires 100,000 tokens)
       const agentPolicy =
           '97bbb7db0baef89caefce61b8107ac74c7a7340166b39d906f174bec';
-      final agentTokens = assets
+      final agentTokens = aggregatedAssets
           .where((asset) => asset['unit'].toString().startsWith(agentPolicy))
           .toList();
 
@@ -363,7 +360,7 @@ class BlockfrostService {
         if (agentBalance >= requiredAgent) {
           result['hasAccess'] = true;
           result['accessLevel'] = 'agent_tokens';
-          result['reason'] = 'Holds sufficient \$AGENT tokens';
+          result['reason'] = 'Holds sufficient \$AGENT tokens (stake-wide)';
           result['details'] = {
             'tokenBalance': agentBalance.toString(),
             'requiredBalance': requiredAgent.toString(),
@@ -377,7 +374,7 @@ class BlockfrostService {
           'No qualifying assets found. Required: 1000+ ADA delegated to specific pool, or T1 ADAM NFT, or 3,500+ \$SHARDS, or 100,000+ \$AGENT tokens';
       result['details'] = {
         'stakeInfo': stakeInfo,
-        'assetCount': assets.length,
+        'assetCount': aggregatedAssets.length,
         'checkedPolicies': [adamNftPolicy, shardsPolicy, agentPolicy],
       };
 
@@ -392,7 +389,7 @@ class BlockfrostService {
     }
   }
 
-  /// Helper method to get payment address from stake address
+  // Helper method to get payment address from stake address (first address)
   Future<String?> _getAddressFromStakeAddress(String stakeAddress) async {
     try {
       final url =
@@ -411,4 +408,186 @@ class BlockfrostService {
       return null;
     }
   }
+
+  /// Helper: get all addresses for a stake address
+  Future<List<String>> _getAddressesForStakeAddress(String stakeAddress) async {
+    try {
+      final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses');
+      final headers = await _getHeaders();
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        final list = json.decode(response.body) as List;
+        return list.map<String>((e) => e['address'] as String).toList();
+      }
+      return <String>[];
+    } catch (e) {
+      return <String>[];
+    }
+  }
+
+  /// Aggregate assets across all addresses controlled by a stake key
+  Future<List<Map<String, dynamic>>> getAggregatedAssetsForStakeAddress(String stakeAddress) async {
+    // Return cached if fresh
+    final cached = _stakeAssetsCache[stakeAddress];
+    if (cached != null && DateTime.now().difference(cached.cachedAt) < _stakeAssetsTtl) {
+      return cached.assets;
+    }
+
+    final addresses = await _getAddressesForStakeAddress(stakeAddress);
+    if (addresses.isEmpty) return <Map<String, dynamic>>[];
+
+    final Map<String, BigInt> unitToQuantity = {};
+
+    // Parallelize with a small concurrency cap (e.g., 4)
+    const int maxConcurrent = 4;
+    int index = 0;
+    Future<void> worker() async {
+      while (true) {
+        String? nextAddr;
+        // Synchronized take next
+        if (index < addresses.length) {
+          nextAddr = addresses[index];
+          index += 1;
+        } else {
+          break;
+        }
+        try {
+          final assets = await getAssets(nextAddr);
+          for (final asset in assets) {
+            final unit = asset['unit'] as String;
+            final qty = BigInt.parse(asset['quantity'] as String);
+            unitToQuantity[unit] = (unitToQuantity[unit] ?? BigInt.zero) + qty;
+          }
+        } catch (_) {
+          // Ignore individual address errors
+        }
+      }
+    }
+
+    // Launch workers
+    final workers = List.generate(maxConcurrent, (_) => worker());
+    await Future.wait(workers);
+
+    // Convert back to list format
+    final aggregated = unitToQuantity.entries
+        .map((e) => {
+              'unit': e.key,
+              'quantity': e.value.toString(),
+            })
+        .toList();
+
+    // Cache result
+    _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(
+      assets: aggregated,
+      cachedAt: DateTime.now(),
+    );
+
+    return aggregated;
+  }
+
+  /// Read Charli3 AGENT/ADA price from an oracle feed address by parsing latest datum
+  Future<double?> getAgentPerAdaFromCharli3(String feedAddress) async {
+    try {
+      // Fetch latest transactions to the feed address (limit 1)
+      final txsUrl = Uri.https(_baseUrl, '/api/v0/addresses/$feedAddress/transactions', {
+        'order': 'desc',
+        'page': '1'
+      });
+      final headers = await _getHeaders();
+      final txsResp = await http.get(txsUrl, headers: headers);
+      if (txsResp.statusCode != 200) return null;
+      final txs = json.decode(txsResp.body) as List;
+      if (txs.isEmpty) return null;
+      final latestTxHash = txs.first['tx_hash'] as String;
+
+      // Get transaction UTXOs to find outputs at the feed address, then read inline datum
+      final utxosUrl = Uri.https(_baseUrl, '/api/v0/txs/$latestTxHash/utxos');
+      final utxosResp = await http.get(utxosUrl, headers: headers);
+      if (utxosResp.statusCode != 200) return null;
+      final utxos = json.decode(utxosResp.body) as Map<String, dynamic>;
+      final outputs = (utxos['outputs'] as List).cast<Map<String, dynamic>>();
+      final outToFeed = outputs.firstWhere(
+        (o) => (o['address'] as String) == feedAddress,
+        orElse: () => {},
+      );
+      if (outToFeed.isEmpty) return null;
+
+      // Inline datum may be in 'inline_datum' -> 'bytes' (Cbor hex) or 'json_value'
+      final inlineDatum = outToFeed['inline_datum'];
+      if (inlineDatum == null) return null;
+
+      // Try JSON value first for simplicity
+      if (inlineDatum['json_value'] != null) {
+        // Expect a map with fields; implementation depends on feed schema
+        final jsonVal = inlineDatum['json_value'];
+        // Heuristic: look for numeric fields that resemble rate
+        final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
+        return rate;
+      }
+
+      // If only bytes are present, we would need CBOR decoding. For now, return null.
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  double? _extractAgentPerAdaFromJsonDatum(dynamic jsonVal) {
+    try {
+      if (jsonVal is Map<String, dynamic>) {
+        // Common Charli3 pattern: { rate: { numerator: X, denominator: Y } } or flat fields
+        if (jsonVal.containsKey('rate')) {
+          final rate = jsonVal['rate'];
+          if (rate is Map && rate['numerator'] != null && rate['denominator'] != null) {
+            final num = (rate['numerator'] as num).toDouble();
+            final den = (rate['denominator'] as num).toDouble();
+            if (den != 0) return num / den; // AGENT per ADA
+          }
+        }
+        // Fallback: direct fields
+        if (jsonVal['agent_per_ada'] != null) {
+          return (jsonVal['agent_per_ada'] as num).toDouble();
+        }
+        if (jsonVal['price'] != null) {
+          return (jsonVal['price'] as num).toDouble();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Get ADA price in USD (simple Coingecko API)
+  Future<double?> getAdaUsdPrice() async {
+    try {
+      final url = Uri.parse('https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd');
+      final resp = await http.get(url);
+      if (resp.statusCode != 200) return null;
+      final data = json.decode(resp.body) as Map<String, dynamic>;
+      final usd = data['cardano']?['usd'];
+      if (usd is num) return usd.toDouble();
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Compute required AGENT amount given a USD target, using Charli3 AGENT/ADA and ADA/USD
+  Future<BigInt?> computeRequiredAgentForUsd(double usdTarget, {String? feedAddress}) async {
+    final feed = feedAddress ?? AppConfig().charli3AgentAdaFeedAddress;
+    final agentPerAda = await getAgentPerAdaFromCharli3(feed);
+    final adaUsd = await getAdaUsdPrice();
+    if (agentPerAda == null || adaUsd == null || adaUsd == 0) return null;
+    // usdTarget USD * (1 ADA / adaUsd USD) = ADA required
+    final adaRequired = usdTarget / adaUsd;
+    // AGENT required = adaRequired * (AGENT per ADA)
+    final agentRequired = adaRequired * agentPerAda;
+    // AGENT has 0 decimals per current assumption; adjust if decimals differ
+    return BigInt.from(agentRequired.ceil());
+  }
+}
+
+class _StakeAssetsCacheEntry {
+  final List<Map<String, dynamic>> assets;
+  final DateTime cachedAt;
+  _StakeAssetsCacheEntry({required this.assets, required this.cachedAt});
 }

@@ -1,4 +1,4 @@
-# TestFlight Debugging Guide for BlueLight
+# TestFlight Debugging Guide for Yuti
 *Created: July 17, 2025*
 
 ## 🐛 **Common TestFlight Issues & Solutions**
@@ -122,8 +122,9 @@ version: 1.0.1+4  # Increment from +3 to +4
 **Verify Fix**:
 ```bash
 xcrun altool --upload-app --type ios -f bluelight.ipa \
-  --apiKey PMMG369C2M \
-  --apiIssuer 5be249f9-c023-40cf-b140-0f78caf40ed7
+  --apiKey $APP_STORE_CONNECT_KEY_ID \
+  --apiIssuer $APP_STORE_CONNECT_ISSUER_ID \
+  --verbose
 ```
 
 ---
@@ -141,10 +142,10 @@ xcrun altool --upload-app --type ios -f bluelight.ipa \
 
 **Common Log Patterns**:
 ```
-[bluelight] 🔍 Backend URL: https://api.fluxpointstudios.com/chat
-[bluelight] 🔍 API Key present: true
-[bluelight] 🔍 Response status: 401
-[bluelight] ❌ T-Backend error: 401
+[Yuti] 🔍 Backend URL: https://api.fluxpointstudios.com/chat
+[Yuti] 🔍 API Key present: true
+[Yuti] 🔍 Response status: 401
+[Yuti] ❌ T-Backend error: 401
 ```
 
 ### **Network Debugging**
