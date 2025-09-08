@@ -539,9 +539,9 @@ class BlockfrostService {
         if (jsonVal.containsKey('rate')) {
           final rate = jsonVal['rate'];
           if (rate is Map && rate['numerator'] != null && rate['denominator'] != null) {
-            final num = (rate['numerator'] as num).toDouble();
-            final den = (rate['denominator'] as num).toDouble();
-            if (den != 0) return num / den; // AGENT per ADA
+            final numerator = (rate['numerator'] as num).toDouble();
+            final denominator = (rate['denominator'] as num).toDouble();
+            if (denominator != 0) return numerator / denominator; // AGENT per ADA
           }
         }
         // Fallback: direct fields

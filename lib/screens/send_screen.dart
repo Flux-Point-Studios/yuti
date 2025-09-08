@@ -577,7 +577,7 @@ class _SendScreenState extends State<SendScreen> {
     try {
       String address = _addressController.text.trim();
       // Resolve ADA Handle if entered
-      if (!widget.walletService.validateAddress(address)) {
+      if (!AddressBookService().isValidCardanoAddress(address)) {
         try {
           final res = await AddressBookService().resolveIfHandle(address);
           address = res['address'] ?? address;
