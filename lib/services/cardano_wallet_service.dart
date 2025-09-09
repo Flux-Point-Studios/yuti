@@ -640,6 +640,14 @@ class CardanoWalletService {
 
     return false;
   }
+
+  /// Update wallet display name and persist
+  Future<void> setWalletName(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    _walletName = trimmed;
+    await _storage.write(key: _walletNameKey, value: trimmed);
+  }
 }
 
 /// Data class for wallet security status

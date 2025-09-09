@@ -311,7 +311,9 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await _localWalletService.renameWallet(controller.text);
+              final newName = controller.text;
+              await _localWalletService.renameWallet(newName);
+              await _walletService.setWalletName(newName);
               if (mounted) setState(() {});
               Navigator.pop(context);
               _showCopyConfirmation('Wallet name updated');
