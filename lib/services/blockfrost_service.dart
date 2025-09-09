@@ -559,11 +559,14 @@ class BlockfrostService {
                 }
               }
               if (priceInt != null) {
-                double price = priceInt!.toDouble();
+                double adaPerAgent = priceInt!.toDouble();
                 if (precision != null && precision! > 0) {
-                  price = price / math.pow(10, precision!.toDouble());
+                  adaPerAgent = adaPerAgent / math.pow(10, precision!.toDouble());
                 }
-                return price;
+                if (adaPerAgent == 0) return null;
+                // Charli3 price map key 0 is quote per 1 base.
+                // For AGENT/ADA, that's ADA per AGENT. We need AGENT per ADA.
+                return 1.0 / adaPerAgent;
               }
             } catch (_) {}
             return null;
