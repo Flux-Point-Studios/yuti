@@ -615,7 +615,31 @@ class BlockfrostService {
   /// Compute required AGENT amount given a USD target, using Charli3 AGENT/ADA and ADA/USD
   Future<BigInt?> computeRequiredAgentForUsd(double usdTarget, {String? feedAddress}) async {
     final feed = feedAddress ?? AppConfig().charli3AgentAdaFeedAddress;
-    final agentPerAda = await getAgentPerAdaFromCharli3(feed);
+    double? agentPerAda;
+    // On web, use serverless proxy to support CBOR decoding if needed
+    try {
+      // ignore: avoid_web_libraries_in_flutter
+      if (identical(0, 0)) {
+        // Trick: no import of dart:html; use kIsWeb at call sites to prefer proxy in UI. Here we still try direct first.
+      }
+      agentPerAda = await getAgentPerAdaFromCharli3(feed);
+    } catch (_) {}
+    // If still null, try proxy endpoint (works across platforms)
+    if (agentPerAda == null) {
+      try {
+        final proxyUrl = Uri.parse('/api/oracle/agent-per-ada?feed=$feed');
+        final resp = await http.get(proxyUrl);
+        if (resp.statusCode == 200) {
+          final data = json.decode(resp.body) as Map<String, dynamic>;
+          agentPerAda = (data['agentPerAda'] as num?)?.toDouble();
+          print('🔍 DEBUG: Charli3 via proxy agentPerAda: ${agentPerAda?.toString()}');
+        } else {
+          print('🔍 DEBUG: Oracle proxy error status: ${resp.statusCode} body: ${resp.body}');
+        }
+      } catch (e) {
+        print('🔍 DEBUG: Oracle proxy fetch error: $e');
+      }
+    }
     final adaUsd = await getAdaUsdPrice();
     if (agentPerAda == null || adaUsd == null || adaUsd == 0) return null;
     // usdTarget USD * (1 ADA / adaUsd USD) = ADA required
