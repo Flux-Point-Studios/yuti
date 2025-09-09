@@ -53,12 +53,16 @@ class BlockfrostService {
         // Web fallback: use serverless proxy without exposing key
         url = Uri.parse('/api/blockfrost/addresses/$address');
       }
-      final response = await http.get(url, headers: headers);
+      var response = await http.get(url, headers: headers);
+      // If upstream returned HTML or non-JSON, fallback to generic proxy form
+      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
+        response = await http.get(alt);
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final amounts = data['amount'] as List;
-
         // Find lovelace amount
         for (var amount in amounts) {
           if (amount['unit'] == 'lovelace') {
@@ -89,13 +93,15 @@ class BlockfrostService {
         if (!kIsWeb) rethrow;
         url = Uri.parse('/api/blockfrost/addresses/$address');
       }
-      final response = await http.get(url, headers: headers);
+      var response = await http.get(url, headers: headers);
+      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
+        response = await http.get(alt);
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final amounts = data['amount'] as List;
-
-        // Filter out lovelace and return other assets
         return amounts
             .where((asset) => asset['unit'] != 'lovelace')
             .map((asset) => asset as Map<String, dynamic>)
@@ -385,7 +391,11 @@ class BlockfrostService {
         if (!kIsWeb) rethrow;
         url = Uri.parse('/api/blockfrost/accounts/$stakeAddress/addresses');
       }
-      final response = await http.get(url, headers: headers);
+      var response = await http.get(url, headers: headers);
+      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses'));
+        response = await http.get(alt);
+      }
       if (response.statusCode == 200) {
         final list = json.decode(response.body) as List;
         return list.map<String>((e) => e['address'] as String).toList();
@@ -396,7 +406,7 @@ class BlockfrostService {
     }
   }
 
-  /// Aggregate assets across all addresses controlled by a stake key
+  /// Aggregate assets across all addresses controlled by a stake key (use Blockfrost aggregated endpoint)
   Future<List<Map<String, dynamic>>> getAggregatedAssetsForStakeAddress(String stakeAddress) async {
     // Return cached if fresh
     final cached = _stakeAssetsCache[stakeAddress];
@@ -404,18 +414,42 @@ class BlockfrostService {
       return cached.assets;
     }
 
+    // Prefer aggregated endpoint
+    try {
+      Uri url;
+      Map<String, String> headers = {};
+      try {
+        headers = await _getHeaders();
+        url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses/assets');
+      } catch (_) {
+        if (!kIsWeb) rethrow;
+        url = Uri.parse('/api/blockfrost/accounts/$stakeAddress/addresses/assets');
+      }
+      var response = await http.get(url, headers: headers);
+      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
+        response = await http.get(alt);
+      }
+      if (response.statusCode == 200) {
+        final list = (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+        // Cache and return
+        _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(assets: list, cachedAt: DateTime.now());
+        return list;
+      }
+    } catch (_) {
+      // fall through to manual per-address as last resort
+    }
+
+    // Manual per-address fallback
     final addresses = await _getAddressesForStakeAddress(stakeAddress);
     if (addresses.isEmpty) return <Map<String, dynamic>>[];
 
     final Map<String, BigInt> unitToQuantity = {};
-
-    // Parallelize with a small concurrency cap (e.g., 4)
     const int maxConcurrent = 4;
     int index = 0;
     Future<void> worker() async {
       while (true) {
         String? nextAddr;
-        // Synchronized take next
         if (index < addresses.length) {
           nextAddr = addresses[index];
           index += 1;
@@ -429,30 +463,17 @@ class BlockfrostService {
             final qty = BigInt.parse(asset['quantity'] as String);
             unitToQuantity[unit] = (unitToQuantity[unit] ?? BigInt.zero) + qty;
           }
-        } catch (_) {
-          // Ignore individual address errors
-        }
+        } catch (_) {}
       }
     }
-
-    // Launch workers
-    final workers = List.generate(maxConcurrent, (_) => worker());
-    await Future.wait(workers);
-
-    // Convert back to list format
+    await Future.wait(List.generate(maxConcurrent, (_) => worker()));
     final aggregated = unitToQuantity.entries
         .map((e) => {
               'unit': e.key,
               'quantity': e.value.toString(),
             })
         .toList();
-
-    // Cache result
-    _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(
-      assets: aggregated,
-      cachedAt: DateTime.now(),
-    );
-
+    _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(assets: aggregated, cachedAt: DateTime.now());
     return aggregated;
   }
 
