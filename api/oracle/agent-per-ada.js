@@ -50,17 +50,28 @@ async function decodeCborHex(hex) {
 
 function extractFromJson(jsonVal) {
   try {
+    const toBigInt = (v) => {
+      if (typeof v === 'bigint') return v;
+      if (typeof v === 'number') return BigInt(v);
+      if (typeof v === 'string' && v.trim() !== '') return BigInt(v);
+      return null;
+    };
     const walk = (node) => {
       if (!node) return null;
       if (node.map) {
         let priceInt = null, precision = null;
         for (const entry of node.map) {
           const key = entry.k?.int;
-          const val = entry.v?.int;
-          if (key === 0 && (typeof val === 'number')) priceInt = val;
-          if (key === 3 && (typeof val === 'number')) precision = val;
+          const raw = entry.v?.int;
+          const bi = toBigInt(raw);
+          if (key === 0 && bi != null) priceInt = bi;
+          if (key === 3 && bi != null) precision = bi;
         }
-        if (priceInt != null) return { price: priceInt, precision };
+        if (priceInt != null) {
+          const precNum = precision != null ? Number(precision) : 0;
+          // Return raw integer and precision to caller
+          return { price: Number(priceInt), precision: precNum };
+        }
       }
       if (typeof node === 'object') {
         for (const v of Object.values(node)) {
