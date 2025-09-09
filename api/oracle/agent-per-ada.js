@@ -1,10 +1,8 @@
 // Serverless function: GET /api/oracle/agent-per-ada?feed=<bech32_address>
 // Uses BLOCKFROST_API_KEY env. Returns { agentPerAda, precision, source, method } on success.
 
-// Ensure fetch is available (Node <18 fallback)
 const fetchCompat = globalThis.fetch || (async (...args) => (await import('node-fetch')).then(m => m.default(...args)));
 
-// Lazy import cbor only if needed to keep cold start small
 async function decodeCborHex(hex) {
   try {
     const { default: cbor } = await import('cbor');
@@ -49,11 +47,9 @@ async function decodeCborHex(hex) {
 
 function extractFromJson(jsonVal) {
   try {
-    // Look for Charli3 CDDL-style maps
     const walk = (node) => {
       if (!node) return null;
       if (node.map) {
-        // Blockfrost style: { map: [ { k:{int:0}, v:{int:334136} }, ... ] }
         let priceInt = null, precision = null;
         for (const entry of node.map) {
           const key = entry.k?.int;
@@ -79,6 +75,73 @@ function extractFromJson(jsonVal) {
   return null;
 }
 
+async function tryAddressUtxos(base, apiKey, feed) {
+  const url = `${base}/api/v0/addresses/${encodeURIComponent(feed)}/utxos?order=desc&page=1&count=50`;
+  const resp = await fetchCompat(url, { headers: { project_id: apiKey } });
+  if (!resp.ok) return null;
+  const list = await resp.json();
+  for (const utxo of list) {
+    const inline = utxo.inline_datum;
+    if (!inline) continue;
+    if (inline.json_value) {
+      const out = extractFromJson(inline.json_value);
+      if (out && typeof out.price === 'number') {
+        const precision = typeof out.precision === 'number' ? out.precision : 0;
+        const agentPerAda = out.price / Math.pow(10, precision);
+        return { agentPerAda, precision, source: 'json', method: 'address_utxos' };
+      }
+    } else if (inline.bytes) {
+      const out = await decodeCborHex(inline.bytes);
+      if (out && typeof out.price === 'number') {
+        const precision = typeof out.precision === 'number' ? out.precision : 0;
+        const agentPerAda = out.price / Math.pow(10, precision);
+        return { agentPerAda, precision, source: 'cbor', method: 'address_utxos' };
+      }
+    }
+  }
+  return null;
+}
+
+async function tryRecentTxs(base, apiKey, feed) {
+  // Scan multiple recent pages to find latest inline datum
+  const perPage = 25;
+  for (let page = 1; page <= 4; page++) {
+    const txsResp = await fetchCompat(`${base}/api/v0/addresses/${encodeURIComponent(feed)}/transactions?order=desc&page=${page}&count=${perPage}`, {
+      headers: { project_id: apiKey }
+    });
+    if (!txsResp.ok) break;
+    const txs = await txsResp.json();
+    if (!Array.isArray(txs) || txs.length === 0) break;
+    for (const t of txs) {
+      const hash = t.tx_hash;
+      const outResp = await fetchCompat(`${base}/api/v0/txs/${hash}/utxos`, { headers: { project_id: apiKey } });
+      if (!outResp.ok) continue;
+      const data = await outResp.json();
+      for (const o of data.outputs || []) {
+        if (o.address !== feed) continue;
+        const inline = o.inline_datum;
+        if (!inline) continue;
+        if (inline.json_value) {
+          const out = extractFromJson(inline.json_value);
+          if (out && typeof out.price === 'number') {
+            const precision = typeof out.precision === 'number' ? out.precision : 0;
+            const agentPerAda = out.price / Math.pow(10, precision);
+            return { agentPerAda, precision, source: 'json', method: 'tx_outputs' };
+          }
+        } else if (inline.bytes) {
+          const out = await decodeCborHex(inline.bytes);
+          if (out && typeof out.price === 'number') {
+            const precision = typeof out.precision === 'number' ? out.precision : 0;
+            const agentPerAda = out.price / Math.pow(10, precision);
+            return { agentPerAda, precision, source: 'cbor', method: 'tx_outputs' };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   try {
     const feed = req.query.feed || req.query.address;
@@ -89,69 +152,13 @@ export default async function handler(req, res) {
 
     const base = 'https://cardano-mainnet.blockfrost.io';
 
-    // 1) Try address UTXOs first
-    const utxosResp = await fetchCompat(`${base}/api/v0/addresses/${encodeURIComponent(feed)}/utxos?order=desc&page=1`, {
-      headers: { project_id: apiKey }
-    });
-    if (utxosResp.ok) {
-      const list = await utxosResp.json();
-      for (const utxo of list) {
-        const inline = utxo.inline_datum;
-        if (!inline) continue;
-        if (inline.json_value) {
-          const out = extractFromJson(inline.json_value);
-          if (out && typeof out.price === 'number') {
-            const precision = typeof out.precision === 'number' ? out.precision : 0;
-            const agentPerAda = out.price / Math.pow(10, precision);
-            return res.status(200).json({ agentPerAda, precision, source: 'json', method: 'address_utxos' });
-          }
-        } else if (inline.bytes) {
-          const out = await decodeCborHex(inline.bytes);
-          if (out && typeof out.price === 'number') {
-            const precision = typeof out.precision === 'number' ? out.precision : 0;
-            const agentPerAda = out.price / Math.pow(10, precision);
-            return res.status(200).json({ agentPerAda, precision, source: 'cbor', method: 'address_utxos' });
-          }
-        }
-      }
-    }
+    const byUtxo = await tryAddressUtxos(base, apiKey, feed);
+    if (byUtxo) return res.status(200).json(byUtxo);
 
-    // 2) Fallback: latest tx and outputs at this address
-    const txsResp = await fetchCompat(`${base}/api/v0/addresses/${encodeURIComponent(feed)}/transactions?order=desc&page=1`, {
-      headers: { project_id: apiKey }
-    });
-    if (txsResp.ok) {
-      const txs = await txsResp.json();
-      if (Array.isArray(txs) && txs.length) {
-        const hash = txs[0].tx_hash;
-        const outResp = await fetchCompat(`${base}/api/v0/txs/${hash}/utxos`, { headers: { project_id: apiKey } });
-        if (outResp.ok) {
-          const data = await outResp.json();
-          for (const o of data.outputs || []) {
-            if (o.address !== feed) continue;
-            const inline = o.inline_datum;
-            if (!inline) continue;
-            if (inline.json_value) {
-              const out = extractFromJson(inline.json_value);
-              if (out && typeof out.price === 'number') {
-                const precision = typeof out.precision === 'number' ? out.precision : 0;
-                const agentPerAda = out.price / Math.pow(10, precision);
-                return res.status(200).json({ agentPerAda, precision, source: 'json', method: 'tx_outputs' });
-              }
-            } else if (inline.bytes) {
-              const out = await decodeCborHex(inline.bytes);
-              if (out && typeof out.price === 'number') {
-                const precision = typeof out.precision === 'number' ? out.precision : 0;
-                const agentPerAda = out.price / Math.pow(10, precision);
-                return res.status(200).json({ agentPerAda, precision, source: 'cbor', method: 'tx_outputs' });
-              }
-            }
-          }
-        }
-      }
-    }
+    const byTx = await tryRecentTxs(base, apiKey, feed);
+    if (byTx) return res.status(200).json(byTx);
 
-    return res.status(404).json({ error: 'Feed datum not found or unsupported format' });
+    return res.status(404).json({ error: 'Feed datum not found or unsupported format', feed });
   } catch (err) {
     console.error('oracle proxy error:', err);
     res.status(500).json({ error: 'Oracle proxy error', detail: String(err && err.stack || err) });
