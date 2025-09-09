@@ -447,44 +447,63 @@ class BlockfrostService {
   /// Read Charli3 AGENT/ADA price from an oracle feed address by parsing latest datum
   Future<double?> getAgentPerAdaFromCharli3(String feedAddress) async {
     try {
-      // Fetch latest transactions to the feed address (limit 1)
+      final headers = await _getHeaders();
+
+      // Preferred: read latest UTXOs at the feed address and parse inline datum directly
+      final addrUtxosUrl = Uri.https(_baseUrl, '/api/v0/addresses/$feedAddress/utxos', {
+        'order': 'desc',
+        'page': '1',
+      });
+      final addrUtxosResp = await http.get(addrUtxosUrl, headers: headers);
+      if (addrUtxosResp.statusCode == 200) {
+        final list = json.decode(addrUtxosResp.body) as List;
+        print('🔍 DEBUG: Charli3 - address utxos count: ${list.length}');
+        for (final utxo in list) {
+          final inlineDatum = utxo['inline_datum'];
+          if (inlineDatum != null) {
+            final jsonVal = inlineDatum['json_value'];
+            final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
+            if (rate != null) {
+              print('🔍 DEBUG: Charli3 - extracted agentPerAda from address utxos: $rate');
+              return rate;
+            }
+          }
+        }
+      } else {
+        print('🔍 DEBUG: Charli3 - address utxos fetch failed: ${addrUtxosResp.statusCode}');
+      }
+
+      // Fallback: use latest transaction to the address, then read its outputs
       final txsUrl = Uri.https(_baseUrl, '/api/v0/addresses/$feedAddress/transactions', {
         'order': 'desc',
         'page': '1'
       });
-      final headers = await _getHeaders();
       final txsResp = await http.get(txsUrl, headers: headers);
       if (txsResp.statusCode != 200) return null;
       final txs = json.decode(txsResp.body) as List;
       if (txs.isEmpty) return null;
       final latestTxHash = txs.first['tx_hash'] as String;
 
-      // Get transaction UTXOs to find outputs at the feed address, then read inline datum
       final utxosUrl = Uri.https(_baseUrl, '/api/v0/txs/$latestTxHash/utxos');
       final utxosResp = await http.get(utxosUrl, headers: headers);
       if (utxosResp.statusCode != 200) return null;
       final utxos = json.decode(utxosResp.body) as Map<String, dynamic>;
       final outputs = (utxos['outputs'] as List).cast<Map<String, dynamic>>();
-      final outToFeed = outputs.firstWhere(
-        (o) => (o['address'] as String) == feedAddress,
-        orElse: () => {},
-      );
-      if (outToFeed.isEmpty) return null;
-
-      // Inline datum may be in 'inline_datum' -> 'bytes' (Cbor hex) or 'json_value'
-      final inlineDatum = outToFeed['inline_datum'];
-      if (inlineDatum == null) return null;
-
-      // Try JSON value first for simplicity
-      if (inlineDatum['json_value'] != null) {
-        // Expect a map with fields; implementation depends on feed schema
-        final jsonVal = inlineDatum['json_value'];
-        // Heuristic: look for numeric fields that resemble rate
-        final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
-        return rate;
+      for (final o in outputs) {
+        if ((o['address'] as String?) == feedAddress) {
+          final inlineDatum = o['inline_datum'];
+          if (inlineDatum != null && inlineDatum['json_value'] != null) {
+            final jsonVal = inlineDatum['json_value'];
+            final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
+            if (rate != null) {
+              print('🔍 DEBUG: Charli3 - extracted agentPerAda from tx outputs: $rate');
+              return rate;
+            }
+          }
+        }
       }
 
-      // If only bytes are present, we would need CBOR decoding. For now, return null.
+      // If only bytes are present, CBOR decode would be required. Not implemented here.
       return null;
     } catch (_) {
       return null;
