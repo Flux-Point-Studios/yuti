@@ -5,6 +5,8 @@
   "outputDirectory": "build/web",
   "rewrites": [
     { "source": "/api/t/chat", "destination": "/api/t/chat" },
+    { "source": "/api/oracle/agent-per-ada", "destination": "/api/oracle/agent-per-ada" },
+    { "source": "/api/blockfrost/:path*", "destination": "/api/blockfrost/:path*" },
     {
       "source": "/(.*)",
       "destination": "/index.html"
