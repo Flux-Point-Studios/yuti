@@ -204,6 +204,19 @@ async function extractFromDatumHash(base, apiKey, hash, debug) {
         return { agentPerAda, precision, source: 'json' };
       }
     }
+    // Fallback: bytes present, decode as CBOR
+    if (body && body.bytes) {
+      if (debug) { try { debug.bytesSeen = true; } catch (_) {} }
+      const out = await decodeCborHex(body.bytes);
+      if (out && typeof out.price === 'number') {
+        const precision = typeof out.precision === 'number' ? out.precision : 0;
+        const adaPerAgent = out.price / Math.pow(10, precision);
+        if (!adaPerAgent) return null;
+        const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
+        if (agentPerAda == null) return null;
+        return { agentPerAda, precision, source: 'cbor' };
+      }
+    }
   } catch (e) {
     console.error('oracle fetch datum json error:', e);
   }
