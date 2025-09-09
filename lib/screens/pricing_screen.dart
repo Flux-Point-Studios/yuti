@@ -772,23 +772,28 @@ class _PricingScreenState extends State<PricingScreen>
   }
 
   Future<void> _handleCardanoWalletConnection(PricingPlan plan) async {
-    // Show dialog to connect Cardano wallet
-    final walletConnected = await _showCardanoWalletDialog();
+    // If a wallet is already connected, skip dialog and verify directly
+    final cardano = _authService.cardanoWalletService;
+    bool proceed = true;
+    if (!cardano.isConnected) {
+      // Show dialog to connect Cardano wallet
+      final walletConnected = await _showCardanoWalletDialog();
+      proceed = walletConnected == true;
+    }
 
-    if (walletConnected == true) {
-      // Check if user has premium access via Cardano wallet
-      final hasPremiumAccess = await _authService.refreshCardanoPremiumAccess();
+    if (!proceed) return;
 
-      if (hasPremiumAccess) {
-        _showSuccess('Premium access verified! Welcome to ${plan.name}!');
+    // Check if user has premium access via Cardano wallet
+    final hasPremiumAccess = await _authService.refreshCardanoPremiumAccess();
 
-        // Navigate to chat after successful verification
-        await Future.delayed(const Duration(seconds: 1));
-        _navigateToChat();
-      } else {
-        _showError(
-            'Your wallet does not contain the required assets for premium access.');
-      }
+    if (hasPremiumAccess) {
+      _showSuccess('Premium access verified! Welcome to ${plan.name}!');
+
+      // Navigate to chat after successful verification
+      await Future.delayed(const Duration(seconds: 1));
+      _navigateToChat();
+    } else {
+      _showError('Your wallet does not contain the required assets for premium access.');
     }
   }
 
