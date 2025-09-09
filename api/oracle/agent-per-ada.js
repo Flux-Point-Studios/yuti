@@ -113,6 +113,39 @@ function summarizePriceMapKeys(jsonVal) {
   } catch (_) { return []; }
 }
 
+function previewJsonValue(node, depth = 0) {
+  try {
+    if (depth > 2 || !node) return '…';
+    if (typeof node !== 'object') return typeof node;
+    if (node.constructor !== undefined && node.fields) {
+      return {
+        kind: 'constr',
+        constructor: node.constructor,
+        fieldsCount: Array.isArray(node.fields) ? node.fields.length : undefined,
+        head: previewJsonValue(node.fields && node.fields[0], depth + 1),
+      };
+    }
+    if (node.map) {
+      const keys = [];
+      for (const entry of node.map.slice(0, 6)) {
+        keys.push(entry?.k?.int ?? typeof entry?.k);
+      }
+      return { kind: 'map', len: node.map.length, keys };
+    }
+    if (node.list) {
+      return { kind: 'list', len: node.list.length, head: previewJsonValue(node.list[0], depth + 1) };
+    }
+    // Generic object
+    const out = {};
+    for (const k of Object.keys(node).slice(0, 6)) {
+      out[k] = typeof node[k] === 'object' ? previewJsonValue(node[k], depth + 1) : typeof node[k];
+    }
+    return out;
+  } catch (_) {
+    return 'err';
+  }
+}
+
 async function fetchDatumJson(base, apiKey, datumHash) {
   try {
     const r = await fetchCompat(`${base}/api/v0/scripts/datum/${datumHash}`, { headers: { project_id: apiKey } });
@@ -142,6 +175,8 @@ async function extractFromInlineDatum(base, apiKey, inline, debug) {
       try {
         debug.jsonKeys = debug.jsonKeys || [];
         debug.jsonKeys.push(summarizePriceMapKeys(inline.json_value));
+        debug.samplePreviews = debug.samplePreviews || [];
+        debug.samplePreviews.push({ from: 'inline', preview: previewJsonValue(inline.json_value) });
       } catch (_) {}
     }
     const out = extractFromJson(inline.json_value);
@@ -156,15 +191,43 @@ async function extractFromInlineDatum(base, apiKey, inline, debug) {
   }
   // Try datum hash via scripts/datum
   if (inline.hash) {
-    const out = await fetchDatumJson(base, apiKey, inline.hash);
-    if (out && typeof out.price === 'number') {
-      const precision = typeof out.precision === 'number' ? out.precision : 0;
-      const adaPerAgent = out.price / Math.pow(10, precision);
-      if (!adaPerAgent) return null;
-      const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-      if (agentPerAda == null) return null;
-      return { agentPerAda, precision, source: 'json' };
-    }
+    try {
+      const r = await fetchCompat(`${base}/api/v0/scripts/datum/${inline.hash}`, { headers: { project_id: apiKey } });
+      if (r.ok) {
+        const body = await r.json();
+        if (debug && body?.json_value) {
+          try {
+            debug.jsonKeys = debug.jsonKeys || [];
+            debug.jsonKeys.push(summarizePriceMapKeys(body.json_value));
+            debug.samplePreviews = debug.samplePreviews || [];
+            debug.samplePreviews.push({ from: 'hash', preview: previewJsonValue(body.json_value) });
+          } catch (_) {}
+        }
+        if (body && body.json_value) {
+          const out = extractFromJson(body.json_value);
+          if (out && typeof out.price === 'number') {
+            const precision = typeof out.precision === 'number' ? out.precision : 0;
+            const adaPerAgent = out.price / Math.pow(10, precision);
+            if (!adaPerAgent) return null;
+            const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
+            if (agentPerAda == null) return null;
+            return { agentPerAda, precision, source: 'json' };
+          }
+        }
+        if (body && body.bytes) {
+          if (debug) { try { debug.bytesSeen = true; } catch (_) {} }
+          const out = await decodeCborHex(body.bytes);
+          if (out && typeof out.price === 'number') {
+            const precision = typeof out.precision === 'number' ? out.precision : 0;
+            const adaPerAgent = out.price / Math.pow(10, precision);
+            if (!adaPerAgent) return null;
+            const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
+            if (agentPerAda == null) return null;
+            return { agentPerAda, precision, source: 'cbor' };
+          }
+        }
+      }
+    } catch (_) {}
   }
   // Try bytes via CBOR
   if (inline.bytes) {
@@ -191,6 +254,8 @@ async function extractFromDatumHash(base, apiKey, hash, debug) {
       try {
         debug.jsonKeys = debug.jsonKeys || [];
         debug.jsonKeys.push(summarizePriceMapKeys(body.json_value));
+        debug.samplePreviews = debug.samplePreviews || [];
+        debug.samplePreviews.push({ from: 'hash', preview: previewJsonValue(body.json_value) });
       } catch (_) {}
     }
     if (body && body.json_value) {
