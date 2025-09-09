@@ -598,7 +598,7 @@ class _PricingScreenState extends State<PricingScreen>
                 DropdownMenuItem(
                   value: 'ada',
                   child: Text(
-                    'AGENT Holders (≥ 100,000 $AGENT)',
+                    'AGENT Holders (≥ 100,000 \$AGENT)',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
