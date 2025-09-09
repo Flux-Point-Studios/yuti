@@ -28,7 +28,7 @@ class _PricingScreenState extends State<PricingScreen>
   final AuthService _authService = AuthService();
   bool _isLoading = false;
   String? _selectedPlan;
-  String _paymentMethod = 'stripe';
+  String _paymentMethod = 'ada';
   int _currentPageIndex = 0;
 
   final List<PricingPlan> _plans = [
@@ -553,9 +553,10 @@ class _PricingScreenState extends State<PricingScreen>
               items: const [
                 DropdownMenuItem(
                   value: 'stripe',
+                  enabled: false,
                   child: Text(
-                    'Credit Card (Stripe)',
-                    style: TextStyle(color: Colors.white),
+                    'Credit Card (Stripe) — Coming soon',
+                    style: TextStyle(color: Colors.white70),
                   ),
                 ),
                 DropdownMenuItem(
@@ -568,7 +569,8 @@ class _PricingScreenState extends State<PricingScreen>
               ],
               onChanged: (value) {
                 setState(() {
-                  _paymentMethod = value ?? 'stripe';
+                  // Stripe is disabled; default to ADA holders flow
+                  _paymentMethod = (value == 'stripe' || value == null) ? 'ada' : value;
                 });
               },
             ),
