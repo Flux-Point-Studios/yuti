@@ -6,6 +6,7 @@ import '../models/chat_session.dart';
 import '../models/chat_message.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
+import '../services/cardano_wallet_service.dart';
 
 // Exception for when user hits daily message limit
 class MessageLimitExceededException implements Exception {
@@ -152,6 +153,13 @@ class ChatHistoryService {
     try {
       final user = _authService.currentUser;
       if (user == null) return;
+      // Gate server writes: only PREMIUM (subscription) or wallet premium users
+      final hasSubscription = await AuthService().checkSubscriptionAccess();
+      final hasPremiumWallet = CardanoWalletService().hasPremiumAccess;
+      if (!hasSubscription && !hasPremiumWallet) {
+        print('🔍 DEBUG: Skipping server session create due to access (local-only session).');
+        return;
+      }
 
       await _supabase.from('chats').insert({
         'id': session.id,
