@@ -26,7 +26,7 @@ class _PricingScreenState extends State<PricingScreen>
   final AuthService _authService = AuthService();
   bool _isLoading = false;
   String? _selectedPlan;
-  String _paymentMethod = 'uex';
+  String _paymentMethod = 'stripe';
   int _currentPageIndex = 0;
 
   final List<PricingPlan> _plans = [
@@ -550,9 +550,9 @@ class _PricingScreenState extends State<PricingScreen>
               icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
               items: const [
                 DropdownMenuItem(
-                  value: 'uex',
+                  value: 'stripe',
                   child: Text(
-                    'Credit Card (UEX)',
+                    'Credit Card (Stripe)',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -566,7 +566,7 @@ class _PricingScreenState extends State<PricingScreen>
               ],
               onChanged: (value) {
                 setState(() {
-                  _paymentMethod = value ?? 'uex';
+                  _paymentMethod = value ?? 'stripe';
                 });
               },
             ),
@@ -668,9 +668,9 @@ class _PricingScreenState extends State<PricingScreen>
       } else if (_paymentMethod == 'ada') {
         // Handle Cardano wallet connection for AGENT holders (≥ 100,000 AGENT)
         await _handleCardanoWalletConnection(plan);
-      } else if (_paymentMethod == 'uex') {
-        // New: Handle UEX payment via hosted checkout
-        await _handleUEXPayment(plan);
+      } else if (_paymentMethod == 'stripe') {
+        // Handle Stripe payment
+        await _handleStripePayment(plan);
       } else {
         // Handle traditional Stripe payment (kept for fallback/testing)
         await _handleStripePayment(plan);
