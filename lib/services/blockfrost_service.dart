@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../config/secure_config.dart';
@@ -41,8 +42,17 @@ class BlockfrostService {
   // Get ADA balance for an address (in lovelace)
   Future<BigInt> getAdaBalance(String address) async {
     try {
-      final url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
-      final headers = await _getHeaders();
+      Uri url;
+      Map<String, String> headers = {};
+      try {
+        // Prefer direct Blockfrost if key is available
+        headers = await _getHeaders();
+        url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
+      } catch (_) {
+        if (!kIsWeb) rethrow;
+        // Web fallback: use serverless proxy without exposing key
+        url = Uri.parse('/api/blockfrost/addresses/$address');
+      }
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
@@ -70,8 +80,15 @@ class BlockfrostService {
   // Get all assets (tokens) for an address
   Future<List<Map<String, dynamic>>> getAssets(String address) async {
     try {
-      final url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
-      final headers = await _getHeaders();
+      Uri url;
+      Map<String, String> headers = {};
+      try {
+        headers = await _getHeaders();
+        url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
+      } catch (_) {
+        if (!kIsWeb) rethrow;
+        url = Uri.parse('/api/blockfrost/addresses/$address');
+      }
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
@@ -96,8 +113,15 @@ class BlockfrostService {
   // Get UTXOs for an address
   Future<List<Map<String, dynamic>>> getUtxos(String address) async {
     try {
-      final url = Uri.https(_baseUrl, '/api/v0/addresses/$address/utxos');
-      final headers = await _getHeaders();
+      Uri url;
+      Map<String, String> headers = {};
+      try {
+        headers = await _getHeaders();
+        url = Uri.https(_baseUrl, '/api/v0/addresses/$address/utxos');
+      } catch (_) {
+        if (!kIsWeb) rethrow;
+        url = Uri.parse('/api/blockfrost/addresses/$address/utxos');
+      }
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
