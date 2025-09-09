@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import '../utils/app_colors.dart';
 import '../widgets/glassmorphism_container.dart';
 
@@ -91,7 +93,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://$url';
     }
-    _controller.loadRequest(Uri.parse(url));
+    if (kIsWeb) {
+      // Open in a new tab on web instead of embedded webview
+      url_launcher.launchUrl(Uri.parse(url), mode: url_launcher.LaunchMode.externalApplication);
+    } else {
+      _controller.loadRequest(Uri.parse(url));
+    }
     setState(() {
       _urlController.text = url;
     });
@@ -237,10 +244,26 @@ class _BrowserScreenState extends State<BrowserScreen> {
           children: [
             _buildToolbar(),
             _buildAddressBar(),
+            if (kIsWeb)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+                ),
+                child: const Text(
+                  'On web, sites open in a new tab for best compatibility.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ),
             if (_isLoading) _buildProgressBar(),
-            Expanded(
-              child: WebViewWidget(controller: _controller),
-            ),
+            if (!kIsWeb)
+              Expanded(
+                child: WebViewWidget(controller: _controller),
+              ),
           ],
         ),
       ),
