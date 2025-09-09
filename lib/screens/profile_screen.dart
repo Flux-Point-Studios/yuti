@@ -616,7 +616,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: const Text(
-                          'Go to Pricing',
+                          'Manage Plan',
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ),
