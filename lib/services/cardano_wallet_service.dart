@@ -320,6 +320,11 @@ class CardanoWalletService {
         print('Access level: ${_premiumAccessDetails['accessLevel']}');
         print('Reason: ${_premiumAccessDetails['reason']}');
       }
+      // Extra diagnostics for AGENT-only logic
+      final details = _premiumAccessDetails['details'] as Map<String, dynamic>?;
+      if (details != null) {
+        print('🔍 DEBUG: Premium details -> tokenBalance: ${details['tokenBalance']}, requiredBalance: ${details['requiredBalance']}, agentPerAda: ${details['agentPerAda']}, adaUsd: ${details['adaUsd']}, usdTarget: ${details['usdTarget']}');
+      }
     } catch (e) {
       print('Error checking premium access: $e');
       _premiumAccess = false;
