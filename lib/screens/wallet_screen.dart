@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../services/auth_service.dart';
 import '../services/cardano_wallet_service.dart';
+import '../services/wallet_service.dart';
 import '../services/transaction_history_service.dart';
 import '../services/address_book_service.dart';
 import '../utils/app_colors.dart';
@@ -27,6 +28,7 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   final CardanoWalletService _walletService = CardanoWalletService();
+  final WalletService _localWalletService = WalletService();
   final TransactionHistoryService _transactionHistoryService = TransactionHistoryService();
   final AddressBookService _addressBookService = AddressBookService();
   
@@ -216,7 +218,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _walletService.walletName ?? 'Connected Wallet',
+                  _localWalletService.walletName ?? 'Connected Wallet',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 18,
@@ -269,7 +271,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _showRenameDialog() {
-    final controller = TextEditingController(text: _walletService.walletName ?? 'Generated Wallet');
+    final controller = TextEditingController(text: _localWalletService.walletName ?? 'Generated Wallet');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -293,7 +295,7 @@ class _WalletScreenState extends State<WalletScreen> {
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 onPressed: () {
-                  final random = _walletService.generateRandomWalletName();
+                  final random = _localWalletService.generateRandomWalletName();
                   controller.text = random;
                 },
                 icon: const Icon(Icons.shuffle, color: AppColors.primaryBlue, size: 16),
@@ -309,7 +311,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await _walletService.renameWallet(controller.text);
+              await _localWalletService.renameWallet(controller.text);
               if (mounted) setState(() {});
               Navigator.pop(context);
               _showCopyConfirmation('Wallet name updated');
