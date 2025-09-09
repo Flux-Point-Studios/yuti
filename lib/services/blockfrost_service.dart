@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../config/secure_config.dart';
@@ -528,6 +529,63 @@ class BlockfrostService {
         }
         if (jsonVal['price'] != null) {
           return (jsonVal['price'] as num).toDouble();
+        }
+
+        // Charli3 oracle-datum standard (CDDL-style inline JSON via Blockfrost):
+        // Structure like: { "fields": [ { "fields": [ { "map": [ {"k":{"int":0}, "v":{"int":334136}}, ... ] } ], "constructor": 2 } ], "constructor": 0 }
+        if (jsonVal.containsKey('fields')) {
+          // Walk the nested structure to find a 'map' node containing entries {k:{int:N}, v:{...}}
+          double? fromMapNode(Map<String, dynamic> mapNode) {
+            try {
+              final entries = (mapNode['map'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+              num? priceInt;
+              num? precision;
+              for (final entry in entries) {
+                final k = entry['k'] as Map<String, dynamic>?;
+                final v = entry['v'] as Map<String, dynamic>?;
+                final keyIdx = k?['int'] as int?;
+                if (keyIdx == null || v == null) continue;
+                // Extract numeric 'int' from value if present
+                num? valInt = v['int'] as num?;
+                if (keyIdx == 0 && valInt != null) {
+                  priceInt = valInt;
+                } else if (keyIdx == 3 && valInt != null) {
+                  precision = valInt;
+                }
+              }
+              if (priceInt != null) {
+                double price = priceInt!.toDouble();
+                if (precision != null && precision! > 0) {
+                  price = price / math.pow(10, precision!.toDouble());
+                }
+                return price;
+              }
+            } catch (_) {}
+            return null;
+          }
+
+          // Search recursively for any object containing a 'map'
+          double? search(dynamic node) {
+            if (node is Map<String, dynamic>) {
+              if (node.containsKey('map')) {
+                final r = fromMapNode(node);
+                if (r != null) return r;
+              }
+              for (final v in node.values) {
+                final r = search(v);
+                if (r != null) return r;
+              }
+            } else if (node is List) {
+              for (final item in node) {
+                final r = search(item);
+                if (r != null) return r;
+              }
+            }
+            return null;
+          }
+
+          final parsed = search(jsonVal);
+          if (parsed != null) return parsed;
         }
       }
     } catch (_) {}
