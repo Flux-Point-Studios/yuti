@@ -265,125 +265,84 @@ class BlockfrostService {
         'details': <String, dynamic>{},
       };
 
-      // Get stake address info for pool delegation check
-      final stakeInfo = await getStakeAddressInfo(stakeAddress);
-      final isActive = stakeInfo['active'] == true;
-      final controlledAmountStr = stakeInfo['controlled_amount'] ?? '0';
-      final controlledAmount = BigInt.parse(controlledAmountStr);
-      final poolId = stakeInfo['pool_id'];
-
-      // Check for stake pool delegation (highest priority after special access)
-      const requiredPoolId =
-          'pool1p00qq8zftf8m2ll0r9d24fx6tq7yzxzy5teltpswl7zew5m7nqp';
-      final minStakeLovelace =
-          BigInt.from(1000) * BigInt.from(1000000); // 1000 ADA in lovelace
-
-      if (isActive &&
-          poolId == requiredPoolId &&
-          controlledAmount >= minStakeLovelace) {
-        result['hasAccess'] = true;
-        result['accessLevel'] = 'stake_pool';
-        result['reason'] =
-            'Delegated to required stake pool with sufficient stake';
-        result['details'] = {
-          'poolId': poolId,
-          'stakeAmount': controlledAmountStr,
-          'stakeAmountAda':
-              (controlledAmount ~/ BigInt.from(1000000)).toString(),
-        };
-        return result;
-      }
-
       // Aggregate all assets across every address controlled by this stake key
+      print('🔍 DEBUG: Premium check - aggregating assets for stake: ' + stakeAddress);
       final aggregatedAssets = await getAggregatedAssetsForStakeAddress(stakeAddress);
+      print('🔍 DEBUG: Premium check - aggregated asset count: ' + aggregatedAssets.length.toString());
 
-      // Check for T1 ADAM Launch Pass NFT
-      const adamNftPolicy =
-          'b46891456b77dbc77c16090fd92a37f087f9a68e953c56b00a20332f';
-      final adamNft = aggregatedAssets
-          .where((asset) => asset['unit'].toString().startsWith(adamNftPolicy))
-          .toList();
-
-      if (adamNft.isNotEmpty) {
-        result['hasAccess'] = true;
-        result['accessLevel'] = 't1_adam_nft';
-        result['reason'] = 'Holds T1 ADAM Launch Pass NFT (stake-wide)';
-        result['details'] = {
-          'nftCount': adamNft.length,
-          'nfts': adamNft,
-        };
-        return result;
-      }
-
-      // Check for $SHARDS tokens (6 decimals, requires 3,500 tokens = 3,500,000,000 base units)
-      const shardsPolicy =
-          'ea153b5d4864af15a1079a94a0e2486d6376fa28aafad272d15b243a';
-      final shardsTokens = aggregatedAssets
-          .where((asset) => asset['unit'].toString().startsWith(shardsPolicy))
-          .toList();
-
-      if (shardsTokens.isNotEmpty) {
-        final shardsBalance = shardsTokens.fold<BigInt>(
-          BigInt.zero,
-          (sum, token) => sum + BigInt.parse(token['quantity']),
-        );
-        final requiredShards = BigInt.from(3500000000); // 3,500 * 10^6
-
-        if (shardsBalance >= requiredShards) {
-          result['hasAccess'] = true;
-          result['accessLevel'] = 'shards_tokens';
-          result['reason'] = 'Holds sufficient \$SHARDS tokens (stake-wide)';
-          result['details'] = {
-            'tokenBalance': shardsBalance.toString(),
-            'tokenBalanceFormatted':
-                (shardsBalance ~/ BigInt.from(1000000)).toString(),
-            'requiredBalance': requiredShards.toString(),
-          };
-          return result;
-        }
-      }
-
-      // Check for $AGENT tokens (0 decimals, requires 100,000 tokens)
+      // AGENT requirement: dynamic $ value using Charli3 AGENT/ADA and Coingecko ADA/USD
       const agentPolicy =
           '97bbb7db0baef89caefce61b8107ac74c7a7340166b39d906f174bec';
       final agentTokens = aggregatedAssets
           .where((asset) => asset['unit'].toString().startsWith(agentPolicy))
           .toList();
 
-      if (agentTokens.isNotEmpty) {
-        final agentBalance = agentTokens.fold<BigInt>(
-          BigInt.zero,
-          (sum, token) => sum + BigInt.parse(token['quantity']),
-        );
-        final requiredAgent = BigInt.from(100000); // 100,000 tokens
+      final agentBalance = agentTokens.isNotEmpty
+          ? agentTokens.fold<BigInt>(
+              BigInt.zero,
+              (sum, token) => sum + BigInt.parse(token['quantity']),
+            )
+          : BigInt.zero;
 
-        if (agentBalance >= requiredAgent) {
-          result['hasAccess'] = true;
-          result['accessLevel'] = 'agent_tokens';
-          result['reason'] = 'Holds sufficient \$AGENT tokens (stake-wide)';
-          result['details'] = {
-            'tokenBalance': agentBalance.toString(),
-            'requiredBalance': requiredAgent.toString(),
-          };
-          return result;
-        }
+      print('🔍 DEBUG: Premium check - AGENT balance (raw): ' + agentBalance.toString());
+
+      // Compute required AGENT tokens for configured USD target
+      final usdTarget = AppConfig().premiumUsdPrice;
+      print('🔍 DEBUG: Premium check - USD target: ' + usdTarget.toString());
+
+      final feedAddr = AppConfig().charli3AgentAdaFeedAddress;
+      final agentPerAda = await getAgentPerAdaFromCharli3(feedAddr);
+      print('🔍 DEBUG: Charli3 agentPerAda: ' + (agentPerAda?.toString() ?? 'null'));
+
+      final adaUsd = await getAdaUsdPrice();
+      print('🔍 DEBUG: Coingecko ADA/USD: ' + (adaUsd?.toString() ?? 'null'));
+
+      BigInt? requiredAgent;
+      if (agentPerAda != null && adaUsd != null && adaUsd != 0) {
+        final adaRequired = usdTarget / adaUsd; // ADA needed for USD target
+        final agentRequired = adaRequired * agentPerAda; // AGENT per ADA
+        requiredAgent = BigInt.from(agentRequired.ceil());
       }
 
-      // If no access found, return detailed reason
-      result['reason'] =
-          'No qualifying assets found. Required: 1000+ ADA delegated to specific pool, or T1 ADAM NFT, or 3,500+ \$SHARDS, or 100,000+ \$AGENT tokens';
+      print('🔍 DEBUG: Premium check - required AGENT tokens: ' + (requiredAgent?.toString() ?? 'null'));
+
+      if (requiredAgent != null && agentBalance >= requiredAgent) {
+        result['hasAccess'] = true;
+        result['accessLevel'] = 'agent_tokens_dynamic_usd';
+        result['reason'] = 'Holds >= \\${requiredAgent} \$AGENT tokens (stake-wide) for \\$' + usdTarget.toString() + ' access';
+        result['details'] = {
+          'tokenBalance': agentBalance.toString(),
+          'requiredBalance': requiredAgent.toString(),
+          'agentPerAda': agentPerAda,
+          'adaUsd': adaUsd,
+          'usdTarget': usdTarget,
+        };
+        return result;
+      }
+
+      // Fallback: if price feeds unavailable, deny with diagnostic details
+      result['reason'] = 'AGENT-only access active. Price feed unavailable or insufficient balance.';
       result['details'] = {
-        'stakeInfo': stakeInfo,
-        'assetCount': aggregatedAssets.length,
-        'checkedPolicies': [adamNftPolicy, shardsPolicy, agentPolicy],
+        'tokenBalance': agentBalance.toString(),
+        'requiredBalance': requiredAgent?.toString(),
+        'agentPerAda': agentPerAda,
+        'adaUsd': adaUsd,
+        'usdTarget': usdTarget,
+        // 'legacyChecksDisabled': true, // keep note of deactivated checks
       };
 
       return result;
+
+      // Legacy checks (temporarily disabled):
+      // - Stake pool delegation
+      // - T1 ADAM Launch Pass NFT
+      // - $SHARDS tokens threshold
+      // These can be restored later if needed.
     } catch (e) {
       return {
         'hasAccess': false,
         'accessLevel': 'error',
-        'reason': 'Error checking premium access: $e',
+        'reason': 'Error checking premium access: ' + e.toString(),
         'details': {},
       };
     }
