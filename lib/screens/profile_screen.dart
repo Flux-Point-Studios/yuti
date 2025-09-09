@@ -12,6 +12,7 @@ import '../widgets/wallet_security_settings.dart';
 import '../services/gamification_service.dart';
 import '../services/wallet_service.dart';
 import '../services/cardano_wallet_service.dart';
+import '../screens/pricing_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -577,24 +578,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getTierColor(_currentUser!.tier).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _getTierColor(_currentUser!.tier),
-                      width: 1,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _getTierColor(_currentUser!.tier).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _getTierColor(_currentUser!.tier),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        '${_currentUser!.tier} USER',
+                        style: TextStyle(
+                          color: _getTierColor(_currentUser!.tier),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    '${_currentUser!.tier} USER',
-                    style: TextStyle(
-                      color: _getTierColor(_currentUser!.tier),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                    if (_currentUser!.tier.toUpperCase() == 'FREE') ...[
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const PricingScreen()),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primaryBlue,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Go to Pricing',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
