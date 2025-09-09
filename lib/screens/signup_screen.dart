@@ -20,7 +20,7 @@ class _SignupScreenState extends State<SignupScreen>
   static const String _companyEmail = 'contact@fluxpointstudios.com';
   static const String _companyWebsite = 'https://fluxpointstudios.com';
   static const String _privacyPolicyUrl =
-      'https://fluxpointstudios.com/privacy';
+      'https://fluxpointstudios.com/privacy-policy';
   static const String _termsOfServiceUrl = 'https://fluxpointstudios.com/terms';
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
