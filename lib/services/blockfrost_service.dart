@@ -271,9 +271,8 @@ class BlockfrostService {
       final aggregatedAssets = await getAggregatedAssetsForStakeAddress(stakeAddress);
       print('🔍 DEBUG: Premium check - aggregated asset count: ' + aggregatedAssets.length.toString());
 
-      // AGENT requirement: dynamic $ value using Charli3 AGENT/ADA and Coingecko ADA/USD
-      const agentPolicy =
-          '97bbb7db0baef89caefce61b8107ac74c7a7340166b39d906f174bec';
+      // AGENT policy
+      const agentPolicy = '97bbb7db0baef89caefce61b8107ac74c7a7340166b39d906f174bec';
       final agentTokens = aggregatedAssets
           .where((asset) => asset['unit'].toString().startsWith(agentPolicy))
           .toList();
@@ -287,58 +286,30 @@ class BlockfrostService {
 
       print('🔍 DEBUG: Premium check - AGENT balance (raw): ' + agentBalance.toString());
 
-      // Compute required AGENT tokens for configured USD target
-      final usdTarget = AppConfig().premiumUsdPrice;
-      print('🔍 DEBUG: Premium check - USD target: ' + usdTarget.toString());
+      // Hardcoded holder requirement: 100,000 AGENT (assumed 0 decimals)
+      final requiredAgent = BigInt.from(100000);
 
-      final feedAddr = AppConfig().charli3AgentAdaFeedAddress;
-      final agentPerAda = await getAgentPerAdaFromCharli3(feedAddr);
-      print('🔍 DEBUG: Charli3 agentPerAda: ' + (agentPerAda?.toString() ?? 'null'));
+      print('🔍 DEBUG: Premium check - required AGENT tokens (fixed): ' + requiredAgent.toString());
 
-      final adaUsd = await getAdaUsdPrice();
-      print('🔍 DEBUG: Coingecko ADA/USD: ' + (adaUsd?.toString() ?? 'null'));
-
-      BigInt? requiredAgent;
-      if (agentPerAda != null && adaUsd != null && adaUsd != 0) {
-        final adaRequired = usdTarget / adaUsd; // ADA needed for USD target
-        final agentRequired = adaRequired * agentPerAda; // AGENT per ADA
-        requiredAgent = BigInt.from(agentRequired.ceil());
-      }
-
-      print('🔍 DEBUG: Premium check - required AGENT tokens: ' + (requiredAgent?.toString() ?? 'null'));
-
-      if (requiredAgent != null && agentBalance >= requiredAgent) {
+      if (agentBalance >= requiredAgent) {
         result['hasAccess'] = true;
-        result['accessLevel'] = 'agent_tokens_dynamic_usd';
-        result['reason'] = 'Holds >= ${requiredAgent.toString()} \$AGENT tokens (stake-wide) for \$${usdTarget.toString()} access';
+        result['accessLevel'] = 'agent_tokens_fixed_threshold';
+        result['reason'] = 'Holds >= ' + requiredAgent.toString() + ' \$AGENT tokens (stake-wide)';
         result['details'] = {
           'tokenBalance': agentBalance.toString(),
           'requiredBalance': requiredAgent.toString(),
-          'agentPerAda': agentPerAda,
-          'adaUsd': adaUsd,
-          'usdTarget': usdTarget,
         };
         return result;
       }
 
-      // Fallback: if price feeds unavailable, deny with diagnostic details
-      result['reason'] = 'AGENT-only access active. Price feed unavailable or insufficient balance.';
+      // Deny with diagnostic details
+      result['reason'] = 'Requires >= ' + requiredAgent.toString() + ' \$AGENT tokens (stake-wide).';
       result['details'] = {
         'tokenBalance': agentBalance.toString(),
-        'requiredBalance': requiredAgent?.toString(),
-        'agentPerAda': agentPerAda,
-        'adaUsd': adaUsd,
-        'usdTarget': usdTarget,
-        // 'legacyChecksDisabled': true, // keep note of deactivated checks
+        'requiredBalance': requiredAgent.toString(),
       };
 
       return result;
-
-      // Legacy checks (temporarily disabled):
-      // - Stake pool delegation
-      // - T1 ADAM Launch Pass NFT
-      // - $SHARDS tokens threshold
-      // These can be restored later if needed.
     } catch (e) {
       return {
         'hasAccess': false,

@@ -59,19 +59,17 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   Future<void> _loadRequiredAgent() async {
     try {
       setState(() => _loadingRequiredAgent = true);
-      final usdTarget = AppConfig().premiumUsdPrice;
-      final feed = AppConfig().charli3AgentAdaFeedAddress;
-      print('🔍 DEBUG: Loading required AGENT amount for USD target: ' + usdTarget.toString() + ' using computeRequiredAgentForUsd');
-      final required = await _blockfrost.computeRequiredAgentForUsd(usdTarget, feedAddress: feed);
-      final adaUsd = await _blockfrost.getAdaUsdPrice();
-      // agentPerAda may be null if only required is known; keep it optional
+      print('🔍 DEBUG: Loading required AGENT amount (fixed threshold: 100000)');
+      final required = BigInt.from(100000);
+      final double? adaUsd = null;
+      // agentPerAda not used with fixed threshold
       setState(() {
         _agentPerAda = null;
         _adaUsd = adaUsd;
         _requiredAgent = required;
         _loadingRequiredAgent = false;
       });
-      print('🔍 DEBUG: Dialog required AGENT tokens (computed): ' + (required?.toString() ?? 'null'));
+      print('🔍 DEBUG: Dialog required AGENT tokens (fixed): ' + required.toString());
     } catch (e) {
       print('🔍 DEBUG: Failed to load required AGENT amount: ' + e.toString());
       if (mounted) setState(() => _loadingRequiredAgent = false);
