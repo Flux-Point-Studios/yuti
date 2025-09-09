@@ -8,6 +8,9 @@ import '../services/auth_service.dart';
 import '../services/gamechanger_service.dart';
 import '../screens/gamechanger_callback_screen.dart';
 import '../utils/app_colors.dart';
+import '../config/app_config.dart';
+import '../services/blockfrost_service.dart';
+import 'package:intl/intl.dart';
 
 class CardanoWalletDialog extends StatefulWidget {
   final AuthService authService;
@@ -27,6 +30,12 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   final TextEditingController _mnemonicController = TextEditingController();
   final TextEditingController _walletNameController = TextEditingController();
   final GameChangerService _gameChangerService = GameChangerService();
+  final BlockfrostService _blockfrost = BlockfrostService();
+
+  BigInt? _requiredAgent;
+  double? _agentPerAda;
+  double? _adaUsd;
+  bool _loadingRequiredAgent = false;
 
   bool _isLoading = false;
   bool _isObscured = true;
@@ -44,6 +53,50 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     print('🔍 DEBUG: CardanoWalletDialog initState() called');
     print('🔍 DEBUG: Initial connection mode: $_connectionMode');
     print('🔍 DEBUG: Initial loading state: $_isLoading');
+    _loadRequiredAgent();
+  }
+  
+  Future<void> _loadRequiredAgent() async {
+    try {
+      setState(() => _loadingRequiredAgent = true);
+      final usdTarget = AppConfig().premiumUsdPrice;
+      final feed = AppConfig().charli3AgentAdaFeedAddress;
+      print('🔍 DEBUG: Loading required AGENT amount for USD target: ' + usdTarget.toString());
+      final agentPerAda = await _blockfrost.getAgentPerAdaFromCharli3(feed);
+      final adaUsd = await _blockfrost.getAdaUsdPrice();
+      print('🔍 DEBUG: Dialog price feeds -> agentPerAda: ' + (agentPerAda?.toString() ?? 'null') + ', adaUsd: ' + (adaUsd?.toString() ?? 'null'));
+      BigInt? required;
+      if (agentPerAda != null && adaUsd != null && adaUsd != 0) {
+        final adaRequired = usdTarget / adaUsd;
+        final agentRequired = adaRequired * agentPerAda;
+        required = BigInt.from(agentRequired.ceil());
+      }
+      setState(() {
+        _agentPerAda = agentPerAda;
+        _adaUsd = adaUsd;
+        _requiredAgent = required;
+        _loadingRequiredAgent = false;
+      });
+      print('🔍 DEBUG: Dialog required AGENT tokens: ' + (required?.toString() ?? 'null'));
+    } catch (e) {
+      print('🔍 DEBUG: Failed to load required AGENT amount: ' + e.toString());
+      if (mounted) setState(() => _loadingRequiredAgent = false);
+    }
+  }
+
+  String _formatWithCommas(BigInt value) {
+    final s = value.toString();
+    final out = StringBuffer();
+    int count = 0;
+    for (int i = s.length - 1; i >= 0; i--) {
+      out.write(s[i]);
+      count++;
+      if (count == 3 && i != 0) {
+        out.write(',');
+        count = 0;
+      }
+    }
+    return out.toString().split('').reversed.join();
   }
 
   @override
@@ -128,7 +181,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Connect your Cardano wallet to verify premium access via $AGENT token holdings (dynamic $ value).',
+            'Connect your Cardano wallet to verify premium access via \$AGENT token holdings (dynamic \$ value).',
             style: TextStyle(
               color: Colors.white.withOpacity(0.7),
               fontSize: 14,
@@ -616,12 +669,16 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           const SizedBox(height: 8),
           Builder(
             builder: (context) {
-              // We keep this UI simple and static; dynamic value is computed server-side when checking access.
-              // Provide clear copy focused on AGENT-only requirement.
+              final usdTarget = AppConfig().premiumUsdPrice;
+              final amountStr = _requiredAgent != null
+                  ? _formatWithCommas(_requiredAgent!)
+                  : (_loadingRequiredAgent ? 'calculating…' : 'unavailable');
+              final ratesStr = (_agentPerAda != null && _adaUsd != null)
+                  ? ' (rates: ${NumberFormat('0.######').format(_agentPerAda!)} AGENT/ADA, ${NumberFormat('0.####').format(_adaUsd!)} USD/ADA)'
+                  : '';
               return Text(
                 'Your wallet will be checked for:\n'
-                '• $500 worth of \$AGENT tokens (stake-wide)\n\n'
-                'We use live Charli3 (AGENT/ADA) and Coingecko (ADA/USD) prices to compute the exact token amount.',
+                '• ' + amountStr + ' \$AGENT tokens (≈\$' + usdTarget.toStringAsFixed(0) + ' USD, stake-wide)' + ratesStr,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.8),
                   fontSize: 12,
