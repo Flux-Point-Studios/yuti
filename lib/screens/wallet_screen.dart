@@ -42,6 +42,10 @@ class _WalletScreenState extends State<WalletScreen> {
     super.initState();
     _initializeServices();
     _loadWalletData();
+    _localWalletService.initialize().then((_) {
+      debugPrint('🔍 DEBUG: WalletScreen init - local wallet name: ${_localWalletService.walletName}');
+      setState(() {});
+    });
   }
 
   Future<void> _initializeServices() async {
@@ -101,6 +105,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildHeader() {
+    debugPrint('🔍 DEBUG: WalletScreen header - local wallet name: ${_localWalletService.walletName}');
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -314,6 +319,7 @@ class _WalletScreenState extends State<WalletScreen> {
               final newName = controller.text;
               await _localWalletService.renameWallet(newName);
               await _walletService.setWalletName(newName);
+              debugPrint('🔍 DEBUG: Renamed wallet to "$newName". Local name: ${_localWalletService.walletName}, Cardano name: ${_walletService.walletName}');
               if (mounted) setState(() {});
               Navigator.pop(context);
               _showCopyConfirmation('Wallet name updated');
