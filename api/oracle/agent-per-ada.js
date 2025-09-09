@@ -129,8 +129,10 @@ function extractFromJson(jsonVal) {
       if (node.map) {
         let priceInt = null, precision = null;
         for (const entry of node.map) {
-          const key = entry.k?.int;
-          // Try to unwrap integer from various shapes
+          // Unwrap key index (may be nested)
+          const keyBI = unwrapInt(entry.k);
+          const key = keyBI != null ? Number(keyBI) : undefined;
+          // Try to unwrap integer from various shapes for value
           const bi = unwrapInt(entry.v);
           if (key === 0 && bi != null) priceInt = bi;
           if (key === 3 && bi != null) precision = bi;
