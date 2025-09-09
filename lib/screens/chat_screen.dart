@@ -16,6 +16,7 @@ import '../widgets/glassmorphism_container.dart';
 import '../widgets/message_limit_widget.dart';
 import '../screens/pricing_screen.dart';
 import '../screens/browser_screen.dart'; // Added import for BrowserScreen
+import '../services/cardano_wallet_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -32,6 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final SpeechService _speechService = SpeechService();
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
   final AuthService _authService = AuthService();
+  final CardanoWalletService _cardanoService = CardanoWalletService();
 
   bool _isTyping = false;
   bool _isListening = false;
@@ -50,8 +52,57 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeChatHistory();
-    _initializeSpeech();
+    _enforceAccessAndInit();
+  }
+
+  Future<void> _enforceAccessAndInit() async {
+    final allowed = await _enforceAccess();
+    if (!mounted || !allowed) return;
+    await _initializeChatHistory();
+    await _initializeSpeech();
+  }
+
+  Future<bool> _enforceAccess() async {
+    try {
+      // Ensure user/session state is loaded
+      await _authService.refreshUser();
+
+      // If not authenticated, send to login
+      if (!_authService.isAuthenticated) {
+        debugPrint('🔍 DEBUG: Access gate - not authenticated, redirecting to /login');
+        if (mounted) Navigator.pushReplacementNamed(context, '/login');
+        return false;
+      }
+
+      // Admin bypass via SupabaseService
+      final user = _authService.currentUser!;
+      if (SupabaseService.isAdminEmail(user.email)) {
+        debugPrint('🔍 DEBUG: Access gate - admin bypass');
+        return true;
+      }
+
+      // Check subscription and premium wallet access
+      final hasSubscription = await _authService.checkSubscriptionAccess();
+      final hasPremiumWallet = _cardanoService.hasPremiumAccess;
+      debugPrint('🔍 DEBUG: Access gate - hasSubscription: $hasSubscription, hasPremiumWallet: $hasPremiumWallet');
+
+      if (!hasSubscription && !hasPremiumWallet) {
+        // Route to pricing for clear next step
+        debugPrint('🔍 DEBUG: Access gate - redirecting to Pricing');
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const PricingScreen()),
+          );
+        }
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('🔍 DEBUG: Access gate error: $e');
+      return true; // fail-open to avoid locking users out unexpectedly
+    }
   }
 
   Future<void> _initializeChatHistory() async {
