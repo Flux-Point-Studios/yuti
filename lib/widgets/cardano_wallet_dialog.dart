@@ -128,7 +128,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Connect your Cardano wallet to verify premium access based on your token holdings and stake pool delegation.',
+            'Connect your Cardano wallet to verify premium access via $AGENT token holdings (dynamic $ value).',
             style: TextStyle(
               color: Colors.white.withOpacity(0.7),
               fontSize: 14,
@@ -614,17 +614,20 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Your wallet will be checked for:\n'
-            '• Stake pool delegation (1000+ ADA)\n'
-            '• T1 ADAM Launch Pass NFT\n'
-            '• \$SHARDS tokens (3,500+)\n'
-            '• \$AGENT tokens (100,000+)\n'
-            '• Legacy and special access tokens',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 12,
-            ),
+          Builder(
+            builder: (context) {
+              // We keep this UI simple and static; dynamic value is computed server-side when checking access.
+              // Provide clear copy focused on AGENT-only requirement.
+              return Text(
+                'Your wallet will be checked for:\n'
+                '• $500 worth of \$AGENT tokens (stake-wide)\n\n'
+                'We use live Charli3 (AGENT/ADA) and Coingecko (ADA/USD) prices to compute the exact token amount.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
+                ),
+              );
+            },
           ),
         ],
       ),
