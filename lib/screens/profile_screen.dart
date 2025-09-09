@@ -50,6 +50,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _loadUserData();
     _loadGamification();
+    // Ensure local and Cardano wallet services are initialized and refresh UI
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final walletService = context.read<WalletService>();
+        await walletService.initialize();
+        await CardanoWalletService().initialize();
+        if (mounted) setState(() {});
+      } catch (_) {}
+    });
   }
 
   Future<void> _loadGamification() async {
@@ -1090,7 +1099,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final walletService = context.read<WalletService>();
     final cardano = CardanoWalletService();
     final hasLocalWallet = walletService.hasWallet;
-    final hasExternalWallet = (_currentUser?.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty) || cardano.isConnected;
+    final hasExternalWallet = cardano.isConnected || ((_currentUser?.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty));
     final hasWallet = hasLocalWallet || hasExternalWallet;
 
     return _buildSection(
