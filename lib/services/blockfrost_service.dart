@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
+import 'dart:typed_data';
+import 'package:cbor/cbor.dart' as cbor;
 import '../config/app_config.dart';
 import '../config/secure_config.dart';
 
@@ -462,11 +464,24 @@ class BlockfrostService {
         for (final utxo in list) {
           final inlineDatum = utxo['inline_datum'];
           if (inlineDatum != null) {
+            // JSON value path
             final jsonVal = inlineDatum['json_value'];
-            final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
-            if (rate != null) {
-              print('🔍 DEBUG: Charli3 - extracted agentPerAda from address utxos: $rate');
-              return rate;
+            if (jsonVal != null) {
+              final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
+              if (rate != null) {
+                print('🔍 DEBUG: Charli3 - extracted agentPerAda from address utxos json: $rate');
+                return rate;
+              }
+            }
+
+            // CBOR bytes path
+            final bytesHex = inlineDatum['bytes'];
+            if (bytesHex != null && bytesHex is String && bytesHex.isNotEmpty) {
+              final cborRate = _extractAgentPerAdaFromCborHex(bytesHex);
+              if (cborRate != null) {
+                print('🔍 DEBUG: Charli3 - extracted agentPerAda from address utxos cbor: $cborRate');
+                return cborRate;
+              }
             }
           }
         }
@@ -493,12 +508,22 @@ class BlockfrostService {
       for (final o in outputs) {
         if ((o['address'] as String?) == feedAddress) {
           final inlineDatum = o['inline_datum'];
-          if (inlineDatum != null && inlineDatum['json_value'] != null) {
-            final jsonVal = inlineDatum['json_value'];
-            final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
-            if (rate != null) {
-              print('🔍 DEBUG: Charli3 - extracted agentPerAda from tx outputs: $rate');
-              return rate;
+          if (inlineDatum != null) {
+            if (inlineDatum['json_value'] != null) {
+              final jsonVal = inlineDatum['json_value'];
+              final rate = _extractAgentPerAdaFromJsonDatum(jsonVal);
+              if (rate != null) {
+                print('🔍 DEBUG: Charli3 - extracted agentPerAda from tx outputs json: $rate');
+                return rate;
+              }
+            }
+            final bytesHex = inlineDatum['bytes'];
+            if (bytesHex != null && bytesHex is String && bytesHex.isNotEmpty) {
+              final cborRate = _extractAgentPerAdaFromCborHex(bytesHex);
+              if (cborRate != null) {
+                print('🔍 DEBUG: Charli3 - extracted agentPerAda from tx outputs cbor: $cborRate');
+                return cborRate;
+              }
             }
           }
         }
@@ -509,6 +534,67 @@ class BlockfrostService {
     } catch (_) {
       return null;
     }
+  }
+
+  // Decode hex string to bytes
+  Uint8List _hexToBytes(String hex) {
+    final cleaned = hex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+    final length = cleaned.length;
+    final bytes = Uint8List(length ~/ 2);
+    for (int i = 0; i < length; i += 2) {
+      final byte = int.parse(cleaned.substring(i, i + 2), radix: 16);
+      bytes[i ~/ 2] = byte;
+    }
+    return bytes;
+  }
+
+  double? _extractAgentPerAdaFromCborHex(String hex) {
+    try {
+      final bytes = _hexToBytes(hex);
+      final decoder = cbor.Cbor();
+      decoder.decodeFromList(bytes);
+      final decoded = decoder.decodedItems; // dynamic list
+
+      double? search(dynamic node) {
+        if (node is Map) {
+          // If map has int keys, try keys 0 (price) and 3 (precision)
+          if (node.containsKey(0)) {
+            final priceVal = node[0];
+            num? priceInt;
+            if (priceVal is num) priceInt = priceVal;
+            if (priceVal is List && priceVal.isNotEmpty && priceVal.first is num) {
+              priceInt = priceVal.first as num; // safety
+            }
+            num? precision = node[3] is num ? node[3] as num : null;
+            if (priceInt != null) {
+              double price = priceInt!.toDouble();
+              if (precision != null && precision > 0) {
+                price = price / math.pow(10, precision.toDouble());
+              }
+              return price;
+            }
+          }
+          for (final v in node.values) {
+            final r = search(v);
+            if (r != null) return r;
+          }
+        } else if (node is List) {
+          for (final item in node) {
+            final r = search(item);
+            if (r != null) return r;
+          }
+        }
+        return null;
+      }
+
+      for (final item in decoded) {
+        final r = search(item);
+        if (r != null) return r;
+      }
+    } catch (e) {
+      print('🔍 DEBUG: Charli3 - CBOR decode error: $e');
+    }
+    return null;
   }
 
   double? _extractAgentPerAdaFromJsonDatum(dynamic jsonVal) {
