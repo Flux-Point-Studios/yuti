@@ -180,6 +180,37 @@ async function tryAddressUtxos(base, apiKey, feed, debug) {
       const res = await extractFromDatumHash(base, apiKey, hash);
       if (res) return { ...res, method: hasOracleFeedToken(utxo.amount) ? 'address_utxos_hash_oracle' : 'address_utxos_hash' };
     }
+    // Deeper fallback: fetch the transaction's outputs to locate inline datum for this exact UTXO
+    try {
+      const txh = utxo.tx_hash;
+      const outIdx = utxo.output_index;
+      if (txh != null && outIdx != null) {
+        const txUtxoResp = await fetchCompat(`${base}/api/v0/txs/${txh}/utxos`, { headers: { project_id: apiKey } });
+        if (txUtxoResp.ok) {
+          const data = await txUtxoResp.json();
+          const outputs = Array.isArray(data.outputs) ? data.outputs : [];
+          let candidate = outputs.find(o => (o.output_index === outIdx) || (o.index === outIdx));
+          if (!candidate && outputs[outIdx]) candidate = outputs[outIdx];
+          if (candidate) {
+            if (debug) {
+              try {
+                debug.txProbes = debug.txProbes || [];
+                debug.txProbes.push({ tx: txh, outIdx, hasInline: !!candidate.inline_datum, hasHash: !!(candidate.data_hash || candidate.datum_hash || candidate.plutus_data_hash) });
+              } catch (_) {}
+            }
+            if (candidate.inline_datum) {
+              const res = await extractFromInlineDatum(base, apiKey, candidate.inline_datum);
+              if (res) return { ...res, method: 'address_utxo_tx_output_inline' };
+            }
+            const dh = candidate.data_hash || candidate.datum_hash || candidate.plutus_data_hash;
+            if (dh) {
+              const res = await extractFromDatumHash(base, apiKey, dh);
+              if (res) return { ...res, method: 'address_utxo_tx_output_hash' };
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
   return null;
 }
