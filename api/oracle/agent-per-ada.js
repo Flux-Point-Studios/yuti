@@ -89,6 +89,30 @@ function extractFromJson(jsonVal) {
   return null;
 }
 
+function summarizePriceMapKeys(jsonVal) {
+  try {
+    const keys = new Set();
+    const visit = (node) => {
+      if (!node) return;
+      if (node.map) {
+        for (const entry of node.map) {
+          const key = entry.k?.int;
+          if (typeof key === 'number') keys.add(key);
+          else if (typeof key === 'string') {
+            const n = Number(key);
+            if (!Number.isNaN(n)) keys.add(n);
+          }
+        }
+      }
+      if (typeof node === 'object') {
+        for (const v of Object.values(node)) visit(v);
+      }
+    };
+    visit(jsonVal);
+    return Array.from(keys.values()).sort((a,b)=>a-b);
+  } catch (_) { return []; }
+}
+
 async function fetchDatumJson(base, apiKey, datumHash) {
   try {
     const r = await fetchCompat(`${base}/api/v0/scripts/datum/${datumHash}`, { headers: { project_id: apiKey } });
@@ -111,9 +135,15 @@ function hasOracleFeedToken(amountArray) {
   }
 }
 
-async function extractFromInlineDatum(base, apiKey, inline) {
+async function extractFromInlineDatum(base, apiKey, inline, debug) {
   // Prefer json_value
   if (inline.json_value) {
+    if (debug) {
+      try {
+        debug.jsonKeys = debug.jsonKeys || [];
+        debug.jsonKeys.push(summarizePriceMapKeys(inline.json_value));
+      } catch (_) {}
+    }
     const out = extractFromJson(inline.json_value);
     if (out && typeof out.price === 'number') {
       const precision = typeof out.precision === 'number' ? out.precision : 0;
@@ -151,16 +181,31 @@ async function extractFromInlineDatum(base, apiKey, inline) {
   return null;
 }
 
-async function extractFromDatumHash(base, apiKey, hash) {
+async function extractFromDatumHash(base, apiKey, hash, debug) {
   if (!hash) return null;
-  const out = await fetchDatumJson(base, apiKey, hash);
-  if (out && typeof out.price === 'number') {
-    const precision = typeof out.precision === 'number' ? out.precision : 0;
-    const adaPerAgent = out.price / Math.pow(10, precision);
-    if (!adaPerAgent) return null;
-    const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-    if (agentPerAda == null) return null;
-    return { agentPerAda, precision, source: 'json' };
+  try {
+    const r = await fetchCompat(`${base}/api/v0/scripts/datum/${hash}`, { headers: { project_id: apiKey } });
+    if (!r.ok) return null;
+    const body = await r.json();
+    if (debug && body?.json_value) {
+      try {
+        debug.jsonKeys = debug.jsonKeys || [];
+        debug.jsonKeys.push(summarizePriceMapKeys(body.json_value));
+      } catch (_) {}
+    }
+    if (body && body.json_value) {
+      const out = extractFromJson(body.json_value);
+      if (out && typeof out.price === 'number') {
+        const precision = typeof out.precision === 'number' ? out.precision : 0;
+        const adaPerAgent = out.price / Math.pow(10, precision);
+        if (!adaPerAgent) return null;
+        const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
+        if (agentPerAda == null) return null;
+        return { agentPerAda, precision, source: 'json' };
+      }
+    }
+  } catch (e) {
+    console.error('oracle fetch datum json error:', e);
   }
   return null;
 }
@@ -182,13 +227,13 @@ async function tryAddressUtxos(base, apiKey, feed, debug) {
     }
     const inline = utxo.inline_datum;
     if (inline) {
-      const res = await extractFromInlineDatum(base, apiKey, inline);
+      const res = await extractFromInlineDatum(base, apiKey, inline, debug);
       if (res) return { ...res, method: hasOracleFeedToken(utxo.amount) ? 'address_utxos_oracle' : 'address_utxos' };
     }
     // Fallback: try datum hash fields
     const hash = utxo.data_hash || utxo.datum_hash || utxo.plutus_data_hash;
     if (hash) {
-      const res = await extractFromDatumHash(base, apiKey, hash);
+      const res = await extractFromDatumHash(base, apiKey, hash, debug);
       if (res) return { ...res, method: hasOracleFeedToken(utxo.amount) ? 'address_utxos_hash_oracle' : 'address_utxos_hash' };
     }
     // Deeper fallback: fetch the transaction's outputs to locate inline datum for this exact UTXO
@@ -210,12 +255,12 @@ async function tryAddressUtxos(base, apiKey, feed, debug) {
               } catch (_) {}
             }
             if (candidate.inline_datum) {
-              const res = await extractFromInlineDatum(base, apiKey, candidate.inline_datum);
+              const res = await extractFromInlineDatum(base, apiKey, candidate.inline_datum, debug);
               if (res) return { ...res, method: 'address_utxo_tx_output_inline' };
             }
             const dh = candidate.data_hash || candidate.datum_hash || candidate.plutus_data_hash;
             if (dh) {
-              const res = await extractFromDatumHash(base, apiKey, dh);
+              const res = await extractFromDatumHash(base, apiKey, dh, debug);
               if (res) return { ...res, method: 'address_utxo_tx_output_hash' };
             }
           }
@@ -252,13 +297,13 @@ async function tryRecentTxs(base, apiKey, feed, debug) {
         }
         // Try inline first
         if (o.inline_datum) {
-          const res = await extractFromInlineDatum(base, apiKey, o.inline_datum);
+          const res = await extractFromInlineDatum(base, apiKey, o.inline_datum, debug);
           if (res) return { ...res, method: hasOracleFeedToken(o.amount) ? 'tx_outputs_oracle' : (o.address === feed ? 'tx_outputs_sameaddr' : 'tx_outputs_any') };
         }
         // Then try datum hash present on the output
         const hashField = o.data_hash || o.datum_hash || o.plutus_data_hash;
         if (hashField) {
-          const res = await extractFromDatumHash(base, apiKey, hashField);
+          const res = await extractFromDatumHash(base, apiKey, hashField, debug);
           if (res) return { ...res, method: hasOracleFeedToken(o.amount) ? 'tx_outputs_hash_oracle' : (o.address === feed ? 'tx_outputs_hash_sameaddr' : 'tx_outputs_any_hash') };
         }
       }
