@@ -42,6 +42,7 @@ async function decodeCborHex(hex) {
     };
     return find(decoded);
   } catch (e) {
+    console.error('oracle cbor decode error:', e);
     return null;
   }
 }
@@ -72,11 +73,13 @@ function extractFromJson(jsonVal) {
     };
     const res = walk(jsonVal);
     if (res) return res;
-  } catch {}
+  } catch (e) {
+    console.error('oracle json extract error:', e);
+  }
   return null;
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
     const feed = req.query.feed || req.query.address;
     if (!feed) return res.status(400).json({ error: 'Missing feed address ?feed=' });
@@ -150,6 +153,7 @@ module.exports = async (req, res) => {
 
     return res.status(404).json({ error: 'Feed datum not found or unsupported format' });
   } catch (err) {
+    console.error('oracle proxy error:', err);
     res.status(500).json({ error: 'Oracle proxy error', detail: String(err && err.stack || err) });
   }
-}; 
+} 
