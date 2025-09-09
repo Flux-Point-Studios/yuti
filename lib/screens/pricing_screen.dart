@@ -598,7 +598,7 @@ class _PricingScreenState extends State<PricingScreen>
                 DropdownMenuItem(
                   value: 'ada',
                   child: Text(
-                    'Token & NFT Holders',
+                    'AGENT Holders (≥ 100,000 $AGENT)',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -705,7 +705,7 @@ class _PricingScreenState extends State<PricingScreen>
         // For free plan, just navigate to chat
         _navigateToChat();
       } else if (_paymentMethod == 'ada') {
-        // Handle Cardano wallet connection for token/NFT holders
+        // Handle Cardano wallet connection for AGENT holders (≥ 100,000 AGENT)
         await _handleCardanoWalletConnection(plan);
       } else if (_paymentMethod == 'uex') {
         // New: Handle UEX payment via hosted checkout
