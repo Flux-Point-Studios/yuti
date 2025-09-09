@@ -48,6 +48,74 @@ async function decodeCborHex(hex) {
   }
 }
 
+function previewJsonValue(node, depth = 0) {
+  try {
+    if (depth > 2 || !node) return '…';
+    if (typeof node !== 'object') return typeof node;
+    if (node.constructor !== undefined && node.fields) {
+      return {
+        kind: 'constr',
+        constructor: node.constructor,
+        fieldsCount: Array.isArray(node.fields) ? node.fields.length : undefined,
+        head: previewJsonValue(node.fields && node.fields[0], depth + 1),
+      };
+    }
+    if (node.map) {
+      const keys = [];
+      for (const entry of node.map.slice(0, 6)) {
+        keys.push(entry?.k?.int ?? typeof entry?.k);
+      }
+      return { kind: 'map', len: node.map.length, keys };
+    }
+    if (node.list) {
+      return { kind: 'list', len: node.list.length, head: previewJsonValue(node.list[0], depth + 1) };
+    }
+    // Generic object
+    const out = {};
+    for (const k of Object.keys(node).slice(0, 6)) {
+      out[k] = typeof node[k] === 'object' ? previewJsonValue(node[k], depth + 1) : typeof node[k];
+    }
+    return out;
+  } catch (_) {
+    return 'err';
+  }
+}
+
+function unwrapInt(node, depth = 0) {
+  try {
+    if (node == null || depth > 6) return null;
+    if (typeof node === 'object') {
+      if (typeof node.int === 'number') return BigInt(node.int);
+      if (typeof node.int === 'string' && node.int.trim() !== '') return BigInt(node.int);
+      if (node.map) {
+        for (const entry of node.map) {
+          const v = unwrapInt(entry?.v, depth + 1);
+          if (v != null) return v;
+        }
+      }
+      if (Array.isArray(node.list)) {
+        for (const it of node.list) {
+          const v = unwrapInt(it, depth + 1);
+          if (v != null) return v;
+        }
+      }
+      if (Array.isArray(node.fields)) {
+        for (const it of node.fields) {
+          const v = unwrapInt(it, depth + 1);
+          if (v != null) return v;
+        }
+      }
+      for (const v of Object.values(node)) {
+        const r = unwrapInt(v, depth + 1);
+        if (r != null) return r;
+      }
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function extractFromJson(jsonVal) {
   try {
     const toBigInt = (v) => {
@@ -62,14 +130,13 @@ function extractFromJson(jsonVal) {
         let priceInt = null, precision = null;
         for (const entry of node.map) {
           const key = entry.k?.int;
-          const raw = entry.v?.int;
-          const bi = toBigInt(raw);
+          // Try to unwrap integer from various shapes
+          const bi = unwrapInt(entry.v);
           if (key === 0 && bi != null) priceInt = bi;
           if (key === 3 && bi != null) precision = bi;
         }
         if (priceInt != null) {
-          const precNum = precision != null ? Number(precision) : 0;
-          // Return raw integer and precision to caller
+          const precNum = precision != null ? Number(precision) : 6; // default precision to 6
           return { price: Number(priceInt), precision: precNum };
         }
       }
@@ -113,39 +180,6 @@ function summarizePriceMapKeys(jsonVal) {
   } catch (_) { return []; }
 }
 
-function previewJsonValue(node, depth = 0) {
-  try {
-    if (depth > 2 || !node) return '…';
-    if (typeof node !== 'object') return typeof node;
-    if (node.constructor !== undefined && node.fields) {
-      return {
-        kind: 'constr',
-        constructor: node.constructor,
-        fieldsCount: Array.isArray(node.fields) ? node.fields.length : undefined,
-        head: previewJsonValue(node.fields && node.fields[0], depth + 1),
-      };
-    }
-    if (node.map) {
-      const keys = [];
-      for (const entry of node.map.slice(0, 6)) {
-        keys.push(entry?.k?.int ?? typeof entry?.k);
-      }
-      return { kind: 'map', len: node.map.length, keys };
-    }
-    if (node.list) {
-      return { kind: 'list', len: node.list.length, head: previewJsonValue(node.list[0], depth + 1) };
-    }
-    // Generic object
-    const out = {};
-    for (const k of Object.keys(node).slice(0, 6)) {
-      out[k] = typeof node[k] === 'object' ? previewJsonValue(node[k], depth + 1) : typeof node[k];
-    }
-    return out;
-  } catch (_) {
-    return 'err';
-  }
-}
-
 async function fetchDatumJson(base, apiKey, datumHash) {
   try {
     const r = await fetchCompat(`${base}/api/v0/scripts/datum/${datumHash}`, { headers: { project_id: apiKey } });
@@ -181,11 +215,10 @@ async function extractFromInlineDatum(base, apiKey, inline, debug) {
     }
     const out = extractFromJson(inline.json_value);
     if (out && typeof out.price === 'number') {
-      const precision = typeof out.precision === 'number' ? out.precision : 0;
+      const precision = typeof out.precision === 'number' ? out.precision : 6;
       const adaPerAgent = out.price / Math.pow(10, precision);
-      if (!adaPerAgent) return null;
-      const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-      if (agentPerAda == null) return null;
+      if (!adaPerAgent || !Number.isFinite(adaPerAgent) || adaPerAgent <= 0) return null;
+      const agentPerAda = 1 / adaPerAgent;
       return { agentPerAda, precision, source: 'json' };
     }
   }
@@ -206,11 +239,10 @@ async function extractFromInlineDatum(base, apiKey, inline, debug) {
         if (body && body.json_value) {
           const out = extractFromJson(body.json_value);
           if (out && typeof out.price === 'number') {
-            const precision = typeof out.precision === 'number' ? out.precision : 0;
+            const precision = typeof out.precision === 'number' ? out.precision : 6;
             const adaPerAgent = out.price / Math.pow(10, precision);
-            if (!adaPerAgent) return null;
-            const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-            if (agentPerAda == null) return null;
+            if (!adaPerAgent || !Number.isFinite(adaPerAgent) || adaPerAgent <= 0) return null;
+            const agentPerAda = 1 / adaPerAgent;
             return { agentPerAda, precision, source: 'json' };
           }
         }
@@ -218,11 +250,10 @@ async function extractFromInlineDatum(base, apiKey, inline, debug) {
           if (debug) { try { debug.bytesSeen = true; } catch (_) {} }
           const out = await decodeCborHex(body.bytes);
           if (out && typeof out.price === 'number') {
-            const precision = typeof out.precision === 'number' ? out.precision : 0;
+            const precision = typeof out.precision === 'number' ? out.precision : 6;
             const adaPerAgent = out.price / Math.pow(10, precision);
-            if (!adaPerAgent) return null;
-            const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-            if (agentPerAda == null) return null;
+            if (!adaPerAgent || !Number.isFinite(adaPerAgent) || adaPerAgent <= 0) return null;
+            const agentPerAda = 1 / adaPerAgent;
             return { agentPerAda, precision, source: 'cbor' };
           }
         }
@@ -233,11 +264,10 @@ async function extractFromInlineDatum(base, apiKey, inline, debug) {
   if (inline.bytes) {
     const out = await decodeCborHex(inline.bytes);
     if (out && typeof out.price === 'number') {
-      const precision = typeof out.precision === 'number' ? out.precision : 0;
+      const precision = typeof out.precision === 'number' ? out.precision : 6;
       const adaPerAgent = out.price / Math.pow(10, precision);
-      if (!adaPerAgent) return null;
-      const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-      if (agentPerAda == null) return null;
+      if (!adaPerAgent || !Number.isFinite(adaPerAgent) || adaPerAgent <= 0) return null;
+      const agentPerAda = 1 / adaPerAgent;
       return { agentPerAda, precision, source: 'cbor' };
     }
   }
@@ -261,11 +291,10 @@ async function extractFromDatumHash(base, apiKey, hash, debug) {
     if (body && body.json_value) {
       const out = extractFromJson(body.json_value);
       if (out && typeof out.price === 'number') {
-        const precision = typeof out.precision === 'number' ? out.precision : 0;
+        const precision = typeof out.precision === 'number' ? out.precision : 6;
         const adaPerAgent = out.price / Math.pow(10, precision);
-        if (!adaPerAgent) return null;
-        const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-        if (agentPerAda == null) return null;
+        if (!adaPerAgent || !Number.isFinite(adaPerAgent) || adaPerAgent <= 0) return null;
+        const agentPerAda = 1 / adaPerAgent;
         return { agentPerAda, precision, source: 'json' };
       }
     }
@@ -274,11 +303,10 @@ async function extractFromDatumHash(base, apiKey, hash, debug) {
       if (debug) { try { debug.bytesSeen = true; } catch (_) {} }
       const out = await decodeCborHex(body.bytes);
       if (out && typeof out.price === 'number') {
-        const precision = typeof out.precision === 'number' ? out.precision : 0;
+        const precision = typeof out.precision === 'number' ? out.precision : 6;
         const adaPerAgent = out.price / Math.pow(10, precision);
-        if (!adaPerAgent) return null;
-        const agentPerAda = adaPerAgent ? 1 / adaPerAgent : null;
-        if (agentPerAda == null) return null;
+        if (!adaPerAgent || !Number.isFinite(adaPerAgent) || adaPerAgent <= 0) return null;
+        const agentPerAda = 1 / adaPerAgent;
         return { agentPerAda, precision, source: 'cbor' };
       }
     }
