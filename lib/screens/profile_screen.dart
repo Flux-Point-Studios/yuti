@@ -1206,7 +1206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Connect your GameChanger wallet to unlock premium features and verify ownership of premium assets.',
+                  'Connect your wallet to unlock premium features and verify ownership of premium assets.',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 14,
@@ -1241,7 +1241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             Icon(Icons.account_balance_wallet, size: 18),
                             const SizedBox(width: 8),
-                            Text('Connect GameChanger Wallet'),
+                            Text('Connect Wallet'),
                           ],
                         ),
                   ),
