@@ -75,6 +75,50 @@ function extractFromJson(jsonVal) {
   return null;
 }
 
+async function fetchDatumJson(base, apiKey, datumHash) {
+  try {
+    const r = await fetchCompat(`${base}/api/v0/scripts/datum/${datumHash}`, { headers: { project_id: apiKey } });
+    if (!r.ok) return null;
+    const body = await r.json();
+    if (body && body.json_value) return extractFromJson(body.json_value);
+    return null;
+  } catch (e) {
+    console.error('oracle fetch datum json error:', e);
+    return null;
+  }
+}
+
+async function extractFromInlineDatum(base, apiKey, inline) {
+  // Prefer json_value
+  if (inline.json_value) {
+    const out = extractFromJson(inline.json_value);
+    if (out && typeof out.price === 'number') {
+      const precision = typeof out.precision === 'number' ? out.precision : 0;
+      const agentPerAda = out.price / Math.pow(10, precision);
+      return { agentPerAda, precision, source: 'json' };
+    }
+  }
+  // Try datum hash via scripts/datum
+  if (inline.hash) {
+    const out = await fetchDatumJson(base, apiKey, inline.hash);
+    if (out && typeof out.price === 'number') {
+      const precision = typeof out.precision === 'number' ? out.precision : 0;
+      const agentPerAda = out.price / Math.pow(10, precision);
+      return { agentPerAda, precision, source: 'json' };
+    }
+  }
+  // Try bytes via CBOR
+  if (inline.bytes) {
+    const out = await decodeCborHex(inline.bytes);
+    if (out && typeof out.price === 'number') {
+      const precision = typeof out.precision === 'number' ? out.precision : 0;
+      const agentPerAda = out.price / Math.pow(10, precision);
+      return { agentPerAda, precision, source: 'cbor' };
+    }
+  }
+  return null;
+}
+
 async function tryAddressUtxos(base, apiKey, feed) {
   const url = `${base}/api/v0/addresses/${encodeURIComponent(feed)}/utxos?order=desc&page=1&count=50`;
   const resp = await fetchCompat(url, { headers: { project_id: apiKey } });
@@ -83,27 +127,13 @@ async function tryAddressUtxos(base, apiKey, feed) {
   for (const utxo of list) {
     const inline = utxo.inline_datum;
     if (!inline) continue;
-    if (inline.json_value) {
-      const out = extractFromJson(inline.json_value);
-      if (out && typeof out.price === 'number') {
-        const precision = typeof out.precision === 'number' ? out.precision : 0;
-        const agentPerAda = out.price / Math.pow(10, precision);
-        return { agentPerAda, precision, source: 'json', method: 'address_utxos' };
-      }
-    } else if (inline.bytes) {
-      const out = await decodeCborHex(inline.bytes);
-      if (out && typeof out.price === 'number') {
-        const precision = typeof out.precision === 'number' ? out.precision : 0;
-        const agentPerAda = out.price / Math.pow(10, precision);
-        return { agentPerAda, precision, source: 'cbor', method: 'address_utxos' };
-      }
-    }
+    const res = await extractFromInlineDatum(base, apiKey, inline);
+    if (res) return { ...res, method: 'address_utxos' };
   }
   return null;
 }
 
 async function tryRecentTxs(base, apiKey, feed) {
-  // Scan multiple recent pages to find latest inline datum
   const perPage = 25;
   for (let page = 1; page <= 4; page++) {
     const txsResp = await fetchCompat(`${base}/api/v0/addresses/${encodeURIComponent(feed)}/transactions?order=desc&page=${page}&count=${perPage}`, {
@@ -121,21 +151,8 @@ async function tryRecentTxs(base, apiKey, feed) {
         if (o.address !== feed) continue;
         const inline = o.inline_datum;
         if (!inline) continue;
-        if (inline.json_value) {
-          const out = extractFromJson(inline.json_value);
-          if (out && typeof out.price === 'number') {
-            const precision = typeof out.precision === 'number' ? out.precision : 0;
-            const agentPerAda = out.price / Math.pow(10, precision);
-            return { agentPerAda, precision, source: 'json', method: 'tx_outputs' };
-          }
-        } else if (inline.bytes) {
-          const out = await decodeCborHex(inline.bytes);
-          if (out && typeof out.price === 'number') {
-            const precision = typeof out.precision === 'number' ? out.precision : 0;
-            const agentPerAda = out.price / Math.pow(10, precision);
-            return { agentPerAda, precision, source: 'cbor', method: 'tx_outputs' };
-          }
-        }
+        const res = await extractFromInlineDatum(base, apiKey, inline);
+        if (res) return { ...res, method: 'tx_outputs' };
       }
     }
   }
