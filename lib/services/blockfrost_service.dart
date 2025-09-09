@@ -297,8 +297,17 @@ class BlockfrostService {
 
       // AGENT policy
       const agentPolicy = '97bbb7db0baef89caefce61b8107ac74c7a7340166b39d906f174bec';
+      // Canonical asset name for AGENT (hex) is '54616c6f73' => 'Talos'. If holdings use this
+      // unit, prefer matching exactly policy+name; otherwise fall back to policy prefix.
+      const agentAssetHex = '54616c6f73';
+      final expectedAgentUnit = agentPolicy + agentAssetHex;
       final agentTokens = aggregatedAssets
-          .where((asset) => asset['unit'].toString().startsWith(agentPolicy))
+          .where((asset) {
+            final unit = asset['unit'].toString();
+            if (unit == expectedAgentUnit) return true;
+            // Fallback: allow policy prefix match to be tolerant of variants
+            return unit.startsWith(agentPolicy);
+          })
           .toList();
 
       final agentBalance = agentTokens.isNotEmpty
@@ -367,8 +376,15 @@ class BlockfrostService {
   /// Helper: get all addresses for a stake address
   Future<List<String>> _getAddressesForStakeAddress(String stakeAddress) async {
     try {
-      final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses');
-      final headers = await _getHeaders();
+      Uri url;
+      Map<String, String> headers = {};
+      try {
+        headers = await _getHeaders();
+        url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses');
+      } catch (_) {
+        if (!kIsWeb) rethrow;
+        url = Uri.parse('/api/blockfrost/accounts/$stakeAddress/addresses');
+      }
       final response = await http.get(url, headers: headers);
       if (response.statusCode == 200) {
         final list = json.decode(response.body) as List;
