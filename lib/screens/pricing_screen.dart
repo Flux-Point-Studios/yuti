@@ -8,6 +8,8 @@ import '../widgets/cardano_wallet_dialog.dart';
 import '../widgets/glassmorphism_container.dart';
 import '../services/uex_service.dart';
 import 'chat_screen.dart';
+import 'dart:convert'; // Added for json
+import 'package:http/http.dart' as http; // Added for http
 
 class PricingScreen extends StatefulWidget {
   const PricingScreen({Key? key}) : super(key: key);
@@ -753,17 +755,33 @@ class _PricingScreenState extends State<PricingScreen>
   }
 
   Future<void> _handleStripePayment(PricingPlan plan) async {
-    // Simulate Stripe payment process
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Update user tier
-    await _authService.updateUserTier(plan.value);
-
-    _showSuccess('Successfully subscribed to ${plan.name} plan!');
-
-    // Navigate to chat after successful subscription
-    await Future.delayed(const Duration(seconds: 1));
-    _navigateToChat();
+    try {
+      final user = _authService.currentUser;
+      if (user == null) throw Exception('Not signed in');
+      final resp = await http.post(
+        Uri.parse('/api/stripe/checkout'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'plan': plan.value,
+          'userId': user.id,
+          'email': user.email,
+          'successUrl': '${Uri.base.origin}/payment-success?status=success',
+          'cancelUrl': '${Uri.base.origin}/pricing?status=cancel',
+        }),
+      );
+      if (resp.statusCode != 200) {
+        throw Exception('Stripe error: ${resp.body}');
+      }
+      final data = json.decode(resp.body) as Map<String, dynamic>;
+      final url = data['url'] as String?;
+      if (url == null || url.isEmpty) {
+        throw Exception('No checkout URL returned');
+      }
+      await _launchUrl(url);
+      _showSuccess('Complete payment in the opened page. You\'ll be upgraded after confirmation.');
+    } catch (e) {
+      _showError('Unable to start payment: $e');
+    }
   }
 
   Future<bool?> _showCardanoWalletDialog() {
