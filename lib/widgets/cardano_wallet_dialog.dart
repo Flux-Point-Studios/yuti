@@ -61,23 +61,17 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       setState(() => _loadingRequiredAgent = true);
       final usdTarget = AppConfig().premiumUsdPrice;
       final feed = AppConfig().charli3AgentAdaFeedAddress;
-      print('🔍 DEBUG: Loading required AGENT amount for USD target: ' + usdTarget.toString());
-      final agentPerAda = await _blockfrost.getAgentPerAdaFromCharli3(feed);
+      print('🔍 DEBUG: Loading required AGENT amount for USD target: ' + usdTarget.toString() + ' using computeRequiredAgentForUsd');
+      final required = await _blockfrost.computeRequiredAgentForUsd(usdTarget, feedAddress: feed);
       final adaUsd = await _blockfrost.getAdaUsdPrice();
-      print('🔍 DEBUG: Dialog price feeds -> agentPerAda: ' + (agentPerAda?.toString() ?? 'null') + ', adaUsd: ' + (adaUsd?.toString() ?? 'null'));
-      BigInt? required;
-      if (agentPerAda != null && adaUsd != null && adaUsd != 0) {
-        final adaRequired = usdTarget / adaUsd;
-        final agentRequired = adaRequired * agentPerAda;
-        required = BigInt.from(agentRequired.ceil());
-      }
+      // agentPerAda may be null if only required is known; keep it optional
       setState(() {
-        _agentPerAda = agentPerAda;
+        _agentPerAda = null;
         _adaUsd = adaUsd;
         _requiredAgent = required;
         _loadingRequiredAgent = false;
       });
-      print('🔍 DEBUG: Dialog required AGENT tokens: ' + (required?.toString() ?? 'null'));
+      print('🔍 DEBUG: Dialog required AGENT tokens (computed): ' + (required?.toString() ?? 'null'));
     } catch (e) {
       print('🔍 DEBUG: Failed to load required AGENT amount: ' + e.toString());
       if (mounted) setState(() => _loadingRequiredAgent = false);
