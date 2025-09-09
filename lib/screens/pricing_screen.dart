@@ -36,60 +36,21 @@ class _PricingScreenState extends State<PricingScreen>
       price: '\$0',
       description: 'Perfect for getting started',
       features: [
-        'Limited API Calls',
-        'Entry model access',
-        'Basic wallet features',
+        '20 messages per day',
       ],
       buttonText: 'Get Started',
-      isRecommended: false,
-    ),
-    PricingPlan(
-      name: 'Basic',
-      value: 'BASIC',
-      price: '\$39.99',
-      description: 'Great for individual developers',
-      features: [
-        'Saved Chat History',
-        'Basic model access',
-        'Earn Fragments (1x)',
-        'Advanced wallet features',
-        'Transaction history',
-      ],
-      buttonText: 'Subscribe',
       isRecommended: false,
     ),
     PricingPlan(
       name: 'Premium',
       value: 'PREMIUM',
       price: '\$99.99',
-      description: 'Ideal for growing teams',
+      description: 'Unlock everything',
       features: [
-        'Advanced model access',
-        'Custom User Profile',
-        'Earn Fragments (1.5x)',
-        'Priority support',
-        'Advanced analytics',
-        'Multi-wallet management',
+        'Unlimited messages',
       ],
       buttonText: 'Subscribe',
       isRecommended: true,
-    ),
-    PricingPlan(
-      name: 'VIP',
-      value: 'VIP',
-      price: '\$149.99',
-      description: 'For enterprise & large teams',
-      features: [
-        'Enterprise model access',
-        'Free Weekly Learning Sessions',
-        'Dedicated Account Manager',
-        'Earn Fragments (2x)',
-        'White-label options',
-        'Custom integrations',
-        '24/7 support',
-      ],
-      buttonText: 'Subscribe',
-      isRecommended: false,
     ),
   ];
 
@@ -733,14 +694,8 @@ class _PricingScreenState extends State<PricingScreen>
       // Map plan to amount in cents
       final int amountCents;
       switch (plan.value) {
-        case 'BASIC':
-          amountCents = 3999; // $39.99
-          break;
         case 'PREMIUM':
           amountCents = 9999; // $99.99
-          break;
-        case 'VIP':
-          amountCents = 14999; // $149.99
           break;
         default:
           amountCents = 0;
