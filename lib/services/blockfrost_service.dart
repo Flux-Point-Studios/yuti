@@ -309,7 +309,7 @@ class BlockfrostService {
       if (requiredAgent != null && agentBalance >= requiredAgent) {
         result['hasAccess'] = true;
         result['accessLevel'] = 'agent_tokens_dynamic_usd';
-        result['reason'] = 'Holds >= \\${requiredAgent} \$AGENT tokens (stake-wide) for \\$' + usdTarget.toString() + ' access';
+        result['reason'] = 'Holds >= ${requiredAgent.toString()} \$AGENT tokens (stake-wide) for \$${usdTarget.toString()} access';
         result['details'] = {
           'tokenBalance': agentBalance.toString(),
           'requiredBalance': requiredAgent.toString(),
