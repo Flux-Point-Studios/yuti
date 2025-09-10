@@ -201,13 +201,17 @@ class CardanoWalletService {
       _connectionStatus = WalletConnectionStatus.connecting;
 
       // Validate inputs
-      if (walletName.isEmpty || address.isEmpty || stakeAddress.isEmpty) {
+      if (walletName.isEmpty || address.isEmpty) {
         throw Exception('Invalid wallet data provided');
       }
 
       // Validate address formats (basic check)
-      if (!_validateAddress(address) || !_validateStakeAddress(stakeAddress)) {
+      if (!_validateAddress(address)) {
         throw Exception('Invalid address format');
+      }
+      // For some external wallets (Smart Wallet), stake address may be unavailable
+      if (stakeAddress.isNotEmpty && !_validateStakeAddress(stakeAddress)) {
+        throw Exception('Invalid stake address format');
       }
 
       // Clean up any existing mnemonic-based wallet data
@@ -223,8 +227,12 @@ class CardanoWalletService {
       await _storage.write(key: _walletNameKey, value: walletName);
       await _storage.write(key: _isConnectedKey, value: 'true');
       await _storage.write(key: 'external_wallet_address', value: address);
-      await _storage.write(
-          key: 'external_wallet_stake_address', value: stakeAddress);
+      if (stakeAddress.isNotEmpty) {
+        await _storage.write(
+            key: 'external_wallet_stake_address', value: stakeAddress);
+      } else {
+        await _storage.delete(key: 'external_wallet_stake_address');
+      }
 
       _connectionStatus = WalletConnectionStatus.connected;
 

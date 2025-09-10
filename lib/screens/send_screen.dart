@@ -10,6 +10,7 @@ import '../models/address_book_entry.dart';
 import 'address_book_screen.dart';
 import 'qr_scanner_screen.dart';
 import '../services/gamification_service.dart';
+import '../services/smart_wallet_service.dart';
 
 class SendScreen extends StatefulWidget {
   final CardanoWalletService walletService;
@@ -275,7 +276,7 @@ class _SendScreenState extends State<SendScreen> {
             TextFormField(
               controller: _addressController,
               decoration: InputDecoration(
-                hintText: 'addr1...',
+                hintText: 'addr1... or gmail address',
                 hintStyle: TextStyle(color: AppColors.textTertiary),
                 filled: true,
                 fillColor: AppColors.backgroundLight.withOpacity(0.1),
@@ -307,6 +308,11 @@ class _SendScreenState extends State<SendScreen> {
               ),
               style: TextStyle(color: AppColors.textPrimary, fontSize: 12),
               maxLines: 3,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tip: Enter a Gmail to send to a Smart Wallet user',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
             ),
           ],
         ),
@@ -583,6 +589,15 @@ class _SendScreenState extends State<SendScreen> {
           address = res['address'] ?? address;
         } catch (_) {}
       }
+      // Resolve Smart Wallet email to address
+      if (!AddressBookService().isValidCardanoAddress(address) && address.contains('@')) {
+        try {
+          final smart = await _resolveSmartWalletAddress(address);
+          if (smart != null) {
+            address = smart;
+          }
+        } catch (_) {}
+      }
       final amount = double.parse(_amountController.text);
       final description = _descriptionController.text.trim();
 
@@ -672,5 +687,14 @@ class _SendScreenState extends State<SendScreen> {
         ],
       ),
     );
+  }
+
+  Future<String?> _resolveSmartWalletAddress(String email) async {
+    try {
+      final svc = SmartWalletService();
+      return await svc.getWalletAddressByEmail(email);
+    } catch (_) {
+      return null;
+    }
   }
 }

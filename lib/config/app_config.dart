@@ -43,6 +43,23 @@ class AppConfig {
   bool get isMainnet =>
       const bool.fromEnvironment('IS_MAINNET', defaultValue: true);
 
+  // Smart Wallet (zkFold) configuration
+  bool get smartWalletEnabled =>
+      const bool.fromEnvironment('SMART_WALLET_ENABLED', defaultValue: true);
+  String get smartWalletApiBase => const String.fromEnvironment(
+      'SMART_WALLET_API_BASE',
+      defaultValue: 'https://wallet-api.zkfold.io');
+  String get smartWalletProverBase => const String.fromEnvironment(
+      'SMART_WALLET_PROVER_BASE',
+      defaultValue: 'https://wallet-prover.zkfold.io');
+  String get smartWalletApiKey => const String.fromEnvironment(
+      'SMART_WALLET_API_KEY',
+      defaultValue: '');
+  // Optional: if using GoogleSignIn directly on Web/mobile
+  String get smartWalletGoogleWebClientId => const String.fromEnvironment(
+      'SMART_WALLET_GOOGLE_WEB_CLIENT_ID',
+      defaultValue: '');
+
   // App settings
   String get appName => 'Yuti';
   String get appVersion => '1.0.0';

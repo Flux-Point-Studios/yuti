@@ -70,12 +70,20 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>This app uses Face ID to secure access to your wallet and private keys</string>
 	
-	<!-- URL Types for GameChanger deep link callback -->
+	<!-- URL Types for GameChanger and Smart Wallet deep link callbacks -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
 			<string>yuti.gamechanger</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>yuti</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>yuti.smartwallet</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>yuti</string>

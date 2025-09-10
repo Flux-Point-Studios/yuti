@@ -7,9 +7,11 @@ import 'package:cardano_dart_types/cardano_dart_types.dart';
 import '../services/auth_service.dart';
 import '../services/gamechanger_service.dart';
 import '../screens/gamechanger_callback_screen.dart';
+import '../services/smart_wallet_service.dart';
 import '../utils/app_colors.dart';
 import '../config/app_config.dart';
 import '../services/blockfrost_service.dart';
+import '../screens/smart_wallet_activation_screen.dart';
 import 'package:intl/intl.dart';
 
 class CardanoWalletDialog extends StatefulWidget {
@@ -24,7 +26,7 @@ class CardanoWalletDialog extends StatefulWidget {
   State<CardanoWalletDialog> createState() => _CardanoWalletDialogState();
 }
 
-enum ConnectionMode { mnemonic, gameChanger, createNew }
+enum ConnectionMode { mnemonic, gameChanger, smartWallet, createNew }
 
 class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   final TextEditingController _mnemonicController = TextEditingController();
@@ -198,6 +200,8 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             _buildMnemonicField(),
           ] else if (_connectionMode == ConnectionMode.gameChanger) ...[
             _buildGameChangerSection(),
+          ] else if (_connectionMode == ConnectionMode.smartWallet) ...[
+            _buildSmartWalletSection(),
           ] else if (_connectionMode == ConnectionMode.createNew) ...[
             _buildCreateNewWalletSection(),
           ],
@@ -353,6 +357,21 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildModeOption(
+                mode: ConnectionMode.smartWallet,
+                title: 'Smart Wallet',
+                subtitle: 'Seedless with Google Login',
+                icon: Icons.lock_open,
+                isSelected: _connectionMode == ConnectionMode.smartWallet,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Second row with Recovery Phrase and Create New
+        Row(
+          children: [
+            Expanded(
+              child: _buildModeOption(
                 mode: ConnectionMode.mnemonic,
                 title: 'Recovery Phrase',
                 subtitle: 'Import with 12-24 words',
@@ -360,17 +379,17 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                 isSelected: _connectionMode == ConnectionMode.mnemonic,
               ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildModeOption(
+                mode: ConnectionMode.createNew,
+                title: 'Create New Wallet',
+                subtitle: 'Generate a new wallet',
+                icon: Icons.add_circle_outline,
+                isSelected: _connectionMode == ConnectionMode.createNew,
+              ),
+            ),
           ],
-        ),
-        const SizedBox(height: 12),
-        // Second row with Create New option (full width)
-        _buildModeOption(
-          mode: ConnectionMode.createNew,
-          title: 'Create New Wallet',
-          subtitle: 'Generate a new wallet with recovery phrase',
-          icon: Icons.add_circle_outline,
-          isSelected: _connectionMode == ConnectionMode.createNew,
-          isFullWidth: true,
         ),
       ],
     );
@@ -1155,6 +1174,125 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Widget _buildSmartWalletSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryBlue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.lock_open,
+                    color: AppColors.primaryBlue,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Seedless Smart Wallet (Google)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Create or access a seedless wallet secured by your Google account. Transactions can be sponsored and support Babel fees.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _connectWithSmartWallet,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.login, size: 18),
+                  label: const Text(
+                    'Continue with Google',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _connectWithSmartWallet() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _showQrCode = false;
+    });
+
+    try {
+      final smart = SmartWalletService();
+      final auth = await smart.continueWithGoogle();
+
+      // Resolve current user's smart wallet address by email
+      String? address = await smart.getWalletAddressByEmail(auth.email);
+      if (address == null || address.isEmpty) {
+        // Offer in-app activation flow via embedded webview + polling
+        final activated = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => SmartWalletActivationScreen(email: auth.email),
+          ),
+        );
+        if (activated == true) {
+          address = await smart.getWalletAddressByEmail(auth.email);
+        }
+      }
+      if (address == null || address.isEmpty) {
+        throw Exception('No Smart Wallet address found for ${auth.email}.');
+      }
+
+      // For Smart Wallet, we only get payment address; stake address may be absent
+      final walletName = 'Smart Wallet (${auth.email})';
+      final success = await widget.authService.connectCardanoWalletExternal(
+        walletName,
+        address,
+        '',
+      );
+
+      if (!success) {
+        throw Exception('Failed to connect Smart Wallet');
+      }
+
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 

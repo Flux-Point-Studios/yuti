@@ -41,6 +41,8 @@ dependencies:
   local_auth: ^2.1.6
   # WebView for in-app browser
   webview_flutter: ^4.4.2
+  encrypt: ^5.0.3
+  pointycastle: ^3.7.3
 
 dev_dependencies:
   flutter_test:

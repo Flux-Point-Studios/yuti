@@ -48,6 +48,13 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="yuti" android:host="gamechanger-callback" />
             </intent-filter>
+            <!-- Smart Wallet OAuth callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="yuti" android:host="smartwallet-oauth" />
+            </intent-filter>
             <!-- Optional: Payment success deep link parity (reserved for future use) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
