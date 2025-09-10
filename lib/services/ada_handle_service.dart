@@ -67,7 +67,10 @@ class AdaHandleService {
     _lastRequestAt = DateTime.now();
 
     final future = _resolveHandleNetwork(normalized).then((result) {
-      _resolveCache[normalized] = _CacheEntry(result, DateTime.now());
+      // Only cache positive results; avoid caching null failures
+      if (result != null) {
+        _resolveCache[normalized] = _CacheEntry(result, DateTime.now());
+      }
       _inflight.remove(normalized);
       return result;
     }).catchError((e) {
@@ -103,7 +106,23 @@ class AdaHandleService {
       return null;
     }
 
-    if (resp.statusCode != 200) return null;
+    if (resp.statusCode != 200) {
+      // On web, try direct as a secondary attempt if proxy failed (may still hit CORS)
+      if (kIsWeb) {
+        try {
+          final direct = await http.get(Uri.parse('$_apiBase/handles/$normalized'), headers: headers);
+          if (direct.statusCode == 200) {
+            resp = direct;
+          } else {
+            return null;
+          }
+        } catch (_) {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
     final data = json.decode(resp.body) as Map<String, dynamic>;
     final resolved = data['resolved_addresses']?['ada'] as String?;
     if (resolved == null || resolved.isEmpty) return null;
