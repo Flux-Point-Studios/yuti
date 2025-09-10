@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../services/address_book_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/glassmorphism_container.dart';
@@ -548,6 +549,8 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     final handleController = TextEditingController(text: entry?.handle ?? '');
     final descriptionController = TextEditingController(text: entry?.description ?? '');
     final formKey = GlobalKey<FormState>();
+    Timer? _handleDebounce;
+    String _lastAutoFilledAddress = addressController.text.trim();
 
     showDialog(
       context: context,
@@ -594,6 +597,42 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   ),
                 ),
                 style: TextStyle(color: AppColors.textPrimary),
+                onChanged: (value) {
+                  // Debounce handle resolution
+                  _handleDebounce?.cancel();
+                  final trimmed = value.trim();
+                  if (trimmed.isEmpty || trimmed.length < 2) return;
+                  _handleDebounce = Timer(const Duration(milliseconds: 600), () async {
+                    try {
+                      final res = await _addressBookService.resolveIfHandle(trimmed);
+                      final addr = res['address'];
+                      if (addr != null && addr.isNotEmpty && _addressBookService.isValidCardanoAddress(addr)) {
+                        final current = addressController.text.trim();
+                        if (current.isEmpty || current == _lastAutoFilledAddress) {
+                          _lastAutoFilledAddress = addr;
+                          addressController.text = addr;
+                        }
+                      }
+                    } catch (_) {}
+                  });
+                },
+                onEditingComplete: () async {
+                  // Immediate resolve when user finishes editing
+                  _handleDebounce?.cancel();
+                  final trimmed = handleController.text.trim();
+                  if (trimmed.isEmpty) return;
+                  try {
+                    final res = await _addressBookService.resolveIfHandle(trimmed);
+                    final addr = res['address'];
+                    if (addr != null && addr.isNotEmpty && _addressBookService.isValidCardanoAddress(addr)) {
+                      final current = addressController.text.trim();
+                      if (current.isEmpty || current == _lastAutoFilledAddress) {
+                        _lastAutoFilledAddress = addr;
+                        addressController.text = addr;
+                      }
+                    }
+                  } catch (_) {}
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -648,7 +687,10 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              _handleDebounce?.cancel();
+              Navigator.pop(context);
+            },
             child: Text(
               'Cancel',
               style: TextStyle(color: AppColors.textSecondary),
@@ -657,6 +699,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
+                _handleDebounce?.cancel();
                 // Resolve handle if provided and no address entered
                 String resolvedAddress = addressController.text.trim();
                 String? savedHandle = handleController.text.trim().isEmpty ? null : handleController.text.trim();
@@ -699,14 +742,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   await _loadEntries();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        entry == null 
-                            ? 'Address or name already exists'
-                            : 'Failed to update entry',
-                      ),
-                      backgroundColor: AppColors.error,
-                    ),
+                    SnackBar(content: const Text('Name or address already exists'), backgroundColor: AppColors.error),
                   );
                 }
               }
