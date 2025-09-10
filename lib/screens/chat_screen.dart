@@ -490,6 +490,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  bool _isWelcomeMessage(ChatMessage message) {
+    return !message.isUser && message.text.startsWith("Hello! I'm Agent T, your crypto concierge");
+  }
+
   void _navigateToPricing() {
     Navigator.push(
       context,
@@ -504,44 +508,54 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       alignment: alignment,
       margin: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/agent_t_pfp.png',
-                  width: 32,
-                  height: 32,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.smart_toy,
-                      size: 20,
-                      color: AppColors.primaryBlue,
-                    );
-                  },
+          Row(
+            mainAxisAlignment:
+                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isUser) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/agent_t_pfp.png',
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.smart_toy,
+                          size: 20,
+                          color: AppColors.primaryBlue,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                  ),
+                  child: isUser
+                      ? _buildUserBubble(message)
+                      : _buildAssistantBubble(message),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
-              ),
-              child: isUser
-                  ? _buildUserBubble(message)
-                  : _buildAssistantBubble(message),
-            ),
+              if (isUser) const SizedBox(width: 8),
+            ],
           ),
-          if (isUser) const SizedBox(width: 8),
+          if (!isUser && !_isWelcomeMessage(message)) ...[
+            const SizedBox(height: 4),
+            _buildAssistantActions(message),
+          ],
         ],
       ),
     );
@@ -578,8 +592,6 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildMessageContent(message),
-          const SizedBox(height: 8),
-          _buildAssistantActions(message),
         ],
       ),
     );
