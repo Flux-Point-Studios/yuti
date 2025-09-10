@@ -8,6 +8,7 @@
     { "source": "/api/oracle/agent-per-ada", "destination": "/api/oracle/agent-per-ada" },
     { "source": "/api/blockfrost/:path*", "destination": "/api/blockfrost/:path*" },
     { "source": "/api/blockfrost-proxy", "destination": "/api/blockfrost-proxy" },
+    { "source": "/api/handle/:path*", "destination": "/api/handle/:path*" },
     { "source": "/api/stripe/checkout", "destination": "/api/stripe/checkout" },
     {
       "source": "/(.*)",
