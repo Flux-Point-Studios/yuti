@@ -551,6 +551,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     final formKey = GlobalKey<FormState>();
     Timer? _handleDebounce;
     String _lastAutoFilledAddress = addressController.text.trim();
+    final ValueNotifier<bool> _isResolvingHandle = ValueNotifier<bool>(false);
 
     showDialog(
       context: context,
@@ -595,14 +596,35 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
+                  suffixIcon: ValueListenableBuilder<bool>(
+                    valueListenable: _isResolvingHandle,
+                    builder: (context, isLoading, _) {
+                      if (!isLoading) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primaryBlue,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 style: TextStyle(color: AppColors.textPrimary),
                 onChanged: (value) {
                   // Debounce handle resolution
                   _handleDebounce?.cancel();
                   final trimmed = value.trim();
-                  if (trimmed.isEmpty || trimmed.length < 2) return;
+                  if (trimmed.isEmpty || trimmed.length < 2) {
+                    _isResolvingHandle.value = false;
+                    return;
+                  }
                   _handleDebounce = Timer(const Duration(milliseconds: 600), () async {
+                    _isResolvingHandle.value = true;
                     try {
                       final res = await _addressBookService.resolveIfHandle(trimmed);
                       final addr = res['address'];
@@ -614,6 +636,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                         }
                       }
                     } catch (_) {}
+                    _isResolvingHandle.value = false;
                   });
                 },
                 onEditingComplete: () async {
@@ -621,6 +644,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   _handleDebounce?.cancel();
                   final trimmed = handleController.text.trim();
                   if (trimmed.isEmpty) return;
+                  _isResolvingHandle.value = true;
                   try {
                     final res = await _addressBookService.resolveIfHandle(trimmed);
                     final addr = res['address'];
@@ -632,6 +656,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                       }
                     }
                   } catch (_) {}
+                  _isResolvingHandle.value = false;
                 },
               ),
               const SizedBox(height: 16),
@@ -689,6 +714,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
           TextButton(
             onPressed: () {
               _handleDebounce?.cancel();
+              _isResolvingHandle.value = false;
               Navigator.pop(context);
             },
             child: Text(
@@ -700,6 +726,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 _handleDebounce?.cancel();
+                _isResolvingHandle.value = false;
                 // Resolve handle if provided and no address entered
                 String resolvedAddress = addressController.text.trim();
                 String? savedHandle = handleController.text.trim().isEmpty ? null : handleController.text.trim();
