@@ -735,14 +735,15 @@ class _PricingScreenState extends State<PricingScreen>
     final cardano = _authService.cardanoWalletService;
     bool proceed = true;
     if (!cardano.isConnected) {
-      // Show dialog to connect Cardano wallet
+      // Show dialog to connect Smart Wallet
+      print('🔍 DEBUG: Pricing -> opening Smart Wallet dialog for premium verification');
       final walletConnected = await _showCardanoWalletDialog();
       proceed = walletConnected == true;
     }
 
     if (!proceed) return;
 
-    // Check if user has premium access via Cardano wallet
+    // Check if user has premium access via Smart Wallet
     final hasPremiumAccess = await _authService.refreshCardanoPremiumAccess();
 
     if (hasPremiumAccess) {
@@ -752,7 +753,7 @@ class _PricingScreenState extends State<PricingScreen>
       await Future.delayed(const Duration(seconds: 1));
       _navigateToChat();
     } else {
-      _showError('Your wallet does not contain the required assets for premium access.');
+      _showError('Your Smart Wallet does not meet premium requirements.');
     }
   }
 

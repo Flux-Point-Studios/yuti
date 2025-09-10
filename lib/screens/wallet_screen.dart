@@ -163,7 +163,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Connect a Cardano wallet to manage your assets',
+                'Sign in with Google to connect your Smart Wallet',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,
@@ -173,13 +173,13 @@ class _WalletScreenState extends State<WalletScreen> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // Go back to connect wallet
+                  Navigator.of(context).pop(); // Close and open Smart Wallet dialog upstream
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Connect Wallet'),
+                child: const Text('Connect Smart Wallet'),
               ),
             ],
           ),

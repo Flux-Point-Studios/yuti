@@ -44,7 +44,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   bool _showQrCode = false;
   String? _errorMessage;
   String? _qrCodeUrl;
-  ConnectionMode _connectionMode = ConnectionMode.mnemonic;
+  ConnectionMode _connectionMode = ConnectionMode.smartWallet;
   
   // Security state for mnemonic display
   bool _hasAcknowledgedSecurityWarning = false;
@@ -198,12 +198,8 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             _buildWalletNameField(),
             const SizedBox(height: 16),
             _buildMnemonicField(),
-          ] else if (_connectionMode == ConnectionMode.gameChanger) ...[
-            _buildGameChangerSection(),
           ] else if (_connectionMode == ConnectionMode.smartWallet) ...[
             _buildSmartWalletSection(),
-          ] else if (_connectionMode == ConnectionMode.createNew) ...[
-            _buildCreateNewWalletSection(),
           ],
           const SizedBox(height: 16),
           _buildPremiumAccessInfo(),
@@ -342,19 +338,9 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           ),
         ),
         const SizedBox(height: 12),
-        // First row with GameChanger and Recovery Phrase
+        // Only Smart Wallet and Import
         Row(
           children: [
-            Expanded(
-              child: _buildModeOption(
-                mode: ConnectionMode.gameChanger,
-                title: 'GameChanger Wallet',
-                subtitle: 'Secure connection (Recommended)',
-                icon: Icons.link,
-                isSelected: _connectionMode == ConnectionMode.gameChanger,
-              ),
-            ),
-            const SizedBox(width: 12),
             Expanded(
               child: _buildModeOption(
                 mode: ConnectionMode.smartWallet,
@@ -364,29 +350,14 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                 isSelected: _connectionMode == ConnectionMode.smartWallet,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Second row with Recovery Phrase and Create New
-        Row(
-          children: [
-            Expanded(
-              child: _buildModeOption(
-                mode: ConnectionMode.mnemonic,
-                title: 'Recovery Phrase',
-                subtitle: 'Import with 12-24 words',
-                icon: Icons.vpn_key,
-                isSelected: _connectionMode == ConnectionMode.mnemonic,
-              ),
-            ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildModeOption(
-                mode: ConnectionMode.createNew,
-                title: 'Create New Wallet',
-                subtitle: 'Generate a new wallet',
-                icon: Icons.add_circle_outline,
-                isSelected: _connectionMode == ConnectionMode.createNew,
+                mode: ConnectionMode.mnemonic,
+                title: 'Import / Restore',
+                subtitle: 'Use 12-24 word phrase',
+                icon: Icons.vpn_key,
+                isSelected: _connectionMode == ConnectionMode.mnemonic,
               ),
             ),
           ],
@@ -460,136 +431,8 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
   }
 
   Widget _buildGameChangerSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.primaryBlue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.security,
-                    color: AppColors.primaryBlue,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Secure GameChanger Connection',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Connect securely using GameChanger wallet without entering your recovery phrase. Your private keys never leave your wallet.',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 8),
-              
-              // iOS Safari requirement tip
-              if (!kIsWeb) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info, color: Colors.blue, size: 14),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'iOS Tip: Set Safari as default browser for best results',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              print(
-                                  '🔍 DEBUG: GameChanger Connect button pressed');
-                              // Test different environments if needed
-                              // GameChangerService.setEnvironment('beta'); // Try this if connection fails
-                              _connectWithGameChanger();
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: const Icon(Icons.link, size: 18),
-                      label: const Text(
-                        'Connect Wallet',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _showQrCodeForGameChanger,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white.withOpacity(0.5),
-                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    icon: Icon(Icons.qr_code,
-                        size: 18, color: Colors.white.withOpacity(0.5)),
-                    label: Text(
-                      'QR Code',
-                      style: TextStyle(
-                          fontSize: 14, color: Colors.white.withOpacity(0.5)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        if (_showQrCode && _qrCodeUrl != null) ...[
-          const SizedBox(height: 16),
-          _buildQrCodeSection(),
-        ],
-      ],
-    );
+    // Hidden in Smart Wallet-only UI
+    return const SizedBox.shrink();
   }
 
   Widget _buildQrCodeSection() {
@@ -1211,7 +1054,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Create or access a seedless wallet secured by your Google account. Transactions can be sponsored and support Babel fees.',
+                'Sign in with Google to access your seedless Smart Wallet. If it’s new, we’ll guide you through activation.',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.8),
                   fontSize: 12,
@@ -1231,9 +1074,9 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                     ),
                   ),
                   icon: const Icon(Icons.login, size: 18),
-                  label: const Text(
-                    'Continue with Google',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  label: Text(
+                    _isLoading ? 'Connecting…' : 'Continue with Google',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -1252,13 +1095,24 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     });
 
     try {
+      print('🔍 DEBUG: Starting Smart Wallet Google flow…');
       final smart = SmartWalletService();
       final auth = await smart.continueWithGoogle();
+      print('🔍 DEBUG: Google login ok for ${auth.email}');
 
-      // Resolve current user's smart wallet address by email
-      String? address = await smart.getWalletAddressByEmail(auth.email);
+      // Attempt in-app activation path first
+      var address = await smart.getWalletAddressByEmail(auth.email);
       if (address == null || address.isEmpty) {
-        // Offer in-app activation flow via embedded webview + polling
+        print('🔍 DEBUG: No address yet; attempting in-app activation…');
+        _showToast('Activating Smart Wallet… this can take a few minutes');
+        final activated = await smart.activateSeedlessWallet(idToken: auth.idToken, email: auth.email);
+        if (activated != null && activated.isNotEmpty) {
+          address = activated;
+        }
+      }
+
+      if (address == null || address.isEmpty) {
+        print('🔍 DEBUG: In-app activation not complete; opening embedded activation page');
         final activated = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => SmartWalletActivationScreen(email: auth.email),
@@ -1268,11 +1122,11 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           address = await smart.getWalletAddressByEmail(auth.email);
         }
       }
+
       if (address == null || address.isEmpty) {
-        throw Exception('No Smart Wallet address found for ${auth.email}.');
+        throw Exception('Smart Wallet not activated yet. Please finish activation.');
       }
 
-      // For Smart Wallet, we only get payment address; stake address may be absent
       final walletName = 'Smart Wallet (${auth.email})';
       final success = await widget.authService.connectCardanoWalletExternal(
         walletName,
@@ -1284,11 +1138,14 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         throw Exception('Failed to connect Smart Wallet');
       }
 
+      _showToast('Smart Wallet connected');
       Navigator.of(context).pop(true);
     } catch (e) {
+      print('🔍 DEBUG: Smart Wallet connection error: $e');
       setState(() {
         _errorMessage = e.toString();
       });
+      _showToast('Smart Wallet error: ${e.toString()}');
     } finally {
       setState(() {
         _isLoading = false;
@@ -1635,5 +1492,15 @@ After connecting, you can switch back to Chrome as default.''';
         .replaceFirst(', null, null)', '');
 
     return 'Connection failed: $cleanedError';
+  }
+
+  void _showToast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.primaryBlue,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
  }

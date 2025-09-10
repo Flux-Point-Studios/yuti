@@ -7,6 +7,7 @@ import '../services/wallet_auth_service.dart';
 import '../widgets/glassmorphism_container.dart';
 import 'chat_screen.dart';
 import 'pricing_screen.dart';
+import '../widgets/cardano_wallet_dialog.dart'; // Added import for CardanoWalletDialog
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -420,7 +421,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 24),
         
-        // Wallet login button
+        // Smart Wallet login button
         GlassmorphismContainer(
           glassType: GlassType.light,
           padding: EdgeInsets.zero,
@@ -437,7 +438,7 @@ class _LoginScreenState extends State<LoginScreen>
             ],
           ),
           child: InkWell(
-            onTap: _isLoading ? null : _handleWalletLogin,
+            onTap: _isLoading ? null : _handleSmartWalletLogin,
             borderRadius: BorderRadius.circular(16),
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -445,13 +446,13 @@ class _LoginScreenState extends State<LoginScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.account_balance_wallet,
+                    Icons.lock_open,
                     color: Colors.white.withOpacity(0.9),
                     size: 24,
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'Connect with GameChanger Wallet',
+                    'Continue with Smart Wallet',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.9),
                       fontSize: 16,
@@ -466,9 +467,9 @@ class _LoginScreenState extends State<LoginScreen>
         
         const SizedBox(height: 12),
         
-        // Wallet login description
+        // Smart Wallet description
         Text(
-          'Login or create account using your Cardano wallet',
+          'Sign in using your Google-backed Smart Wallet',
           style: TextStyle(
             color: Colors.white.withOpacity(0.6),
             fontSize: 12,
@@ -687,5 +688,30 @@ class _LoginScreenState extends State<LoginScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
+  }
+
+  Future<void> _handleSmartWalletLogin() async {
+    setState(() => _isLoading = true);
+    try {
+      // Open Smart Wallet dialog through pricing-like path (reusing dialog)
+      print('🔍 DEBUG: Login -> opening Smart Wallet dialog');
+      final connected = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => CardanoWalletDialog(authService: _authService),
+      );
+
+      if (connected == true) {
+        _showSuccess('Smart Wallet connected!');
+        await Future.delayed(const Duration(milliseconds: 600));
+        _navigateToChat();
+      } else {
+        _showError('Smart Wallet connection cancelled');
+      }
+    } catch (e) {
+      _showError('Smart Wallet error: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 }

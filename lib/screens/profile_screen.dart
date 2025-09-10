@@ -434,15 +434,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isWalletLoading = true);
 
     try {
-      // Use the same dialog approach as pricing page to preserve context
+      print('🔍 DEBUG: ProfileScreen _linkWallet -> opening Smart Wallet dialog');
       final walletConnected = await _showCardanoWalletDialog();
 
       if (walletConnected == true) {
-        _showSuccess('Wallet linked successfully!');
+        _showSuccess('Smart Wallet connected successfully!');
         await _loadUserData(); // Refresh user data
       }
     } catch (e) {
-      _showError('Failed to link wallet. Please try again.');
+      _showError('Failed to connect Smart Wallet. Please try again.');
     } finally {
       setState(() => _isWalletLoading = false);
     }
@@ -1206,7 +1206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No Wallet Connected',
+                  'No Smart Wallet Connected',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 16,
@@ -1215,7 +1215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Connect your wallet to unlock premium features and verify ownership of premium assets.',
+                  'Sign in with Google to unlock Smart Wallet features and premium access verification.',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 14,
@@ -1250,7 +1250,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             Icon(Icons.account_balance_wallet, size: 18),
                             const SizedBox(width: 8),
-                            Text('Connect Wallet'),
+                            Text('Connect Smart Wallet'),
                           ],
                         ),
                   ),
