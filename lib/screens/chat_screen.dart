@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:markdown/markdown.dart' as md;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/chat_message.dart';
 import '../models/chat_session.dart';
@@ -574,6 +578,8 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildMessageContent(message),
+          const SizedBox(height: 8),
+          _buildAssistantActions(message),
         ],
       ),
     );
@@ -623,16 +629,15 @@ class _ChatScreenState extends State<ChatScreen> {
               color: AppColors.primaryBlue,
               fontSize: 16,
             ),
+            a: const TextStyle(
+              color: AppColors.primaryBlue,
+              decoration: TextDecoration.underline,
+            ),
           ),
+          extensionSet: md.ExtensionSet.gitHubWeb,
           onTapLink: (text, href, title) {
             if (href == null || href.isEmpty) return;
-            // Open in in-app browser
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BrowserScreen(initialUrl: href),
-              ),
-            );
+            _handleLinkTap(href);
           },
         );
       case MessageType.qrCode:
@@ -647,6 +652,69 @@ class _ChatScreenState extends State<ChatScreen> {
           style: const TextStyle(color: Colors.white, fontSize: 16),
         );
     }
+  }
+
+  Widget _buildAssistantActions(ChatMessage message) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.copy, size: 18, color: AppColors.textSecondary),
+          tooltip: 'Copy',
+          onPressed: () => _copyAssistantMessage(message.text),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _copyAssistantMessage(String text) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Copied to clipboard'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    } catch (e) {
+      // Silently ignore copy failures
+    }
+  }
+
+  Future<void> _handleLinkTap(String href) async {
+    final trimmed = href.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return;
+
+    final isHttp = uri.scheme == 'http' || uri.scheme == 'https';
+    final looksLikeWeb = trimmed.startsWith('www.');
+
+    if (isHttp || looksLikeWeb) {
+      final url = isHttp ? trimmed : 'https://$trimmed';
+      if (kIsWeb) {
+        try {
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        } catch (_) {}
+      } else {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BrowserScreen(initialUrl: url),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final can = await canLaunchUrl(Uri.parse(trimmed));
+      if (can) {
+        await launchUrl(Uri.parse(trimmed), mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
   }
 
   Widget _buildQrCodeMessage(ChatMessage message) {
