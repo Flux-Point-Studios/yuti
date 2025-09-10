@@ -6,6 +6,7 @@ import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
 import '../widgets/glassmorphism_container.dart';
 import 'pricing_screen.dart';
+import 'chat_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -616,14 +617,31 @@ class _SignupScreenState extends State<SignupScreen>
       );
 
       _showSuccess('Account created successfully!');
-
-      // Navigate to pricing for new FREE users
-      _navigateToPricing();
+      // Temporarily bypass email confirmation: go straight to the app
+      _navigateToChat();
     } catch (e) {
       _showError('An error occurred during signup: ${e.toString()}');
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _navigateToChat() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const ChatScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          );
+        },
+      ),
+    );
   }
 
   void _navigateToPricing() {
