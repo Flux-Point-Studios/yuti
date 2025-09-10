@@ -100,6 +100,12 @@ class AdaHandleService {
       resp = await http.get(Uri.parse('$_apiBase/handles/$normalized'), headers: headers);
     }
 
+    // Debug diagnostics (safe for production; short)
+    try {
+      // ignore: avoid_print
+      print('🔍 HANDLE DEBUG: status=${resp.statusCode} ct=${resp.headers['content-type']} len=${resp.body.length}');
+    } catch (_) {}
+
     if (resp.statusCode == 429) {
       // Back off briefly and return null to avoid hammering
       await Future.delayed(const Duration(seconds: 1));
@@ -123,8 +129,33 @@ class AdaHandleService {
         return null;
       }
     }
-    final data = json.decode(resp.body) as Map<String, dynamic>;
-    final resolved = data['resolved_addresses']?['ada'] as String?;
+    Map<String, dynamic> data;
+    try {
+      data = json.decode(resp.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+
+    String? resolved;
+    final ra = data['resolved_addresses'];
+    if (ra is Map) {
+      final adaVal = ra['ada'];
+      if (adaVal is String) {
+        resolved = adaVal;
+      } else if (adaVal is Map) {
+        // Some variants nest address
+        resolved = (adaVal['address'] as String?) ?? (adaVal['mainnet'] as String?);
+      }
+    }
+    // Other possible shapes
+    resolved ??= data['address'] as String?;
+    final addrs = data['addresses'] ?? data['addr'] ?? data['ada'];
+    if (resolved == null && addrs is Map) {
+      final ada = addrs['ada'];
+      if (ada is String) resolved = ada;
+      if (ada is Map) resolved = ada['address'] as String?;
+    }
+
     if (resolved == null || resolved.isEmpty) return null;
     return AdaHandleData(
       handle: data['handle'] ?? normalized,
