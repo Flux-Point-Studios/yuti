@@ -1,5 +1,4 @@
 module.exports = async (req, res) => {
-  // CORS preflight
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -11,8 +10,6 @@ module.exports = async (req, res) => {
   try {
     const parts = Array.isArray(req.query.path) ? req.query.path : [req.query.path].filter(Boolean);
     const joined = parts.join('/');
-
-    // Preserve original query string
     const originalUrl = req.url || '';
     const qIndex = originalUrl.indexOf('?');
     const queryString = qIndex >= 0 ? originalUrl.substring(qIndex) : '';
@@ -24,14 +21,20 @@ module.exports = async (req, res) => {
       headers: { 'Accept': 'application/json' },
     });
 
-    const bodyText = await upstream.text();
+    const contentType = upstream.headers.get('content-type') || '';
+    let bodyText = await upstream.text();
+    let body;
+    try {
+      body = JSON.parse(bodyText);
+    } catch {
+      // If upstream returned HTML or invalid JSON, wrap it so client still gets JSON
+      body = { raw: bodyText };
+    }
 
-    // Pass-through status and content-type; add caching to ease rate limits
-    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json; charset=utf-8');
-    // Cache at the edge for 5 minutes; allow stale while revalidating for 10 minutes
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
 
-    res.status(upstream.status).send(bodyText);
+    res.status(upstream.status).send(JSON.stringify(body));
   } catch (err) {
     res.status(500).json({ error: 'Handle proxy failed', message: String(err) });
   }
