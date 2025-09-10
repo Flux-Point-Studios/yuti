@@ -13,6 +13,7 @@ import '../services/blockfrost_service.dart';
 import '../screens/smart_wallet_activation_screen.dart';
 import '../services/smart_wallet_service.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CardanoWalletDialog extends StatefulWidget {
   final AuthService authService;
@@ -1101,11 +1102,8 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       if (kIsWeb) {
         final url = await smart.buildGoogleAuthUrlWeb();
         _showToast('Redirecting to Google…');
-        // Redirect this window
-        // ignore: avoid_web_libraries_in_flutter
-        // Directly set window.location via platform channel replacement
-        // Use Navigator to open in-app browser fallback on Flutter Web
-        Navigator.of(context).pushNamed('/browser', arguments: {'url': url});
+        // Redirect in same tab for proper OAuth context
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         return; // Web callback will continue the flow
       }
 

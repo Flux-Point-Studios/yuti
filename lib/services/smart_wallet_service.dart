@@ -376,11 +376,10 @@ class SmartWalletService {
     final envClientId = _config.smartWalletGoogleWebClientId;
     if (envClientId.isNotEmpty) return envClientId;
 
-    // Fetch from Smart Wallet Backend
+    // Fetch from Smart Wallet Backend via serverless proxy to avoid CORS on web
     try {
-      final url = Uri.parse('${_config.smartWalletApiBase}/v0/oauth/credentials');
-      final headers = await _jsonHeaders(allowApiKey: true);
-      final resp = await http.get(url, headers: headers);
+      final url = Uri.parse('/api/zkf-oauth-credentials');
+      final resp = await http.get(url);
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         return data['client_id']?.toString();
