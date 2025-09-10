@@ -82,14 +82,16 @@ class SmartWalletService {
   }
 
   // Web OAuth helpers
-  Future<String> buildGoogleAuthUrlWeb({String? returnTo}) async {
+  Future<String> buildGoogleAuthUrlWeb({String? returnTo, bool useZkFoldRedirect = true}) async {
     final clientId = await _obtainGoogleClientId();
     if (clientId == null || clientId.isEmpty) {
       throw Exception('Missing Google OAuth client ID');
     }
     final codeVerifier = _generateCodeVerifier();
     final codeChallenge = _codeChallengeS256(codeVerifier);
-    final redirectUri = '${Uri.base.origin}/smartwallet-oauth';
+    final redirectUri = useZkFoldRedirect
+      ? 'https://wallet.zkfold.io/oauth2callback'
+      : '${Uri.base.origin}/smartwallet-oauth';
 
     // Pack code_verifier into state (base64url JSON)
     final stateObj = {
@@ -108,6 +110,7 @@ class SmartWalletService {
       'access_type': 'offline',
       'prompt': 'select_account',
       'state': state,
+      'include_granted_scopes': 'true',
     };
 
     return Uri.https('accounts.google.com', '/o/oauth2/v2/auth', params).toString();

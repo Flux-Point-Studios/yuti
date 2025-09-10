@@ -1100,11 +1100,13 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       final smart = SmartWalletService();
 
       if (kIsWeb) {
-        final url = await smart.buildGoogleAuthUrlWeb();
-        _showToast('Redirecting to Google…');
-        // Redirect in same tab for proper OAuth context
+        final url = await smart.buildGoogleAuthUrlWeb(useZkFoldRedirect: true);
+        _showToast('Redirecting to Google via zkFold…');
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        return; // Web callback will continue the flow
+        // Guidance: after completing Google on zkFold page, press this button again.
+        _showToast('After Google login completes, press Continue again to finish connection');
+        setState(() { _isLoading = false; });
+        return;
       }
 
       final auth = await smart.continueWithGoogle();
