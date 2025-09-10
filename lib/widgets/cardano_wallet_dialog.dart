@@ -7,11 +7,11 @@ import 'package:cardano_dart_types/cardano_dart_types.dart';
 import '../services/auth_service.dart';
 import '../services/gamechanger_service.dart';
 import '../screens/gamechanger_callback_screen.dart';
-import '../services/smart_wallet_service.dart';
 import '../utils/app_colors.dart';
 import '../config/app_config.dart';
 import '../services/blockfrost_service.dart';
 import '../screens/smart_wallet_activation_screen.dart';
+import '../services/smart_wallet_service.dart';
 import 'package:intl/intl.dart';
 
 class CardanoWalletDialog extends StatefulWidget {
@@ -1097,6 +1097,18 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
     try {
       print('🔍 DEBUG: Starting Smart Wallet Google flow…');
       final smart = SmartWalletService();
+
+      if (kIsWeb) {
+        final url = await smart.buildGoogleAuthUrlWeb();
+        _showToast('Redirecting to Google…');
+        // Redirect this window
+        // ignore: avoid_web_libraries_in_flutter
+        // Directly set window.location via platform channel replacement
+        // Use Navigator to open in-app browser fallback on Flutter Web
+        Navigator.of(context).pushNamed('/browser', arguments: {'url': url});
+        return; // Web callback will continue the flow
+      }
+
       final auth = await smart.continueWithGoogle();
       print('🔍 DEBUG: Google login ok for ${auth.email}');
 

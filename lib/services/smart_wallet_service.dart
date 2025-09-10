@@ -81,6 +81,73 @@ class SmartWalletService {
     return SmartWalletAuthResult(email: email, idToken: idToken);
   }
 
+  // Web OAuth helpers
+  Future<String> buildGoogleAuthUrlWeb({String? returnTo}) async {
+    final clientId = await _obtainGoogleClientId();
+    if (clientId == null || clientId.isEmpty) {
+      throw Exception('Missing Google OAuth client ID');
+    }
+    final codeVerifier = _generateCodeVerifier();
+    final codeChallenge = _codeChallengeS256(codeVerifier);
+    final redirectUri = '${Uri.base.origin}/smartwallet-oauth';
+
+    // Pack code_verifier into state (base64url JSON)
+    final stateObj = {
+      'cv': codeVerifier,
+      if (returnTo != null) 'rt': returnTo,
+    };
+    final state = _base64UrlEncode(Uint8List.fromList(utf8.encode(jsonEncode(stateObj))));
+
+    final params = {
+      'client_id': clientId,
+      'redirect_uri': redirectUri,
+      'response_type': 'code',
+      'scope': _googleScopes,
+      'code_challenge': codeChallenge,
+      'code_challenge_method': 'S256',
+      'access_type': 'offline',
+      'prompt': 'select_account',
+      'state': state,
+    };
+
+    return Uri.https('accounts.google.com', '/o/oauth2/v2/auth', params).toString();
+  }
+
+  Future<SmartWalletAuthResult> completeWebLogin({
+    required String code,
+    required String state,
+  }) async {
+    final clientId = await _obtainGoogleClientId();
+    if (clientId == null || clientId.isEmpty) {
+      throw Exception('Missing Google OAuth client ID');
+    }
+    // Decode state
+    final stateJson = utf8.decode(_base64UrlDecode(state));
+    final stateObj = jsonDecode(stateJson) as Map<String, dynamic>;
+    final codeVerifier = stateObj['cv']?.toString();
+    if (codeVerifier == null || codeVerifier.isEmpty) {
+      throw Exception('Missing code_verifier in state');
+    }
+    final redirectUri = '${Uri.base.origin}/smartwallet-oauth';
+
+    final token = await _exchangeCodeForToken(
+      code: code,
+      clientId: clientId,
+      codeVerifier: codeVerifier,
+      redirectUri: redirectUri,
+    );
+
+    final idToken = token.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('OAuth failed: missing id_token');
+    }
+    final email = _extractEmailFromIdToken(idToken);
+    if (email == null || email.isEmpty) {
+      throw Exception('OAuth failed: missing email from id_token');
+    }
+    return SmartWalletAuthResult(email: email, idToken: idToken);
+  }
+
   Future<String?> getWalletAddressByEmail(String email) async {
     final url = Uri.parse('${_config.smartWalletApiBase}/v0/wallet/address');
     final headers = await _jsonHeaders();

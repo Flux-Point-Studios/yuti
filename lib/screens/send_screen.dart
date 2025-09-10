@@ -11,6 +11,7 @@ import 'address_book_screen.dart';
 import 'qr_scanner_screen.dart';
 import '../services/gamification_service.dart';
 import '../services/smart_wallet_service.dart';
+import '../services/auth_service.dart';
 
 class SendScreen extends StatefulWidget {
   final CardanoWalletService walletService;
@@ -592,16 +593,42 @@ class _SendScreenState extends State<SendScreen> {
       // Resolve Smart Wallet email to address
       if (!AddressBookService().isValidCardanoAddress(address) && address.contains('@')) {
         try {
-          final smart = await _resolveSmartWalletAddress(address);
-          if (smart != null) {
-            address = smart;
+          final smartAddr = await _resolveSmartWalletAddress(address);
+          if (smartAddr != null) {
+            address = smartAddr;
           }
         } catch (_) {}
       }
       final amount = double.parse(_amountController.text);
       final description = _descriptionController.text.trim();
 
-      // Create transaction record
+      // Real Smart Wallet submit flow
+      final auth = AuthService();
+      final user = auth.currentUser;
+      if (user == null) throw Exception('Not signed in');
+
+      final smart = SmartWalletService();
+      final email = user.email;
+      final paymentKeyHash = smart.derivePaymentKeyHashHex(email);
+
+      // Value map: lovelace or multiasset (basic ADA only here)
+      final value = <String, int>{
+        'lovelace': (amount * 1000000).round(),
+      };
+
+      debugPrint('🔍 DEBUG: Building Smart Wallet tx to $address with $amount ADA');
+      final built = await smart.buildSendFunds(
+        email: email,
+        paymentKeyHashHex: paymentKeyHash,
+        recipientAddress: address,
+        valueMap: value,
+      );
+
+      debugPrint('🔍 DEBUG: Built txId=${built.txId}, fee=${built.txFee}');
+      final submitted = await smart.submitTransaction(txCborHex: built.txCborHex, notifyEmails: [email]);
+      debugPrint('🔍 DEBUG: Submitted txId=${submitted.txId}');
+
+      // Create transaction record for UI/history
       final transaction = Transaction(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         type: 'send',
@@ -609,37 +636,17 @@ class _SendScreenState extends State<SendScreen> {
         toAddress: address,
         amount: amount,
         asset: _selectedAsset,
-        tokenPolicyId: _selectedAsset != 'ADA' 
-            ? _availableTokens.firstWhere((t) => t['asset_name'] == _selectedAsset)['policy_id']
-            : null,
-        fee: _estimatedFee,
-        status: 'pending',
+        tokenPolicyId: null,
+        fee: double.tryParse(built.txFee) ?? _estimatedFee,
+        status: 'confirmed',
         timestamp: DateTime.now(),
         description: description.isNotEmpty ? description : null,
+        txHash: submitted.txId,
       );
 
-      // Add to transaction history
       await _transactionHistoryService.addTransaction(transaction);
-
-      // Update address book last used
       await _addressBookService.updateLastUsed(address);
 
-      // Simulate transaction submission (in real app, this would call the wallet service)
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Update transaction status
-      await _transactionHistoryService.updateTransactionStatus(
-        transaction.id,
-        'confirmed',
-        txHash: 'mock_tx_${DateTime.now().millisecondsSinceEpoch}',
-      );
-
-      // Award XP for 'Send an asset'
-      try {
-        await GamificationService().awardTask('task_first_send');
-      } catch (_) {}
-
-      // Show success and navigate back
       _showSuccessDialog();
     } catch (e) {
       setState(() {
