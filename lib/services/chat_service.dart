@@ -13,6 +13,7 @@ import 'saturn_swap_service.dart';
 import 'cardano_wallet_service.dart';
 import 'address_book_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:math' as math;
 
 enum ChatIntent {
   balance,
@@ -295,24 +296,49 @@ class ChatService {
   Future<ChatMessage> _handleBalanceQuery() async {
     try {
       final address = await _walletService.getReceiveAddress();
-      final balanceLovelace = await _blockfrostService.getAdaBalance(address);
+      final stakeAddr = _cardanoWalletService.stakeAddress;
+
+      BigInt balanceLovelace;
+      if (stakeAddr != null && stakeAddr.isNotEmpty) {
+        balanceLovelace = await _blockfrostService.getAggregatedAdaForStakeAddress(stakeAddr);
+      } else {
+        balanceLovelace = await _blockfrostService.getAdaBalance(address);
+      }
       final balanceAda = balanceLovelace.toDouble() / 1000000;
-      
-      // Get token balances
-      final assets = await _blockfrostService.getAssets(address);
-      
+
+      // Get token balances (prefer stake-aggregated)
+      final rawAssets = (stakeAddr != null && stakeAddr.isNotEmpty)
+          ? await _blockfrostService.getAggregatedAssetsForStakeAddress(stakeAddr)
+          : await _blockfrostService.getAssets(address);
+
       String response = "Your current balance is **₳${balanceAda.toStringAsFixed(2)}** "
                        "($balanceAda ADA)";
       
-      if (assets.isNotEmpty) {
-        response += "\n\nYou also have ${assets.length} other token(s):";
-        for (var asset in assets.take(5)) {
+      if (rawAssets.isNotEmpty) {
+        response += "\n\nYou also have ${rawAssets.length} other token(s):";
+        int count = 0;
+        for (var asset in rawAssets) {
+          if (count >= 5) break;
           final unit = asset['unit'] as String;
-          final quantity = asset['quantity'] as String;
-          response += "\n• $quantity of $unit";
+          final quantityStr = asset['quantity'] as String;
+          Map<String, dynamic> display = {};
+          try {
+            display = await _blockfrostService.getAssetDisplayInfo(unit);
+          } catch (_) {}
+          final name = (display['ticker'] as String?) ?? (display['name'] as String?) ?? unit;
+          final decimals = (display['decimals'] as int?) ?? 0;
+          String humanStr;
+          try {
+            final human = BigInt.parse(quantityStr).toDouble() / math.pow(10, decimals);
+            humanStr = decimals > 0 ? human.toStringAsFixed(decimals.clamp(0, 8)) : human.toStringAsFixed(0);
+          } catch (_) {
+            humanStr = quantityStr;
+          }
+          response += "\n• $humanStr $name";
+          count++;
         }
-        if (assets.length > 5) {
-          response += "\n...and ${assets.length - 5} more";
+        if (rawAssets.length > 5) {
+          response += "\n...and ${rawAssets.length - 5} more";
         }
       }
       
@@ -651,23 +677,51 @@ class ChatService {
         return null;
       }
 
-      // Resolve address
+      // Resolve address and stake
       final address = await _walletService.getReceiveAddress();
       final stakeAddr = _cardanoWalletService.stakeAddress;
 
-      // Fetch on-chain data
-      final balanceLovelace = await _blockfrostService.getAdaBalance(address);
+      // Fetch balances
+      BigInt balanceLovelace;
+      if (stakeAddr != null && stakeAddr.isNotEmpty) {
+        // Use aggregated ADA if available
+        balanceLovelace = await _blockfrostService.getAggregatedAdaForStakeAddress(stakeAddr);
+      } else {
+        balanceLovelace = await _blockfrostService.getAdaBalance(address);
+      }
       final balanceAda = balanceLovelace.toDouble() / 1000000.0;
 
-      final assets = await _blockfrostService.getAssets(address);
-      // Reduce assets to a concise summary (top 20 by quantity)
-      final summarizedAssets = List<Map<String, dynamic>>.from(assets)
-          .map((a) => {
-                'unit': a['unit'],
-                'quantity': a['quantity'],
-              })
-          .take(20)
-          .toList();
+      // Assets: prefer stake-aggregated when stake is known; otherwise address-only
+      List<Map<String, dynamic>> rawAssets;
+      if (stakeAddr != null && stakeAddr.isNotEmpty) {
+        rawAssets = await _blockfrostService.getAggregatedAssetsForStakeAddress(stakeAddr);
+      } else {
+        rawAssets = await _blockfrostService.getAssets(address);
+      }
+      // Enrich top assets with display metadata and decimals
+      final topAssets = rawAssets.take(20).toList();
+      final List<Map<String, dynamic>> summarizedAssets = [];
+      for (final asset in topAssets) {
+        final unit = asset['unit'] as String;
+        final quantityStr = asset['quantity'] as String;
+        Map<String, dynamic> display = {};
+        try {
+          display = await _blockfrostService.getAssetDisplayInfo(unit);
+        } catch (_) {}
+        final decimals = (display['decimals'] as int?) ?? 0;
+        double human = 0.0;
+        try {
+          human = BigInt.parse(quantityStr).toDouble() / math.pow(10, decimals);
+        } catch (_) {}
+        summarizedAssets.add({
+          'unit': unit,
+          'quantity': quantityStr,
+          'name': display['name'],
+          'ticker': display['ticker'],
+          'decimals': decimals,
+          'human_readable': human.toStringAsFixed(decimals.clamp(0, 8)),
+        });
+      }
 
       final txs = await _blockfrostService.getTransactions(address, page: 1);
       final summarizedTxs = txs

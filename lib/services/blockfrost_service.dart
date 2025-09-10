@@ -81,6 +81,38 @@ class BlockfrostService {
     }
   }
 
+  // Get aggregated ADA balance for a stake address (in lovelace)
+  Future<BigInt> getAggregatedAdaForStakeAddress(String stakeAddress) async {
+    try {
+      Uri url;
+      Map<String, String> headers = {};
+      try {
+        headers = await _getHeaders();
+        url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress');
+      } catch (_) {
+        if (!kIsWeb) rethrow;
+        url = Uri.parse('/api/blockfrost/accounts/$stakeAddress');
+      }
+      var response = await http.get(url, headers: headers);
+      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress'));
+        response = await http.get(alt);
+      }
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final controlled = (data['controlled_amount'] ?? data['controlled'] ?? '0').toString();
+        return BigInt.tryParse(controlled) ?? BigInt.zero;
+      } else if (response.statusCode == 404) {
+        return BigInt.zero;
+      } else {
+        throw Exception('Failed to fetch aggregated ADA: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching aggregated ADA: $e');
+    }
+  }
+
   // Get all assets (tokens) for an address
   Future<List<Map<String, dynamic>>> getAssets(String address) async {
     try {
@@ -202,6 +234,53 @@ class BlockfrostService {
     } catch (e) {
       throw Exception('Error fetching asset metadata: $e');
     }
+  }
+
+  // Helper: attempt to decode a hex string to ASCII; return null if invalid
+  String? _tryDecodeHexToAscii(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    final cleaned = hex.trim();
+    if (cleaned.length % 2 != 0) return null;
+    try {
+      final bytes = <int>[];
+      for (int i = 0; i < cleaned.length; i += 2) {
+        bytes.add(int.parse(cleaned.substring(i, i + 2), radix: 16));
+      }
+      return String.fromCharCodes(bytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Get display info (name, ticker, decimals) for an asset unit
+  Future<Map<String, dynamic>> getAssetDisplayInfo(String unit) async {
+    final meta = await getAssetMetadata(unit);
+    final policyId = meta['policy_id'];
+    final assetHex = meta['asset_name'];
+    final fingerprint = meta['fingerprint'];
+    final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
+    final registry = (meta['metadata'] ?? {}) as Map<String, dynamic>;
+
+    int? decimals;
+    final decVal = registry['decimals'] ?? onchain['decimals'];
+    if (decVal is int) {
+      decimals = decVal;
+    } else if (decVal is String) {
+      decimals = int.tryParse(decVal);
+    }
+
+    final nameCandidate = registry['name'] ?? onchain['name'] ?? _tryDecodeHexToAscii(assetHex);
+    final tickerCandidate = registry['ticker'] ?? onchain['ticker'];
+
+    return {
+      'unit': unit,
+      'policy_id': policyId,
+      'asset_name': assetHex,
+      'name': nameCandidate?.toString(),
+      'ticker': tickerCandidate?.toString(),
+      'decimals': decimals,
+      'fingerprint': fingerprint,
+    };
   }
 
   // Submit transaction
