@@ -82,7 +82,7 @@ class SmartWalletService {
   }
 
   // Web OAuth helpers
-  Future<String> buildGoogleAuthUrlWeb({String? returnTo, bool useZkFoldRedirect = true}) async {
+  Future<String> buildGoogleAuthUrlWeb({String? returnTo, bool useZkFoldRedirect = false}) async {
     final clientId = await _obtainGoogleClientId();
     if (clientId == null || clientId.isEmpty) {
       throw Exception('Missing Google OAuth client ID');
