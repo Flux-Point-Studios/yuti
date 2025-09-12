@@ -375,9 +375,18 @@ class SmartWalletService {
   // INTERNALS
 
   Future<String?> _obtainGoogleClientId() async {
-    // Prefer environment override
+    // Prefer environment override or serverless exposure
     final envClientId = _config.smartWalletGoogleWebClientId;
     if (envClientId.isNotEmpty) return envClientId;
+    try {
+      final resp = await http.get(Uri.parse('/api/google-oauth-client'));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final cid = data['client_id']?.toString() ?? '';
+        if (cid.isNotEmpty) return cid;
+      }
+    } catch (_) {}
+
 
     // Fetch from Smart Wallet Backend via serverless proxy to avoid CORS on web
     try {
