@@ -4,6 +4,7 @@ import '../services/smart_wallet_service.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase/supabase.dart' show OAuthProvider; // for OAuthProvider enum
 
 class SmartWalletWebCallbackScreen extends StatefulWidget {
   const SmartWalletWebCallbackScreen({Key? key}) : super(key: key);
@@ -55,23 +56,26 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
     final current = Uri.base;
     final code = current.queryParameters['code'];
     final state = current.queryParameters['state'];
+    debugPrint('🧭 SW OAuth: callback params received state=${state != null ? state.substring(0, 8) : 'null'} codeLen=${code?.length ?? 0}');
     setState(() => _status = 'Processing Smart Wallet login…');
     try {
       if (code == null || state == null) {
         throw Exception('Missing OAuth parameters');
       }
       final auth = await _smart.completeWebLogin(code: code, state: state);
+      debugPrint('🪪 SW OAuth: id_token len=${auth.idToken.length} email=${auth.email}');
 
       // Create real Supabase Auth session from Google id_token
       setState(() => _status = 'Creating session…');
       final res = await SupabaseService.client.auth.signInWithIdToken(
-        provider: Provider.google,
+        provider: OAuthProvider.google,
         idToken: auth.idToken,
       );
       final supaUser = res.user ?? SupabaseService.client.auth.currentUser;
       if (supaUser == null) {
         throw Exception('Failed to create Supabase session');
       }
+      debugPrint('🔐 SW Session: userId=${supaUser.id} email=${auth.email}');
 
       // Ensure profile in users table
       await _ensureUserProfile(supaUser.id, auth.email);
@@ -86,6 +90,7 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
       if (address == null || address.isNotEmpty == false) {
         throw Exception('Activation required - please try again');
       }
+      debugPrint('🔗 SW Wallet: address=${address.length > 16 ? address.substring(0,16) + '…' : address}');
       final success = await _auth.connectCardanoWalletExternal('Smart Wallet (${auth.email})', address, '');
       if (!success) throw Exception('Could not connect Smart Wallet');
       if (!mounted) return;
@@ -94,6 +99,7 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
       Navigator.pushReplacementNamed(context, '/profile');
     } catch (e) {
       if (!mounted) return;
+      debugPrint('❌ SW OAuth Error: $e');
       setState(() => _status = 'Smart Wallet error: $e');
     }
   }
