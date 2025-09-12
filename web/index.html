@@ -61,7 +61,7 @@
   <meta name="twitter:image" content="/icons/bluelight-512.png?v=3">
 
   <script>
-    // Move OAuth params from ?query to #fragment on callback to avoid third-party auto-parsing
+    // Capture OAuth params early and store globally so Flutter can read them
     (function() {
       if (window.location && window.location.pathname === '/smartwallet-oauth') {
         var qs = new URLSearchParams(window.location.search);
@@ -69,12 +69,12 @@
         var state = qs.get('state');
         if (code && state) {
           try {
-            var fragObj = { code: code, state: state };
-            var frag = '#sw_oauth=' + encodeURIComponent(JSON.stringify(fragObj));
-            history.replaceState({}, document.title, window.location.pathname + frag);
-            console.log('SW OAuth: moved code/state to fragment');
+            window.__SW_OAUTH__ = { code: code, state: state };
+            // Clean URL to path only to avoid fragment/query interference
+            history.replaceState({}, document.title, window.location.pathname);
+            console.log('SW OAuth: stored code/state globally and cleaned URL');
           } catch (e) {
-            console.log('SW OAuth: failed to move code/state to fragment', e);
+            console.log('SW OAuth: failed to store globals', e);
           }
         }
       }

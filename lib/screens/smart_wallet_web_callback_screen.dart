@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:supabase/supabase.dart' show OAuthProvider; // for OAuthProvider enum
 import 'dart:convert';
+import 'dart:js_util' as js_util;
 
 class SmartWalletWebCallbackScreen extends StatefulWidget {
   const SmartWalletWebCallbackScreen({Key? key}) : super(key: key);
@@ -78,6 +79,25 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
         print('❌ SW OAuth: fragment parse error: $e');
       }
     }
+
+    // Fallback: read from global window.__SW_OAUTH__ set in index.html
+    if (code == null || state == null) {
+      try {
+        final obj = js_util.getProperty(js_util.globalThis, '__SW_OAUTH__');
+        if (obj != null) {
+          final c = js_util.getProperty(obj, 'code');
+          final s = js_util.getProperty(obj, 'state');
+          if (c != null && s != null) {
+            code = c.toString();
+            state = s.toString();
+            print('🔍 SW OAuth: recovered params from window.__SW_OAUTH__');
+          }
+        }
+      } catch (e) {
+        print('❌ SW OAuth: window.__SW_OAUTH__ read error: $e');
+      }
+    }
+
     return {
       if (code != null) 'code': code,
       if (state != null) 'state': state,
