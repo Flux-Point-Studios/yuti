@@ -15,6 +15,7 @@ import 'utils/app_colors.dart';
 import 'config/secure_config.dart';
 import 'screens/payment_callback_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'screens/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -244,6 +245,7 @@ class MyApp extends StatelessWidget {
           '/smartwallet-oauth': (context) => const SmartWalletWebCallbackScreen(),
           '/payment-success': (context) => const PaymentCallbackScreen(),
           '/browser': (context) => const BrowserScreen(),
+          '/profile': (context) => const ProfileScreen(),
         },
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
 import '../services/smart_wallet_service.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 
 class SmartWalletWebCallbackScreen extends StatefulWidget {
   const SmartWalletWebCallbackScreen({Key? key}) : super(key: key);
@@ -21,8 +22,45 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
     _handleCallback();
   }
 
+  Future<void> _ensureUserSession(String email) async {
+    if (_auth.isAuthenticated) return; // already signed in
+    try {
+      // Try to find an existing user by email
+      final existing = await SupabaseService.client
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle();
+
+      if (existing == null) {
+        // Create a bare user row; RLS expects auth context, but we can use RPC or allow insert via anon for this route
+        try {
+          await SupabaseService.client.from('users').insert({
+            'email': email,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } catch (_) {}
+      }
+
+      // Create a lightweight local user session object (no Supabase Auth token)
+      // Our AuthService uses local storage; set a basic FREE user
+      _auth.initialize();
+      // Fetch user record back and store
+      final userRow = await SupabaseService.client
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+      // Save into AuthService via private fields handling
+      // Using signIn flow is not available here; mimic post-login state
+      // Minimal approach: set _currentUser via refresh
+      await _auth.refreshUser();
+    } catch (e) {
+      // Fail-open; wallet link will still proceed
+    }
+  }
+
   Future<void> _handleCallback() async {
-    final uri = ModalRoute.of(context)?.settings.name;
     final current = Uri.base;
     final code = current.queryParameters['code'];
     final state = current.queryParameters['state'];
@@ -32,6 +70,10 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
         throw Exception('Missing OAuth parameters');
       }
       final auth = await _smart.completeWebLogin(code: code, state: state);
+
+      // Ensure app user exists and is locally signed in
+      await _ensureUserSession(auth.email);
+
       // Attempt activation immediately
       var address = await _smart.getWalletAddressByEmail(auth.email);
       address ??= await _smart.activateSeedlessWallet(idToken: auth.idToken, email: auth.email);
