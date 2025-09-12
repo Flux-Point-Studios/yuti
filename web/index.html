@@ -92,6 +92,8 @@
             if (window.sessionStorage && window.sessionStorage.setItem) {
               window.sessionStorage.setItem('SW_OAUTH', JSON.stringify(stored));
             }
+            // Clean URL to path-only to prevent any auto OAuth handlers from triggering
+            history.replaceState({}, document.title, window.location.pathname);
           } catch (e) {}
         }
       }
