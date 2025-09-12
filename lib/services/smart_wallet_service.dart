@@ -129,7 +129,7 @@ class SmartWalletService {
       final stateJson = utf8.decode(_base64UrlDecode(state));
       final stateObj = jsonDecode(stateJson) as Map<String, dynamic>;
       final codeVerifier = stateObj['cv']?.toString();
-      debugPrint('🧩 SW OAuth: decoded state ok; cvLen=${codeVerifier?.length ?? 0}');
+      print('🧩 SW OAuth: decoded state ok; cvLen=${codeVerifier?.length ?? 0}');
       if (codeVerifier == null || codeVerifier.isEmpty) {
         throw Exception('Missing code_verifier in state');
       }
@@ -141,7 +141,7 @@ class SmartWalletService {
         codeVerifier: codeVerifier,
         redirectUri: redirectUri,
       );
-      debugPrint('🔄 SW OAuth: token exchanged; idTokenLen=${token.idToken?.length ?? 0}');
+      print('🔄 SW OAuth: token exchanged; idTokenLen=${token.idToken?.length ?? 0}');
 
       final idToken = token.idToken;
       if (idToken == null || idToken.isEmpty) {
@@ -153,7 +153,7 @@ class SmartWalletService {
       }
       return SmartWalletAuthResult(email: email, idToken: idToken);
     } catch (e) {
-      debugPrint('❌ SW OAuth state/token error: $e');
+      print('❌ SW OAuth state/token error: $e');
       rethrow;
     }
   }
