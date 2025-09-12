@@ -59,6 +59,27 @@
   <meta name="twitter:title" content="Yuti - Natural Language Crypto Hub">
   <meta name="twitter:description" content="Your intelligent crypto companion. Natural language interface for blockchain, DeFi, trading, and Web3 services.">
   <meta name="twitter:image" content="/icons/bluelight-512.png?v=3">
+
+  <script>
+    // Move OAuth params from ?query to #fragment on callback to avoid third-party auto-parsing
+    (function() {
+      if (window.location && window.location.pathname === '/smartwallet-oauth') {
+        var qs = new URLSearchParams(window.location.search);
+        var code = qs.get('code');
+        var state = qs.get('state');
+        if (code && state) {
+          try {
+            var fragObj = { code: code, state: state };
+            var frag = '#sw_oauth=' + encodeURIComponent(JSON.stringify(fragObj));
+            history.replaceState({}, document.title, window.location.pathname + frag);
+            console.log('SW OAuth: moved code/state to fragment');
+          } catch (e) {
+            console.log('SW OAuth: failed to move code/state to fragment', e);
+          }
+        }
+      }
+    })();
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
