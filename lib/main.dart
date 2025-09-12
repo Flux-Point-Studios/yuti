@@ -16,9 +16,15 @@ import 'config/secure_config.dart';
 import 'screens/payment_callback_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'screens/profile_screen.dart';
+import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Global error logging
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+  };
 
   // Initialize Supabase
   await SupabaseService.initialize();
@@ -42,7 +48,15 @@ void main() async {
     ),
   );
 
-  runApp(const MyApp());
+  runZonedGuarded(() {
+    runApp(const MyApp());
+  }, (Object error, StackTrace stack) {
+    // Ensure errors in async zones are surfaced
+    // Avoid leaking sensitive data; just log the type and message
+    // Stack trace helps us pinpoint the origin in release builds
+    // ignore: avoid_print
+    print('Global error: $error\n$stack');
+  });
 }
 
 /// Initialize API keys for all platforms since .env files aren't supported in mobile
