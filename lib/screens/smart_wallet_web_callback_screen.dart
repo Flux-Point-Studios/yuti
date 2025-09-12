@@ -3,6 +3,7 @@ import '../utils/app_colors.dart';
 import '../services/smart_wallet_service.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SmartWalletWebCallbackScreen extends StatefulWidget {
   const SmartWalletWebCallbackScreen({Key? key}) : super(key: key);
@@ -22,42 +23,32 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
     _handleCallback();
   }
 
-  Future<void> _ensureUserSession(String email) async {
-    if (_auth.isAuthenticated) return; // already signed in
+  Future<void> _ensureUserProfile(String userId, String email) async {
     try {
-      // Try to find an existing user by email
-      final existing = await SupabaseService.client
-          .from('users')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
-
-      if (existing == null) {
-        // Create a bare user row; RLS expects auth context, but we can use RPC or allow insert via anon for this route
-        try {
-          await SupabaseService.client.from('users').insert({
-            'email': email,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        } catch (_) {}
+      // Try RPC first (bypasses RLS)
+      try {
+        await SupabaseService.client.rpc('create_user_profile', params: {
+          'user_id': userId,
+          'user_email': email,
+        });
+      } catch (_) {
+        // Fallback: check if exists, else insert (may be blocked by RLS in prod)
+        final exists = await SupabaseService.client
+            .from('users')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+        if (exists == null) {
+          try {
+            await SupabaseService.client.from('users').insert({
+              'id': userId,
+              'email': email,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          } catch (_) {}
+        }
       }
-
-      // Create a lightweight local user session object (no Supabase Auth token)
-      // Our AuthService uses local storage; set a basic FREE user
-      _auth.initialize();
-      // Fetch user record back and store
-      final userRow = await SupabaseService.client
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .single();
-      // Save into AuthService via private fields handling
-      // Using signIn flow is not available here; mimic post-login state
-      // Minimal approach: set _currentUser via refresh
-      await _auth.refreshUser();
-    } catch (e) {
-      // Fail-open; wallet link will still proceed
-    }
+    } catch (_) {}
   }
 
   Future<void> _handleCallback() async {
@@ -71,13 +62,28 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
       }
       final auth = await _smart.completeWebLogin(code: code, state: state);
 
-      // Ensure app user exists and is locally signed in
-      await _ensureUserSession(auth.email);
+      // Create real Supabase Auth session from Google id_token
+      setState(() => _status = 'Creating session…');
+      final res = await SupabaseService.client.auth.signInWithIdToken(
+        provider: Provider.google,
+        idToken: auth.idToken,
+      );
+      final supaUser = res.user ?? SupabaseService.client.auth.currentUser;
+      if (supaUser == null) {
+        throw Exception('Failed to create Supabase session');
+      }
+
+      // Ensure profile in users table
+      await _ensureUserProfile(supaUser.id, auth.email);
+
+      // Refresh local AuthService so _currentUser is populated
+      await _auth.refreshUser();
 
       // Attempt activation immediately
+      setState(() => _status = 'Linking Smart Wallet…');
       var address = await _smart.getWalletAddressByEmail(auth.email);
       address ??= await _smart.activateSeedlessWallet(idToken: auth.idToken, email: auth.email);
-      if (address == null || address.isEmpty) {
+      if (address == null || address.isNotEmpty == false) {
         throw Exception('Activation required - please try again');
       }
       final success = await _auth.connectCardanoWalletExternal('Smart Wallet (${auth.email})', address, '');
