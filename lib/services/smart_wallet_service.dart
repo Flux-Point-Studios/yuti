@@ -414,6 +414,31 @@ class SmartWalletService {
     required String codeVerifier,
     required String redirectUri,
   }) async {
+    if (kIsWeb) {
+      // Use serverless proxy to include client_secret if configured and avoid CORS
+      final url = Uri.parse('/api/google-token-exchange');
+      final resp = await http.post(url, headers: {
+        'Content-Type': 'application/json;charset=utf-8',
+      }, body: jsonEncode({
+        'code': code,
+        'client_id': clientId,
+        'code_verifier': codeVerifier,
+        'redirect_uri': redirectUri,
+      }));
+      if (resp.statusCode != 200) {
+        throw Exception('Token exchange failed (${resp.statusCode})');
+      }
+      final m = jsonDecode(resp.body) as Map<String, dynamic>;
+      return _TokenResponse(
+        accessToken: m['access_token']?.toString(),
+        idToken: m['id_token']?.toString(),
+        refreshToken: m['refresh_token']?.toString(),
+        expiresIn: (m['expires_in'] is int)
+            ? m['expires_in'] as int
+            : int.tryParse(m['expires_in']?.toString() ?? '0') ?? 0,
+      );
+    }
+
     final url = Uri.parse('https://oauth2.googleapis.com/token');
     final resp = await http.post(url, headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
