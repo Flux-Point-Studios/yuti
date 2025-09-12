@@ -41,10 +41,6 @@ class SupabaseService {
       url: _supabaseUrl,
       anonKey: _supabaseAnonKey,
       debug: _useLocalDev,
-      authOptions: const AuthClientOptions(
-        autoRefreshToken: true,
-        persistSession: true,
-      ),
     );
   }
 
