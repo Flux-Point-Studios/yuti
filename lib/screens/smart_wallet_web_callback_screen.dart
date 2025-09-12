@@ -55,18 +55,28 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
 
   Map<String, String> _extractOAuthParams() {
     final current = Uri.base;
+    final uriString = current.toString();
     String? code = current.queryParameters['code'];
     String? state = current.queryParameters['state'];
-    if ((code == null || state == null) && current.fragment.isNotEmpty) {
+    final frag = current.fragment;
+    print('🔍 SW OAuth: Uri.base=${uriString.length > 120 ? uriString.substring(0,120) + '…' : uriString}');
+    print('🔍 SW OAuth: fragment len=${frag.length}');
+
+    if ((code == null || state == null) && frag.isNotEmpty) {
       try {
-        final frag = current.fragment;
-        if (frag.startsWith('sw_oauth=')) {
-          final jsonStr = Uri.decodeComponent(frag.substring('sw_oauth='.length));
-          final m = json.decode(jsonStr) as Map<String, dynamic>;
-          code = m['code']?.toString();
-          state = m['state']?.toString();
+        var fragStr = frag;
+        // Support cases where fragment contains additional prefixes
+        final idx = fragStr.indexOf('sw_oauth=');
+        if (idx >= 0) {
+          fragStr = fragStr.substring(idx + 'sw_oauth='.length);
         }
-      } catch (_) {}
+        final jsonStr = Uri.decodeComponent(fragStr);
+        final m = json.decode(jsonStr) as Map<String, dynamic>;
+        code = m['code']?.toString();
+        state = m['state']?.toString();
+      } catch (e) {
+        print('❌ SW OAuth: fragment parse error: $e');
+      }
     }
     return {
       if (code != null) 'code': code,
