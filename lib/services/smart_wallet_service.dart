@@ -125,30 +125,37 @@ class SmartWalletService {
       throw Exception('Missing Google OAuth client ID');
     }
     // Decode state
-    final stateJson = utf8.decode(_base64UrlDecode(state));
-    final stateObj = jsonDecode(stateJson) as Map<String, dynamic>;
-    final codeVerifier = stateObj['cv']?.toString();
-    if (codeVerifier == null || codeVerifier.isEmpty) {
-      throw Exception('Missing code_verifier in state');
-    }
-    final redirectUri = '${Uri.base.origin}/smartwallet-oauth';
+    try {
+      final stateJson = utf8.decode(_base64UrlDecode(state));
+      final stateObj = jsonDecode(stateJson) as Map<String, dynamic>;
+      final codeVerifier = stateObj['cv']?.toString();
+      debugPrint('🧩 SW OAuth: decoded state ok; cvLen=${codeVerifier?.length ?? 0}');
+      if (codeVerifier == null || codeVerifier.isEmpty) {
+        throw Exception('Missing code_verifier in state');
+      }
+      final redirectUri = '${Uri.base.origin}/smartwallet-oauth';
 
-    final token = await _exchangeCodeForToken(
-      code: code,
-      clientId: clientId,
-      codeVerifier: codeVerifier,
-      redirectUri: redirectUri,
-    );
+      final token = await _exchangeCodeForToken(
+        code: code,
+        clientId: clientId,
+        codeVerifier: codeVerifier,
+        redirectUri: redirectUri,
+      );
+      debugPrint('🔄 SW OAuth: token exchanged; idTokenLen=${token.idToken?.length ?? 0}');
 
-    final idToken = token.idToken;
-    if (idToken == null || idToken.isEmpty) {
-      throw Exception('OAuth failed: missing id_token');
+      final idToken = token.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('OAuth failed: missing id_token');
+      }
+      final email = _extractEmailFromIdToken(idToken);
+      if (email == null || email.isEmpty) {
+        throw Exception('OAuth failed: missing email from id_token');
+      }
+      return SmartWalletAuthResult(email: email, idToken: idToken);
+    } catch (e) {
+      debugPrint('❌ SW OAuth state/token error: $e');
+      rethrow;
     }
-    final email = _extractEmailFromIdToken(idToken);
-    if (email == null || email.isEmpty) {
-      throw Exception('OAuth failed: missing email from id_token');
-    }
-    return SmartWalletAuthResult(email: email, idToken: idToken);
   }
 
   Future<String?> getWalletAddressByEmail(String email) async {
