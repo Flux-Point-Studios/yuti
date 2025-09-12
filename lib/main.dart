@@ -17,9 +17,13 @@ import 'screens/payment_callback_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'screens/profile_screen.dart';
 import 'dart:async';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Use path-based routing on web so hash fragments don't affect route parsing
+  usePathUrlStrategy();
 
   // Global error logging
   FlutterError.onError = (FlutterErrorDetails details) {
