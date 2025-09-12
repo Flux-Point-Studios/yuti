@@ -11,7 +11,7 @@
     { "source": "/api/handle/:path*", "destination": "/api/handle/:path*" },
     { "source": "/api/stripe/checkout", "destination": "/api/stripe/checkout" },
     {
-      "source": "/(.*)",
+      "source": "/((?!api|.*\\..*).*)",
       "destination": "/index.html"
     }
   ],
