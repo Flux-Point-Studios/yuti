@@ -61,21 +61,38 @@
   <meta name="twitter:image" content="/icons/bluelight-512.png?v=3">
 
   <script>
-    // Capture OAuth params early and store globally so Flutter can read them
+    // Capture OAuth params early (from query or fragment) and persist globally + in sessionStorage
     (function() {
       if (window.location && window.location.pathname === '/smartwallet-oauth') {
-        var qs = new URLSearchParams(window.location.search);
-        var code = qs.get('code');
-        var state = qs.get('state');
-        if (code && state) {
-          try {
-            window.__SW_OAUTH__ = { code: code, state: state };
-            // Clean URL to path only to avoid fragment/query interference
-            history.replaceState({}, document.title, window.location.pathname);
-            console.log('SW OAuth: stored code/state globally and cleaned URL');
-          } catch (e) {
-            console.log('SW OAuth: failed to store globals', e);
+        var stored = null;
+        try {
+          var qs = new URLSearchParams(window.location.search);
+          var codeQ = qs.get('code');
+          var stateQ = qs.get('state');
+          if (codeQ && stateQ) {
+            stored = { code: codeQ, state: stateQ };
+            console.log('SW OAuth: captured params from query');
           }
+        } catch(e) {}
+        try {
+          if (!stored && window.location.hash && window.location.hash.indexOf('sw_oauth=') >= 0) {
+            var fragRaw = window.location.hash;
+            var idx = fragRaw.indexOf('sw_oauth=');
+            var fragStr = fragRaw.substring(idx + 'sw_oauth='.length);
+            var parsed = JSON.parse(decodeURIComponent(fragStr));
+            if (parsed && parsed.code && parsed.state) {
+              stored = { code: parsed.code, state: parsed.state };
+              console.log('SW OAuth: captured params from fragment');
+            }
+          }
+        } catch(e) {}
+        if (stored) {
+          try {
+            window.__SW_OAUTH__ = stored;
+            if (window.sessionStorage && window.sessionStorage.setItem) {
+              window.sessionStorage.setItem('SW_OAUTH', JSON.stringify(stored));
+            }
+          } catch (e) {}
         }
       }
     })();

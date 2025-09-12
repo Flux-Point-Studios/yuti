@@ -98,6 +98,24 @@ class _SmartWalletWebCallbackScreenState extends State<SmartWalletWebCallbackScr
       }
     }
 
+    // Fallback: sessionStorage
+    if (code == null || state == null) {
+      try {
+        final ss = js_util.getProperty(js_util.globalThis, 'sessionStorage');
+        if (ss != null) {
+          final raw = js_util.callMethod(ss, 'getItem', ['SW_OAUTH']);
+          if (raw != null) {
+            final m = json.decode(raw.toString()) as Map<String, dynamic>;
+            code = m['code']?.toString();
+            state = m['state']?.toString();
+            print('🔍 SW OAuth: recovered params from sessionStorage');
+          }
+        }
+      } catch (e) {
+        print('❌ SW OAuth: sessionStorage read error: $e');
+      }
+    }
+
     return {
       if (code != null) 'code': code,
       if (state != null) 'state': state,
