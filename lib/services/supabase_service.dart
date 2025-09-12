@@ -42,8 +42,6 @@ class SupabaseService {
       anonKey: _supabaseAnonKey,
       debug: _useLocalDev,
       authOptions: const AuthClientOptions(
-        // Avoid auto-exchanging OAuth codes on web; we manage Google OAuth ourselves
-        detectSessionInUrl: false,
         autoRefreshToken: true,
         persistSession: true,
       ),
