@@ -90,6 +90,20 @@
       const isCallbackRoute = window.location.pathname === '/smartwallet-oauth';
       if (isCallbackRoute) {
         console.log('SW: Skipping service worker registration on /smartwallet-oauth');
+        if ('serviceWorker' in navigator) {
+          // Unregister any existing SWs and clear caches to avoid interference
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            registrations.forEach(function(reg) { reg.unregister(); });
+            console.log('SW: Unregistered existing service workers');
+          });
+          if (window.caches && caches.keys) {
+            caches.keys().then(function(keys) {
+              Promise.all(keys.map(function(k){ return caches.delete(k); }))
+                .then(function(){ console.log('SW: Cleared caches'); })
+                .catch(function(){ /* ignore */ });
+            });
+          }
+        }
       }
       if ('serviceWorker' in navigator && !isCallbackRoute) {
         window.addEventListener('flutter-first-frame', function() {
