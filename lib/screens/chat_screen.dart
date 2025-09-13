@@ -731,28 +731,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildQrCodeMessage(ChatMessage message) {
     final address = message.metadata?['address'] ?? '';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          message.text,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: QrImageView(
-            data: address,
-            size: 200,
-            backgroundColor: Colors.white,
-          ),
-        ),
-      ],
-    );
+    return _QrToggle(address: address, caption: message.text);
   }
 
   Widget _buildTransactionMessage(ChatMessage message) {
@@ -1230,5 +1209,98 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     _speechService.dispose();
     super.dispose();
+  }
+}
+
+class _QrToggle extends StatefulWidget {
+  final String address;
+  final String caption;
+  const _QrToggle({Key? key, required this.address, required this.caption}) : super(key: key);
+
+  @override
+  State<_QrToggle> createState() => _QrToggleState();
+}
+
+class _QrToggleState extends State<_QrToggle> {
+  bool _showQr = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.caption,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () => setState(() => _showQr = !_showQr),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: _showQr
+                ? Container(
+                    key: const ValueKey('qr'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: QrImageView(
+                      data: widget.address,
+                      size: 200,
+                      backgroundColor: Colors.white,
+                    ),
+                  )
+                : Container(
+                    key: const ValueKey('addr'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: SelectableText(
+                            widget.address,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () async {
+                            await Clipboard.setData(ClipboardData(text: widget.address));
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Address copied'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                          child: const Icon(Icons.copy, color: Colors.white70, size: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _showQr ? 'Tap to show address' : 'Tap to show QR code',
+          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontStyle: FontStyle.italic),
+        ),
+      ],
+    );
   }
 }
