@@ -1286,6 +1286,7 @@ class _QrToggleState extends State<_QrToggle> {
         ),
         const SizedBox(height: 12),
         GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _showQr = !_showQr),
           onLongPress: () { if (_showQr) _openFullscreen(); },
           child: AnimatedSwitcher(
@@ -1309,7 +1310,10 @@ class _QrToggleState extends State<_QrToggle> {
                       embeddedImageStyle: const QrEmbeddedImageStyle(size: Size(36, 36)),
                     ),
                   )
-                : Container(
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _showQr = true),
+                    child: Container(
                     key: const ValueKey('addr'),
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -1347,7 +1351,7 @@ class _QrToggleState extends State<_QrToggle> {
                         ),
                       ],
                     ),
-                  ),
+                  )),
           ),
         ),
         const SizedBox(height: 6),
