@@ -498,6 +498,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   void _navigateToLogin() {
+    // Login screen auto-opens Smart Wallet; we just navigate there
     Navigator.push(
       context,
       PageRouteBuilder(
@@ -517,24 +518,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   void _navigateToSignup() {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const SignupScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(1.0, 0.0),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          );
-        },
-      ),
-    );
+    // Signup also funnels to Smart Wallet via LoginScreen for fewer clicks
+    _navigateToLogin();
   }
-
 
 
   void _navigateToChat() {

@@ -40,6 +40,12 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
+    // Auto-open Smart Wallet flow when arriving on login screen if not authenticated
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!_authService.isAuthenticated) {
+        await _handleSmartWalletLogin();
+      }
+    });
   }
 
   void _initializeAnimations() {
@@ -98,11 +104,10 @@ class _LoginScreenState extends State<LoginScreen>
                             const SizedBox(height: 40),
                             _buildHeader(),
                             const SizedBox(height: 40),
-                            _buildLoginForm(),
-                            const SizedBox(height: 24),
-                            _buildForgotPassword(),
-                            const SizedBox(height: 32),
                             _buildWalletLoginSection(),
+                            const SizedBox(height: 16),
+                            // Keep legacy email/password behind a disclosure for fallback
+                            _buildLoginForm(),
                             const SizedBox(height: 40),
                             _buildBackButton(),
                             const SizedBox(height: 40),
@@ -325,7 +330,7 @@ class _LoginScreenState extends State<LoginScreen>
     return SizedBox(
       height: 56,
       child: GlassButton(
-        onPressed: _isLoading ? null : _handleLogin,
+        onPressed: _isLoading ? null : _handleSmartWalletLogin,
         isPrimary: true,
         showGlow: true,
         padding: const EdgeInsets.symmetric(vertical: 16),
