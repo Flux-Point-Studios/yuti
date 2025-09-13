@@ -41,7 +41,10 @@ class _WalletScreenState extends State<WalletScreen> {
   void initState() {
     super.initState();
     _initializeServices();
-    _loadWalletData();
+    _walletService.initialize().then((_) async {
+      await _ensureWalletConnectedFromUser();
+      await _loadWalletData();
+    });
     _localWalletService.initialize().then((_) {
       debugPrint('🔍 DEBUG: WalletScreen init - local wallet name: ${_localWalletService.walletName}');
       setState(() {});
@@ -51,6 +54,19 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _initializeServices() async {
     await _transactionHistoryService.initialize();
     await _addressBookService.initialize();
+  }
+
+  Future<void> _ensureWalletConnectedFromUser() async {
+    try {
+      if (_walletService.isConnected) return;
+      final user = widget.authService.currentUser;
+      final address = user?.walletAddress;
+      final stake = user?.stakeAddress ?? '';
+      if (address != null && address.isNotEmpty) {
+        final ok = await _walletService.connectExternalWallet('Smart Wallet (${user!.email})', address, stake);
+        if (ok && mounted) setState(() {});
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadWalletData() async {
@@ -128,7 +144,10 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           const Spacer(),
           IconButton(
-            onPressed: _loadWalletData,
+            onPressed: () async {
+              await _ensureWalletConnectedFromUser();
+              await _loadWalletData();
+            },
             icon: Icon(
               Icons.refresh,
               color: AppColors.primaryBlue,
@@ -172,8 +191,12 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close and open Smart Wallet dialog upstream
+                onPressed: () async {
+                  await _ensureWalletConnectedFromUser();
+                  await _loadWalletData();
+                  if (!_walletService.isConnected && mounted) {
+                    Navigator.of(context).pop(); // Open Smart Wallet dialog upstream
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
