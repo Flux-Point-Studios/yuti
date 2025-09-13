@@ -149,7 +149,7 @@ class AddressBookService {
               'last_used': updatedEntry.lastUsed?.toIso8601String(),
             })
             .eq('id', id)
-            .eq('user_id', _userId);
+            .eq('user_id', _userId!);
       }
 
       _entries[index] = updatedEntry;
@@ -169,7 +169,7 @@ class AddressBookService {
 
     try {
       if (_isLoggedIn) {
-        await _supabase.from('address_book').delete().eq('id', id).eq('user_id', _userId);
+        await _supabase.from('address_book').delete().eq('id', id).eq('user_id', _userId!);
       }
       if (_entries.length < initialLength) {
         await _saveCache();
@@ -222,7 +222,7 @@ class AddressBookService {
               .from('address_book')
               .update({'last_used': updated.lastUsed!.toIso8601String()})
               .eq('id', entry.id)
-              .eq('user_id', _userId);
+              .eq('user_id', _userId!);
         }
       } catch (_) {}
     }
@@ -241,7 +241,7 @@ class AddressBookService {
     await _saveCache();
     try {
       if (_isLoggedIn) {
-        await _supabase.from('address_book').delete().eq('user_id', _userId);
+        await _supabase.from('address_book').delete().eq('user_id', _userId!);
       }
     } catch (_) {}
   }
