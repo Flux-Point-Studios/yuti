@@ -1,13 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../utils/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/wallet_auth_service.dart';
 import '../widgets/glassmorphism_container.dart';
 import 'chat_screen.dart';
 import 'pricing_screen.dart';
-import '../widgets/cardano_wallet_dialog.dart'; // Added import for CardanoWalletDialog
+import '../services/smart_wallet_service.dart';
+import 'smart_wallet_activation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -362,19 +364,57 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleSmartWalletLogin() async {
     setState(() => _isLoading = true);
     try {
-      // Open Smart Wallet dialog
-      print('🔍 DEBUG: Login -> opening Smart Wallet dialog');
-      final connected = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => CardanoWalletDialog(authService: _authService, smartWalletOnly: true),
-      );
+      final smart = SmartWalletService();
 
-      if (connected == true) {
-        _showSuccess('Smart Wallet connected!');
-        await Future.delayed(const Duration(milliseconds: 400));
-        _navigateToChat();
+      if (kIsWeb) {
+        final url = await smart.buildGoogleAuthUrlWeb(useZkFoldRedirect: false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Redirecting to Google…')),
+        );
+        await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
+        setState(() => _isLoading = false);
+        return; // Web flow continues on callback screen
       }
+
+      // Mobile: complete Google login, ensure wallet is activated/linked
+      final auth = await smart.continueWithGoogle();
+      var address = await smart.getWalletAddressByEmail(auth.email);
+      if (address == null || address.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Activating Smart Wallet… this may take a few minutes')),
+        );
+        final activated = await smart.activateSeedlessWallet(idToken: auth.idToken, email: auth.email);
+        if (activated != null && activated.isNotEmpty) {
+          address = activated;
+        }
+      }
+      if (address == null || address.isEmpty) {
+        final activated = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => SmartWalletActivationScreen(email: auth.email),
+          ),
+        );
+        if (activated == true) {
+          address = await smart.getWalletAddressByEmail(auth.email);
+        }
+      }
+      if (address == null || address.isEmpty) {
+        throw Exception('Smart Wallet not activated yet. Please finish activation.');
+      }
+
+      final walletName = 'Smart Wallet (${auth.email})';
+      final success = await _authService.connectCardanoWalletExternal(
+        walletName,
+        address,
+        '',
+      );
+      if (!success) {
+        throw Exception('Failed to connect Smart Wallet');
+      }
+
+      _showSuccess('Smart Wallet connected!');
+      await Future.delayed(const Duration(milliseconds: 300));
+      _navigateToChat();
     } catch (e) {
       _showError('Smart Wallet error: $e');
     } finally {
