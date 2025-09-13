@@ -12,6 +12,7 @@ import 'uex_service.dart';
 import 'saturn_swap_service.dart';
 import 'cardano_wallet_service.dart';
 import 'address_book_service.dart';
+import 'auth_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math' as math;
 
@@ -416,14 +417,41 @@ class ChatService {
   
   Future<ChatMessage> _handleReceiveAddress() async {
     try {
-      final address = await _walletService.getReceiveAddress();
-      
+      String? address;
+
+      // Prefer live CardanoWalletService connection
+      if (_cardanoWalletService.isConnected && _cardanoWalletService.currentAddress != null) {
+        address = _cardanoWalletService.currentAddress!;
+      }
+
+      // Fallback to user profile wallet (linked Smart Wallet)
+      address ??= AuthService().currentUser?.walletAddress;
+
+      // Fallback to WalletService stored wallet
+      address ??= await _walletService.getReceiveAddress();
+
+      if (address.isEmpty) {
+        throw Exception('empty');
+      }
+
       return ChatMessage.qrCode(
         text: "Your Cardano receive address is:\n`$address`\n\n"
               "You can share this QR code or copy the address to receive ADA.",
         address: address,
       );
-    } catch (e) {
+    } catch (_) {
+      try {
+        // Last resort: initialize services and retry once
+        await _cardanoWalletService.initialize();
+        final retry = _cardanoWalletService.currentAddress ?? AuthService().currentUser?.walletAddress;
+        if (retry != null && retry.isNotEmpty) {
+          return ChatMessage.qrCode(
+            text: "Your Cardano receive address is:\n`$retry`\n\n"
+                  "You can share this QR code or copy the address to receive ADA.",
+            address: retry,
+          );
+        }
+      } catch (_) {}
       return ChatMessage.text(
         text: "❌ I couldn't retrieve your address. Please try again.",
         isUser: false,
