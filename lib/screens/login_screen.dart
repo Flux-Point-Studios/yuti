@@ -105,9 +105,6 @@ class _LoginScreenState extends State<LoginScreen>
                             _buildHeader(),
                             const SizedBox(height: 40),
                             _buildWalletLoginSection(),
-                            const SizedBox(height: 16),
-                            // Keep legacy email/password behind a disclosure for fallback
-                            _buildLoginForm(),
                             const SizedBox(height: 40),
                             _buildBackButton(),
                             const SizedBox(height: 40),
@@ -192,241 +189,9 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildLoginForm() {
-    return GlassmorphismContainer(
-      glassType: GlassType.medium,
-      padding: const EdgeInsets.all(24),
-      borderRadius: BorderRadius.circular(20),
-      blur: 15.0,
-      showGlow: true,
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildEmailField(),
-                const SizedBox(height: 20),
-                _buildPasswordField(),
-                const SizedBox(height: 32),
-                _buildLoginButton(),
-              ],
-            ),
-          ),
-    );
-  }
-
-  Widget _buildEmailField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Email',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Enter your email',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-            prefixIcon: Icon(
-              Icons.email_outlined,
-              color: Colors.white.withOpacity(0.7),
-            ),
-            filled: true,
-            fillColor: AppColors.glassBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primaryBlue, width: 2),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Email is required';
-            }
-            if (!value.contains('@')) {
-              return 'Enter a valid email';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPasswordField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Password',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Enter your password',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-            prefixIcon: Icon(
-              Icons.lock_outlined,
-              color: Colors.white.withOpacity(0.7),
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                color: Colors.white.withOpacity(0.7),
-              ),
-              onPressed: () {
-                setState(() {
-                  _obscurePassword = !_obscurePassword;
-                });
-              },
-            ),
-            filled: true,
-            fillColor: AppColors.glassBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primaryBlue, width: 2),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Password is required';
-            }
-            if (value.length < 6) {
-              return 'Password must be at least 6 characters';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoginButton() {
-    return SizedBox(
-      height: 56,
-      child: GlassButton(
-        onPressed: _isLoading ? null : _handleSmartWalletLogin,
-        isPrimary: true,
-        showGlow: true,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: _isLoading
-            ? const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              )
-            : const Text(
-                'Sign In',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildForgotPassword() {
-    return TextButton(
-      onPressed: _handleForgotPassword,
-      child: const Text(
-        'Forgot Password?',
-        style: TextStyle(
-          color: AppColors.primaryBlue,
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBackButton() {
-    return TextButton.icon(
-      onPressed: () => Navigator.pop(context),
-      icon: const Icon(Icons.arrow_back, color: Colors.white),
-      label: Text(
-        'Back to Welcome',
-        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
-      ),
-    );
-  }
-
   Widget _buildWalletLoginSection() {
     return Column(
       children: [
-        // Divider with "OR" text
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Colors.transparent,
-                      Colors.white.withOpacity(0.3),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'OR',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Colors.white.withOpacity(0.3),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        
-        // Smart Wallet login button
         GlassmorphismContainer(
           glassType: GlassType.light,
           padding: EdgeInsets.zero,
@@ -469,10 +234,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ),
-        
         const SizedBox(height: 12),
-        
-        // Smart Wallet description
         Text(
           'Sign in using your Google-backed Smart Wallet',
           style: TextStyle(
@@ -497,96 +259,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final result = await _authService.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-
-      if (result.isSuccess) {
-        final user = result.user!;
-
-        // Admin bypass - skip pricing page for admin email
-        if (_emailController.text.trim().toLowerCase() ==
-            'nathanielminton@fluxpointstudios.com') {
-          _navigateToChat();
-          return;
-        }
-
-        // Navigate based on user tier
-        if (user.tier == 'FREE') {
-          _navigateToPricing();
-        } else {
-          _navigateToChat();
-        }
-      } else {
-        _showError(result.error ?? 'Login failed');
-      }
-    } catch (e) {
-      _showError('An error occurred during login');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _handleWalletLogin() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final result = await _walletAuthService.authenticateWithWallet(WalletAuthType.login);
-
-      if (result.success) {
-        final user = result.user!;
-        
-        _showSuccess('Wallet connected successfully! Welcome ${user.walletAddress?.substring(0, 10)}...');
-        
-        // Navigate based on user tier
-        await Future.delayed(const Duration(seconds: 1));
-        if (user.tier == 'FREE') {
-          _navigateToPricing();
-        } else {
-          _navigateToChat();
-        }
-      } else {
-        _showError(result.error ?? 'Wallet authentication failed');
-      }
-    } catch (e) {
-      _showError('Failed to connect wallet. Please try again.');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _handleForgotPassword() async {
-    if (_emailController.text.trim().isEmpty) {
-      _showError('Please enter your email first');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final result = await _authService.resetPassword(
-        email: _emailController.text.trim(),
-      );
-
-      if (result.isSuccess) {
-        _showSuccess(result.message ?? 'Password reset email sent');
-      } else {
-        _showError(result.error ?? 'Failed to send reset email');
-      }
-    } catch (e) {
-      _showError('An error occurred');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
   void _navigateToChat() {
     Navigator.pushReplacement(
       context,
@@ -600,21 +272,13 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  void _navigateToPricing() {
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const PricingScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(1.0, 0.0),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          );
-        },
+  Widget _buildBackButton() {
+    return TextButton.icon(
+      onPressed: () => Navigator.pop(context),
+      icon: const Icon(Icons.arrow_back, color: Colors.white),
+      label: Text(
+        'Back to Welcome',
+        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
       ),
     );
   }
@@ -698,7 +362,7 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleSmartWalletLogin() async {
     setState(() => _isLoading = true);
     try {
-      // Open Smart Wallet dialog through pricing-like path (reusing dialog)
+      // Open Smart Wallet dialog
       print('🔍 DEBUG: Login -> opening Smart Wallet dialog');
       final connected = await showDialog<bool>(
         context: context,
@@ -708,10 +372,8 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (connected == true) {
         _showSuccess('Smart Wallet connected!');
-        await Future.delayed(const Duration(milliseconds: 600));
+        await Future.delayed(const Duration(milliseconds: 400));
         _navigateToChat();
-      } else {
-        _showError('Smart Wallet connection cancelled');
       }
     } catch (e) {
       _showError('Smart Wallet error: $e');
