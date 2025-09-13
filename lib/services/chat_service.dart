@@ -465,8 +465,7 @@ class ChatService {
       }
 
       return ChatMessage.qrCode(
-        text: "Your Cardano receive address is:\n`$address`\n\n"
-              "You can share this QR code or copy the address to receive ADA.",
+        text: "You can share this QR or tap below to show and copy your address.",
         address: address,
       );
     } catch (_) {
@@ -476,8 +475,7 @@ class ChatService {
         final retry = _cardanoWalletService.currentAddress ?? AuthService().currentUser?.walletAddress;
         if (retry != null && retry.isNotEmpty) {
           return ChatMessage.qrCode(
-            text: "Your Cardano receive address is:\n`$retry`\n\n"
-                  "You can share this QR code or copy the address to receive ADA.",
+            text: "You can share this QR or tap below to show and copy your address.",
             address: retry,
           );
         }

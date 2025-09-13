@@ -602,9 +602,14 @@ class _ChatScreenState extends State<ChatScreen> {
       case MessageType.text:
         // If assistant text contains an address, show our QR/Toggle UI
         if (!message.isUser) {
-          final addr = _extractAddressFromText(message.text);
-          if (addr != null) {
-            return _QrToggle(address: addr, caption: message.text);
+          // Do NOT inject QR for send confirmations to avoid confusion
+          final lower = message.text.toLowerCase();
+          final isSendConfirm = lower.contains('i would send') || lower.contains('transaction');
+          if (!isSendConfirm) {
+            final addr = _extractAddressFromText(message.text);
+            if (addr != null) {
+              return _QrToggle(address: addr, caption: message.text);
+            }
           }
         }
         return MarkdownBody(
