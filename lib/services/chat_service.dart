@@ -12,6 +12,7 @@ import 'uex_service.dart';
 import 'saturn_swap_service.dart';
 import 'cardano_wallet_service.dart';
 import 'address_book_service.dart';
+import 'smart_wallet_service.dart';
 import 'auth_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math' as math;
@@ -360,7 +361,7 @@ class ChatService {
       if (parsed == null) {
         return ChatMessage.text(
           text: "❌ I didn't understand that send command. Please use the format: "
-                "'Send [amount] ADA to [address]'",
+                "'Send [amount] ADA to [address/name/handle/email]'",
           isUser: false,
         );
       }
@@ -368,11 +369,39 @@ class ChatService {
       final amount = parsed['amount'] as double;
       String address = parsed['address'] as String;
 
-      // Resolve ADA Handle if provided
+      // Resolve by email via Smart Wallet
+      if (address.contains('@') && !_walletService.validateAddress(address)) {
+        try {
+          final sw = SmartWalletService();
+          final resolved = await sw.getWalletAddressByEmail(address);
+          if (resolved != null && resolved.isNotEmpty) {
+            address = resolved;
+          }
+        } catch (_) {}
+      }
+
+      // Resolve ADA Handle or contact name if still not an address
       if (!_walletService.validateAddress(address)) {
         try {
+          // ADA Handle like $yuti or yuti
           final res = await AddressBookService().resolveIfHandle(address);
           address = res['address'] ?? address;
+        } catch (_) {}
+      }
+      if (!_walletService.validateAddress(address)) {
+        try {
+          // Contact name match
+          final book = AddressBookService();
+          await book.initialize();
+          final lowered = input.toLowerCase();
+          final match = book.entries.firstWhere(
+            (e) => lowered.contains(e.name.toLowerCase()),
+            orElse: () => AddressBookEntry(
+              id: '', name: '', address: '', createdAt: DateTime.now()),
+          );
+          if (match.address.isNotEmpty) {
+            address = match.address;
+          }
         } catch (_) {}
       }
       
@@ -798,19 +827,49 @@ class ChatService {
   }
   
   Map<String, dynamic>? _parseSendCommand(String input) {
-    // Try to parse "send X ADA to address"
-    final regex = RegExp(
-      r'(\d+\.?\d*)\s*(ada)?\s*to\s*([a-zA-Z0-9]+)',
-      caseSensitive: false,
-    );
-    
-    final match = regex.firstMatch(input);
-    if (match == null) return null;
-    
+    final lower = input.toLowerCase().trim();
+    if (!lower.startsWith('send')) return null;
+
+    // Find amount (e.g., '1 ada' or just '1')
+    final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*ada?', caseSensitive: false)
+        .firstMatch(lower);
+    if (amountMatch == null) return null;
+    final amount = double.tryParse(amountMatch.group(1)!);
+    if (amount == null) return null;
+
+    // Preferred recipient after 'to'
+    String? recipient;
+    final toMatch = RegExp(r'\bto\b\s+(.+)$', caseSensitive: false)
+        .firstMatch(lower);
+    if (toMatch != null) {
+      recipient = toMatch.group(1)!.trim();
+    }
+
+    // If no explicit 'to', try common patterns: address/handle/email/name anywhere
+    recipient ??= _firstRecipientCandidate(lower);
+    if (recipient == null || recipient.isEmpty) return null;
+
     return {
-      'amount': double.parse(match.group(1)!),
-      'address': input.substring(match.end).trim(),
+      'amount': amount,
+      'address': recipient,
     };
+  }
+
+  String? _firstRecipientCandidate(String text) {
+    // Cardano address
+    final addr = RegExp(r'(addr1[0-9a-z]+|addr_test1[0-9a-z]+)', caseSensitive: false)
+        .firstMatch(text);
+    if (addr != null) return addr.group(1);
+    // ADA Handle like $name or name starting with $
+    final handle = RegExp(r'(\$[a-z0-9_]+)', caseSensitive: false).firstMatch(text);
+    if (handle != null) return handle.group(1);
+    // Email (for Smart Wallet)
+    final email = RegExp(r'[\w.+-]+@[\w.-]+', caseSensitive: false).firstMatch(text);
+    if (email != null) return email.group(0);
+    // Otherwise, return the word after 'send' if present (could be a contact name)
+    final afterSend = RegExp(r'^send\s+([^\s]+)').firstMatch(text);
+    if (afterSend != null) return afterSend.group(1);
+    return null;
   }
   
   String _normalizeCurrency(String currency) {
