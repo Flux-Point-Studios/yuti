@@ -13,6 +13,7 @@ import '../services/gamification_service.dart';
 import '../services/wallet_service.dart';
 import '../services/cardano_wallet_service.dart';
 import '../screens/pricing_screen.dart';
+import '../services/smart_wallet_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -57,8 +58,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await walletService.initialize();
         await CardanoWalletService().initialize();
         if (mounted) setState(() {});
+        // Attempt auto-link after services initialized
+        await _tryAutoLinkSmartWallet();
       } catch (_) {}
     });
+  }
+
+  Future<void> _tryAutoLinkSmartWallet() async {
+    try {
+      if (_currentUser == null) return;
+      final alreadyLinked = _currentUser!.walletAddress != null && _currentUser!.walletAddress!.isNotEmpty;
+      if (alreadyLinked) return;
+      // Resolve smart wallet address by email
+      final addr = await SmartWalletService().getWalletAddressByEmail(_currentUser!.email);
+      if (addr != null && addr.isNotEmpty) {
+        setState(() => _isWalletLoading = true);
+        final ok = await _authService.connectCardanoWalletExternal('Smart Wallet (${_currentUser!.email})', addr, '');
+        setState(() => _isWalletLoading = false);
+        if (ok) {
+          _showSuccess('Smart Wallet connected');
+          await _loadUserData();
+        }
+      }
+    } catch (e) {
+      // Silent; user can tap Connect to retry
+    }
   }
 
   Future<void> _loadGamification() async {
