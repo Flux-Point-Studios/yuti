@@ -1256,8 +1256,9 @@ class _QrToggleState extends State<_QrToggle> {
                       data: widget.address,
                       size: 320,
                       backgroundColor: Colors.white,
+                      errorCorrectionLevel: QrErrorCorrectLevel.H,
                       embeddedImage: const AssetImage('assets/bluelight.png'),
-                      embeddedImageStyle: const QrEmbeddedImageStyle(size: Size(96, 96)),
+                      embeddedImageStyle: const QrEmbeddedImageStyle(size: Size(64, 64)),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1303,8 +1304,9 @@ class _QrToggleState extends State<_QrToggle> {
                       data: widget.address,
                       size: 200,
                       backgroundColor: Colors.white,
+                      errorCorrectionLevel: QrErrorCorrectLevel.H,
                       embeddedImage: const AssetImage('assets/bluelight.png'),
-                      embeddedImageStyle: const QrEmbeddedImageStyle(size: Size(48, 48)),
+                      embeddedImageStyle: const QrEmbeddedImageStyle(size: Size(36, 36)),
                     ),
                   )
                 : Container(
