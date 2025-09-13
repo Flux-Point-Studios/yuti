@@ -10,6 +10,7 @@ import 'chat_screen.dart';
 import 'pricing_screen.dart';
 import '../services/smart_wallet_service.dart';
 import 'smart_wallet_activation_screen.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -218,11 +219,11 @@ class _LoginScreenState extends State<LoginScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.lock_open,
+                    Icons.g_mobiledata,
                     color: Colors.white.withOpacity(0.9),
-                    size: 24,
+                    size: 28,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Text(
                     'Continue with Smart Wallet',
                     style: TextStyle(
@@ -233,6 +234,18 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _isLoading ? null : _navigateToManual,
+          child: Text(
+            'No Google email? Click here',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              decoration: TextDecoration.underline,
+              fontSize: 12,
             ),
           ),
         ),
@@ -420,5 +433,23 @@ class _LoginScreenState extends State<LoginScreen>
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _navigateToManual() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const SignupScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          );
+        },
+      ),
+    );
   }
 }

@@ -18,11 +18,13 @@ import 'package:url_launcher/url_launcher.dart';
 class CardanoWalletDialog extends StatefulWidget {
   final AuthService authService;
   final bool smartWalletOnly;
+  final bool manualOnly;
 
   const CardanoWalletDialog({
     Key? key,
     required this.authService,
     this.smartWalletOnly = false,
+    this.manualOnly = false,
   }) : super(key: key);
 
   @override
@@ -195,10 +197,17 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!widget.smartWalletOnly) _buildConnectionModeSelector(),
-          if (!widget.smartWalletOnly) const SizedBox(height: 20),
+          if (!widget.smartWalletOnly && !widget.manualOnly) _buildConnectionModeSelector(),
+          if (!widget.smartWalletOnly && !widget.manualOnly) const SizedBox(height: 20),
           if (widget.smartWalletOnly) ...[
             _buildSmartWalletSection(),
+          ] else if (widget.manualOnly) ...[
+            // Manual-only flow: show Import/Restore and Create New sections
+            _buildWalletNameField(),
+            const SizedBox(height: 16),
+            _buildMnemonicField(),
+            const SizedBox(height: 20),
+            _buildCreateNewWalletSection(),
           ] else if (_connectionMode == ConnectionMode.mnemonic) ...[
             _buildWalletNameField(),
             const SizedBox(height: 16),
@@ -207,7 +216,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             _buildSmartWalletSection(),
           ],
           const SizedBox(height: 16),
-          if (!widget.smartWalletOnly) _buildPremiumAccessInfo(),
+          if (!widget.smartWalletOnly && !widget.manualOnly) _buildPremiumAccessInfo(),
           if (_errorMessage != null) ...[
             const SizedBox(height: 16),
             _buildErrorMessage(),
@@ -343,7 +352,6 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
           ),
         ),
         const SizedBox(height: 12),
-        // Only Smart Wallet and Import
         Row(
           children: [
             Expanded(
@@ -363,6 +371,16 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                 subtitle: 'Use 12-24 word phrase',
                 icon: Icons.vpn_key,
                 isSelected: _connectionMode == ConnectionMode.mnemonic,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildModeOption(
+                mode: ConnectionMode.createNew,
+                title: 'Create New',
+                subtitle: 'Generate new wallet',
+                icon: Icons.add_circle_outline,
+                isSelected: _connectionMode == ConnectionMode.createNew,
               ),
             ),
           ],
@@ -627,8 +645,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
         children: [
           Expanded(
             child: TextButton(
-              onPressed:
-                  _isLoading ? null : () => Navigator.of(context).pop(false),
+              onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -646,21 +663,10 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             ),
           ),
           const SizedBox(width: 16),
-          if (!widget.smartWalletOnly && _connectionMode == ConnectionMode.mnemonic)
+          if ((widget.manualOnly) || (!widget.smartWalletOnly && _connectionMode == ConnectionMode.mnemonic))
             Expanded(
               child: ElevatedButton(
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        print('🔍 DEBUG: Connect Wallet button pressed');
-                        print('🔍 DEBUG: _isLoading state: $_isLoading');
-                        print('🔍 DEBUG: _connectionMode: $_connectionMode');
-                        print(
-                            '🔍 DEBUG: Mnemonic field text: "${_mnemonicController.text}"');
-                        print(
-                            '🔍 DEBUG: Wallet name field text: "${_walletNameController.text}"');
-                        _connectWallet();
-                      },
+                onPressed: _isLoading ? null : _connectWallet,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,
@@ -675,16 +681,12 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text(
                         'Connect Wallet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                       ),
               ),
             ),

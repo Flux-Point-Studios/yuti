@@ -125,6 +125,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             _buildSubtitle(),
                             const SizedBox(height: 48),
                             _buildActionButtons(),
+                            const SizedBox(height: 8),
+                            _buildNoGoogleHint(),
                             const SizedBox(height: 60),
                             _buildFeatureCards(),
                             const SizedBox(height: 60),
@@ -250,12 +252,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget _buildActionButtons() {
     return Column(
       children: [
-        _buildPrimaryButton('Login', Icons.login, () => _navigateToLogin()),
+        _buildPrimaryButton('Login', Icons.g_mobiledata, () => _navigateToLogin(), useGoogleStyle: true),
         const SizedBox(height: 16),
         _buildSecondaryButton(
           'Sign Up',
-          Icons.person_add,
+          Icons.g_mobiledata,
           () => _navigateToSignup(),
+          useGoogleStyle: true,
         ),
       ],
     );
@@ -264,7 +267,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget _buildPrimaryButton(
     String text,
     IconData icon,
-    VoidCallback onPressed,
+    VoidCallback onPressed, { bool useGoogleStyle = false }
   ) {
     return SizedBox(
       width: double.infinity,
@@ -277,7 +280,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white),
+            Icon(useGoogleStyle ? Icons.g_mobiledata : icon, color: Colors.white),
             const SizedBox(width: 8),
             Text(
               text,
@@ -296,7 +299,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget _buildSecondaryButton(
     String text,
     IconData icon,
-    VoidCallback onPressed,
+    VoidCallback onPressed, { bool useGoogleStyle = false }
   ) {
     return SizedBox(
       width: double.infinity,
@@ -309,7 +312,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppColors.primaryBlue),
+            Icon(useGoogleStyle ? Icons.g_mobiledata : icon, color: AppColors.primaryBlue),
             const SizedBox(width: 8),
             Text(
               text,
@@ -320,6 +323,20 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoGoogleHint() {
+    return GestureDetector(
+      onTap: _navigateToManualAuth,
+      child: Text(
+        "No Google email? Click here",
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.7),
+          decoration: TextDecoration.underline,
+          fontSize: 12,
         ),
       ),
     );
@@ -522,6 +539,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _navigateToLogin();
   }
 
+  void _navigateToManualAuth() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const SignupScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
 
   void _navigateToChat() {
     Navigator.pushReplacement(
