@@ -169,7 +169,7 @@ class AuthService {
         // Wait for the session to be properly established
         await Future.delayed(const Duration(milliseconds: 100));
         
-        // Set the current session immediately
+        // Set the current session if present (may be null when email confirmation required)
         _currentSession = response.session;
         
         try {
@@ -242,7 +242,34 @@ class AuthService {
       return AuthResult.error('Failed to sign in');
     } catch (e) {
       print('Signin error: $e');
+      final message = e.toString();
+      // Handle unconfirmed email case gracefully and re-send confirmation link
+      if (message.contains('email_not_confirmed')) {
+        try {
+          await _supabase.auth.resend(
+            type: OtpType.signup,
+            email: email,
+          );
+        } catch (resendError) {
+          print('Resend confirmation error: $resendError');
+        }
+        return AuthResult.error(
+          'Email not confirmed. We just sent a new confirmation link to $email.',
+        );
+      }
       return AuthResult.error('Failed to sign in: ${e.toString()}');
+    }
+  }
+
+  Future<void> resendSignUpConfirmation(String email) async {
+    try {
+      await _supabase.auth.resend(
+        type: OtpType.signup,
+        email: email,
+      );
+    } catch (e) {
+      print('Resend sign-up confirmation failed: $e');
+      rethrow;
     }
   }
 
@@ -350,83 +377,57 @@ class AuthService {
       _currentUser = User(
         id: _currentUser!.id,
         email: _currentUser!.email,
-        customerId: _currentUser!.customerId,
-        tier: hasPremiumAccess ? 'premium' : _currentUser!.tier,
-        createdAt: _currentUser!.createdAt,
-        updatedAt: DateTime.now(),
-        subscriptionId: _currentUser!.subscriptionId,
-        subscriptionStatus:
-            hasPremiumAccess ? 'active' : _currentUser!.subscriptionStatus,
-        endedAt: _currentUser!.endedAt,
         walletAddress: walletAddress,
         stakeAddress: stakeAddress,
         premiumAccessDetails: premiumDetails,
+        tier: _currentUser!.tier,
+        createdAt: _currentUser!.createdAt,
+        updatedAt: DateTime.now(),
       );
 
       await _saveUserSession();
-      await _updateUserInDatabase(); // Save wallet data to database
-
-      // Award XP for 'Add a wallet'
-      try {
-        final gami = GamificationService();
-        await gami.awardTask('task_add_wallet');
-      } catch (_) {}
-
+      await _updateUserInDatabase();
       return true;
     } catch (e) {
-      print('Error connecting Cardano wallet: $e');
+      print('Connect Cardano wallet error: $e');
       return false;
     }
   }
 
-  /// Connect external Cardano wallet (e.g., GameChanger) for premium access verification
-  Future<bool> connectCardanoWalletExternal(String walletName, String address, String stakeAddress) async {
+  /// Connect external wallet (e.g., GameChanger)
+  Future<bool> connectCardanoWalletExternal(
+      String walletName, String address, String stakeAddress) async {
     if (_currentUser == null) {
       return false;
     }
 
     try {
-      // Connect external wallet
-      final success = await _cardanoWalletService.connectExternalWallet(walletName, address, stakeAddress);
+      final success = await _cardanoWalletService
+          .connectExternalWallet(walletName, address, stakeAddress);
 
       if (!success) {
         return false;
       }
 
-      // Check premium access
       final hasPremiumAccess = _cardanoWalletService.hasPremiumAccess;
       final premiumDetails = _cardanoWalletService.premiumAccessDetails;
 
-      // Update user with wallet info and premium access
       _currentUser = User(
         id: _currentUser!.id,
         email: _currentUser!.email,
-        customerId: _currentUser!.customerId,
-        tier: hasPremiumAccess ? 'premium' : _currentUser!.tier,
-        createdAt: _currentUser!.createdAt,
-        updatedAt: DateTime.now(),
-        subscriptionId: _currentUser!.subscriptionId,
-        subscriptionStatus:
-            hasPremiumAccess ? 'active' : _currentUser!.subscriptionStatus,
-        endedAt: _currentUser!.endedAt,
         walletAddress: address,
         stakeAddress: stakeAddress,
         premiumAccessDetails: premiumDetails,
+        tier: _currentUser!.tier,
+        createdAt: _currentUser!.createdAt,
+        updatedAt: DateTime.now(),
       );
 
       await _saveUserSession();
-      await _updateUserInDatabase(); // Save wallet data to database
-
-      // Award XP for 'Add a wallet'
-      try {
-        final gami = GamificationService();
-        await gami.awardTask('task_add_wallet');
-      } catch (_) {}
-
-      print('External Cardano wallet connected successfully: $walletName');
+      await _updateUserInDatabase();
       return true;
     } catch (e) {
-      print('Error connecting external Cardano wallet: $e');
+      print('Connect external wallet error: $e');
       return false;
     }
   }
