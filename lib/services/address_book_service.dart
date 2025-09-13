@@ -49,6 +49,34 @@ class AddressBookService {
           );
         }).toList();
         _entries.sort((a, b) => a.name.compareTo(b.name));
+
+        // If remote is empty but local cache exists, bootstrap-sync local -> remote
+        if (_entries.isEmpty) {
+          try {
+            final cached = await _storage.read(key: _addressBookKey);
+            if (cached != null) {
+              final List<dynamic> cacheList = json.decode(cached);
+              final localEntries = cacheList.map((e) => AddressBookEntry.fromJson(e)).toList();
+              if (localEntries.isNotEmpty) {
+                final payload = localEntries.map((e) => {
+                  'id': e.id,
+                  'user_id': _userId!,
+                  'name': e.name,
+                  'address': e.address,
+                  'handle': e.handle,
+                  'description': e.description,
+                  'created_at': e.createdAt.toIso8601String(),
+                  'last_used': e.lastUsed?.toIso8601String(),
+                }).toList();
+                await _supabase.from('address_book').upsert(payload, onConflict: 'id');
+                _entries = localEntries;
+                _entries.sort((a, b) => a.name.compareTo(b.name));
+              }
+            }
+          } catch (e) {
+            // Silent; best-effort bootstrap
+          }
+        }
         // Cache for offline use
         await _saveCache();
         return;
