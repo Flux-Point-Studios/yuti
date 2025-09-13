@@ -14,6 +14,7 @@ import 'cardano_wallet_service.dart';
 import 'address_book_service.dart';
 import 'smart_wallet_service.dart';
 import 'auth_service.dart';
+import '../models/address_book_entry.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math' as math;
 
