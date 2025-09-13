@@ -91,6 +91,7 @@ class ChatService {
   final SaturnSwapService _saturnSwapService = SaturnSwapService();
   late final TransactionService _transactionService;
   final CardanoWalletService _cardanoWalletService = CardanoWalletService();
+  final AddressBookService _addressBookService = AddressBookService();
 
   // Wallet context cache to avoid excessive API calls
   Map<String, dynamic>? _cachedWalletContext;
@@ -623,12 +624,21 @@ class ChatService {
       print('🔍 DEBUG: Failed to build wallet context: $e');
     }
 
+    // Include lightweight contacts list for Agent T
+    List<Map<String, String>>? contacts;
+    try {
+      await _addressBookService.initialize();
+      final list = _addressBookService.summarizeForContext(limit: 25);
+      contacts = list.isNotEmpty ? list : null;
+    } catch (_) {}
+
     final body = jsonEncode({
       'message': message,
       'session_id': _sessionId,
       if (walletContext != null)
         'context': {
           'wallet': walletContext,
+          if (contacts != null) 'contacts': contacts,
           'hints': 'Use wallet.context to answer user questions about balance, transactions, and holdings. All values are public chain data; never request or expose private keys. If user requests actions like send/swap, ask for missing details and call appropriate tools.'
         },
     });
