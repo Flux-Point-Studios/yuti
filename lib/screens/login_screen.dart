@@ -367,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen>
       final connected = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => CardanoWalletDialog(authService: _authService),
+        builder: (context) => CardanoWalletDialog(authService: _authService, smartWalletOnly: true),
       );
 
       if (connected == true) {

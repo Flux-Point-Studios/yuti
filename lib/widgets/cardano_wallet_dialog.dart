@@ -17,10 +17,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 class CardanoWalletDialog extends StatefulWidget {
   final AuthService authService;
+  final bool smartWalletOnly;
 
   const CardanoWalletDialog({
     Key? key,
     required this.authService,
+    this.smartWalletOnly = false,
   }) : super(key: key);
 
   @override
@@ -193,9 +195,11 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildConnectionModeSelector(),
-          const SizedBox(height: 20),
-          if (_connectionMode == ConnectionMode.mnemonic) ...[
+          if (!widget.smartWalletOnly) _buildConnectionModeSelector(),
+          if (!widget.smartWalletOnly) const SizedBox(height: 20),
+          if (widget.smartWalletOnly) ...[
+            _buildSmartWalletSection(),
+          ] else if (_connectionMode == ConnectionMode.mnemonic) ...[
             _buildWalletNameField(),
             const SizedBox(height: 16),
             _buildMnemonicField(),
@@ -203,7 +207,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             _buildSmartWalletSection(),
           ],
           const SizedBox(height: 16),
-          _buildPremiumAccessInfo(),
+          if (!widget.smartWalletOnly) _buildPremiumAccessInfo(),
           if (_errorMessage != null) ...[
             const SizedBox(height: 16),
             _buildErrorMessage(),
@@ -642,7 +646,7 @@ class _CardanoWalletDialogState extends State<CardanoWalletDialog> {
             ),
           ),
           const SizedBox(width: 16),
-          if (_connectionMode == ConnectionMode.mnemonic)
+          if (!widget.smartWalletOnly && _connectionMode == ConnectionMode.mnemonic)
             Expanded(
               child: ElevatedButton(
                 onPressed: _isLoading
