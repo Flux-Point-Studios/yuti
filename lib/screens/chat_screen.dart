@@ -1224,6 +1224,49 @@ class _QrToggle extends StatefulWidget {
 class _QrToggleState extends State<_QrToggle> {
   bool _showQr = true;
 
+  void _openFullscreen() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black87,
+      builder: (ctx) {
+        return GestureDetector(
+          onTap: () => Navigator.of(ctx).pop(),
+          child: Container(
+            color: Colors.transparent,
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: QrImageView(
+                      data: widget.address,
+                      size: 320,
+                      backgroundColor: Colors.white,
+                      embeddedImage: const AssetImage('assets/bluelight.png'),
+                      embeddedImageStyle: const QrEmbeddedImageStyle(size: Size(96, 96)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Tap anywhere to close',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1236,6 +1279,7 @@ class _QrToggleState extends State<_QrToggle> {
         const SizedBox(height: 12),
         GestureDetector(
           onTap: () => setState(() => _showQr = !_showQr),
+          onLongPress: () { if (_showQr) _openFullscreen(); },
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             switchInCurve: Curves.easeOut,
@@ -1252,6 +1296,8 @@ class _QrToggleState extends State<_QrToggle> {
                       data: widget.address,
                       size: 200,
                       backgroundColor: Colors.white,
+                      embeddedImage: const AssetImage('assets/bluelight.png'),
+                      embeddedImageStyle: const QrEmbeddedImageStyle(size: Size(48, 48)),
                     ),
                   )
                 : Container(
