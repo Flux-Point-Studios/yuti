@@ -1,6 +1,6 @@
 {
   "name": "bluelight-crypto-hub",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "BlueLight - Natural Language Crypto Hub with AI Assistant",
   "type": "module",
   "main": "index.js",

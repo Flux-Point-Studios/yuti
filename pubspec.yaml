@@ -3,7 +3,7 @@ description: Yuti – a conversational Cardano wallet with Agent T AI assistant
 
 publish_to: 'none'
 
-version: 1.0.1+30
+version: 1.5.0+31
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
