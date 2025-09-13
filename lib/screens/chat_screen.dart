@@ -659,6 +659,13 @@ class _ChatScreenState extends State<ChatScreen> {
       case MessageType.swap:
         return _buildSwapMessage(message);
       default:
+        // Smart-detect receive address in assistant text (historical messages from server)
+        if (!message.isUser) {
+          final addr = _extractAddressFromText(message.text);
+          if (addr != null) {
+            return _QrToggle(address: addr, caption: message.text);
+          }
+        }
         return Text(
           message.text,
           style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -1349,4 +1356,12 @@ class _QrToggleState extends State<_QrToggle> {
       ],
     );
   }
+}
+
+String? _extractAddressFromText(String text) {
+  final codeAddr = RegExp(r'`(addr1[0-9a-z]+|addr_test1[0-9a-z]+)`', caseSensitive: false).firstMatch(text);
+  if (codeAddr != null) return codeAddr.group(1);
+  final bare = RegExp(r'(addr1[0-9a-z]+|addr_test1[0-9a-z]+)', caseSensitive: false).firstMatch(text);
+  if (bare != null) return bare.group(1);
+  return null;
 }
