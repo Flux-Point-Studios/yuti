@@ -600,6 +600,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageContent(ChatMessage message) {
     switch (message.type) {
       case MessageType.text:
+        // If assistant text contains an address, show our QR/Toggle UI
+        if (!message.isUser) {
+          final addr = _extractAddressFromText(message.text);
+          if (addr != null) {
+            return _QrToggle(address: addr, caption: message.text);
+          }
+        }
         return MarkdownBody(
           data: message.text,
           styleSheet: MarkdownStyleSheet(
@@ -659,13 +666,6 @@ class _ChatScreenState extends State<ChatScreen> {
       case MessageType.swap:
         return _buildSwapMessage(message);
       default:
-        // Smart-detect receive address in assistant text (historical messages from server)
-        if (!message.isUser) {
-          final addr = _extractAddressFromText(message.text);
-          if (addr != null) {
-            return _QrToggle(address: addr, caption: message.text);
-          }
-        }
         return Text(
           message.text,
           style: const TextStyle(color: Colors.white, fontSize: 16),
