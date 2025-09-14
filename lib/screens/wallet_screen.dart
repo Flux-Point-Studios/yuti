@@ -14,6 +14,10 @@ import 'swap_screen.dart';
 import 'transactions_screen.dart';
 import 'address_book_screen.dart';
 import '../services/blockfrost_service.dart'; // Added import for BlockfrostService
+import '../services/asset_cache_service.dart';
+import '../config/app_config.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class WalletScreen extends StatefulWidget {
   final AuthService authService;
@@ -33,6 +37,7 @@ class _WalletScreenState extends State<WalletScreen> {
   final TransactionHistoryService _transactionHistoryService = TransactionHistoryService();
   final AddressBookService _addressBookService = AddressBookService();
   final BlockfrostService _blockfrostService = BlockfrostService(); // Added BlockfrostService
+  final AssetCacheService _assetCache = AssetCacheService();
   
   bool _isLoading = false;
   Map<String, dynamic>? _walletBalance;
@@ -718,7 +723,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _buildTokenItem(Map<String, dynamic> token) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: _blockfrostService.getAssetDisplayInfo(token['unit'] ?? token['unit_id'] ?? token['unit']),
+      future: _assetCache.getDisplayInfoWithCache(token['unit'] ?? token['unit_id'] ?? token['unit']),
       builder: (context, snap) {
         final display = snap.data;
         final name = display?['name'] ?? token['asset_name'] ?? 'Unknown Token';
@@ -729,7 +734,9 @@ class _WalletScreenState extends State<WalletScreen> {
           final v = BigInt.parse(qtyStr).toDouble();
           human = (v / (decimals == 0 ? 1 : (pow10(decimals)))).toStringAsFixed(decimals.clamp(0, 8));
         } catch (_) {}
-        return Padding(
+        return GestureDetector(
+          onLongPress: () => _researchAsset(token['unit'] ?? token['unit_id'] ?? token['unit'], name.toString()),
+          child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
@@ -777,7 +784,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
         ],
       ),
-        );
+        ));
       },
     );
   }
@@ -1122,4 +1129,33 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   double pow10(int n) => List.generate(n, (_) => 10).fold<double>(1, (a, b) => a * b);
+
+  Future<void> _researchAsset(String unit, String displayName) async {
+    try {
+      final cacheKey = 'research:$unit';
+      final cached = await _assetCache.getResearch(cacheKey);
+      if (cached != null && mounted) {
+        _showCopyConfirmation('T Insights (cached): ${cached['summary'] ?? ''}');
+        return;
+      }
+
+      final app = AppConfig();
+      final endpoint = app.tBackendUrl + '/chat';
+      final url = Uri.parse(endpoint);
+      final headers = {'Content-Type': 'application/json'};
+      final body = jsonEncode({
+        'message': 'Give a brief overview (max 6 lines) about Cardano asset "$displayName" with unit "$unit". Include what it is, notable utility, and any relevant resources. Use bullet points.',
+        'session_id': 'wallet_insights',
+        'context': {'asset_unit': unit, 'asset_name': displayName},
+      });
+      final resp = await http.post(url, headers: headers, body: body);
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body) as Map<String, dynamic>;
+        final reply = data['reply']?.toString() ?? 'No info available.';
+        await _assetCache.cacheResearch(cacheKey, {'summary': reply});
+        if (!mounted) return;
+        _showCopyConfirmation('T Insights: $reply');
+      }
+    } catch (_) {}
+  }
 } 
