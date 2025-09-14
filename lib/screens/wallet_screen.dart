@@ -212,7 +212,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildWalletContent() {
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,9 +223,140 @@ class _WalletScreenState extends State<WalletScreen> {
           const SizedBox(height: 20),
           _buildActionButtons(),
           const SizedBox(height: 20),
-          if (_tokenHoldings != null && _tokenHoldings!.isNotEmpty)
-            _buildTokensList(),
+          Expanded(child: _buildAssetsTabs()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAssetsTabs() {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TabBar(
+            labelColor: AppColors.primaryBlue,
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: AppColors.primaryBlue,
+            tabs: const [
+              Tab(text: 'Tokens'),
+              Tab(text: 'NFTs'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildTokensListScrollable(),
+                _buildNftsListScrollable(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTokensListScrollable() {
+    final tokens = _tokenHoldings ?? [];
+    return SingleChildScrollView(
+      child: tokens.isEmpty
+          ? _emptyAssets('No tokens found')
+          : GlassmorphismContainer(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Tokens', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    ...tokens.map((t) => _buildTokenItem(t)),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildNftsListScrollable() {
+    final nfts = (_tokenHoldings ?? []).where(_isLikelyNft).toList();
+    return SingleChildScrollView(
+      child: nfts.isEmpty
+          ? _emptyAssets('No NFTs found')
+          : GlassmorphismContainer(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('NFTs', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    ...nfts.map((n) => _buildNftItem(n)),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  bool _isLikelyNft(Map<String, dynamic> token) {
+    // Heuristic: NFTs are non-fungible (quantity == 1) and often have asset_name metadata
+    try {
+      final qtyStr = token['quantity']?.toString() ?? '0';
+      final isOne = BigInt.tryParse(qtyStr) == BigInt.one;
+      final name = token['asset_name']?.toString() ?? '';
+      return isOne && name.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Widget _buildNftItem(Map<String, dynamic> token) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
+            ),
+            child: const Icon(Icons.image, color: AppColors.primaryBlue, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  token['asset_name'] ?? 'NFT',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  'Policy: ${token['policy_id']?.substring(0, 8) ?? ''}...',
+                  style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '#1',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyAssets(String text) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(text, style: TextStyle(color: AppColors.textSecondary)),
       ),
     );
   }
