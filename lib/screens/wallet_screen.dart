@@ -13,6 +13,7 @@ import 'send_screen.dart';
 import 'swap_screen.dart';
 import 'transactions_screen.dart';
 import 'address_book_screen.dart';
+import '../services/blockfrost_service.dart'; // Added import for BlockfrostService
 
 class WalletScreen extends StatefulWidget {
   final AuthService authService;
@@ -31,6 +32,7 @@ class _WalletScreenState extends State<WalletScreen> {
   final WalletService _localWalletService = WalletService();
   final TransactionHistoryService _transactionHistoryService = TransactionHistoryService();
   final AddressBookService _addressBookService = AddressBookService();
+  final BlockfrostService _blockfrostService = BlockfrostService(); // Added BlockfrostService
   
   bool _isLoading = false;
   Map<String, dynamic>? _walletBalance;
@@ -313,7 +315,16 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildNftItem(Map<String, dynamic> token) {
-    return Padding(
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _blockfrostService.getAssetMetadata(token['unit'] ?? token['unit_id'] ?? token['unit']),
+      builder: (context, snap) {
+        final meta = snap.data ?? {};
+        final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
+        final name = onchain['name']?.toString() ?? token['asset_name'] ?? 'NFT';
+        final policy = (meta['policy_id'] ?? token['policy_id'] ?? '').toString();
+        final image = (onchain['image'] ?? onchain['img'] ?? '').toString();
+        final imageUrl = _coerceImageUrl(image);
+        return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
@@ -325,7 +336,10 @@ class _WalletScreenState extends State<WalletScreen> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
             ),
-            child: const Icon(Icons.image, color: AppColors.primaryBlue, size: 24),
+            clipBehavior: Clip.antiAlias,
+            child: imageUrl == null
+                ? const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)
+                : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -333,11 +347,11 @@ class _WalletScreenState extends State<WalletScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  token['asset_name'] ?? 'NFT',
+                  name,
                   style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  'Policy: ${token['policy_id']?.substring(0, 8) ?? ''}...',
+                  'Policy: ${policy.isNotEmpty ? policy.substring(0, policy.length.clamp(0, 8)) : ''}...',
                   style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
                 ),
               ],
@@ -349,6 +363,8 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
@@ -701,7 +717,19 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildTokenItem(Map<String, dynamic> token) {
-    return Padding(
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _blockfrostService.getAssetDisplayInfo(token['unit'] ?? token['unit_id'] ?? token['unit']),
+      builder: (context, snap) {
+        final display = snap.data;
+        final name = display?['name'] ?? token['asset_name'] ?? 'Unknown Token';
+        final decimals = (display?['decimals'] as int?) ?? 0;
+        final qtyStr = token['quantity']?.toString() ?? '0';
+        String human = qtyStr;
+        try {
+          final v = BigInt.parse(qtyStr).toDouble();
+          human = (v / (decimals == 0 ? 1 : (pow10(decimals)))).toStringAsFixed(decimals.clamp(0, 8));
+        } catch (_) {}
+        return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
@@ -724,14 +752,14 @@ class _WalletScreenState extends State<WalletScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  token['asset_name'] ?? 'Unknown Token',
+                  name.toString(),
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
-                  'Policy: ${token['policy_id']?.substring(0, 8) ?? ''}...',
+                  'Policy: ${(display?['policy_id'] ?? token['policy_id'] ?? '')}'.substring(0, (display?['policy_id'] ?? token['policy_id'] ?? '').toString().length.clamp(0, 8)) + '...',
                   style: TextStyle(
                     color: AppColors.textTertiary,
                     fontSize: 12,
@@ -741,7 +769,7 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ),
           Text(
-            token['quantity']?.toString() ?? '0',
+            human,
             style: TextStyle(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w500,
@@ -749,6 +777,8 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
@@ -1070,4 +1100,26 @@ class _WalletScreenState extends State<WalletScreen> {
       _showCopyConfirmation('Error exporting mnemonic');
     }
   }
+
+  String? _coerceImageUrl(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    var v = raw;
+    // Some on-chain metadata stores as list ["ipfs://..."]
+    if (v.startsWith('[')) {
+      try {
+        final arr = v.replaceAll('[', '').replaceAll(']', '').replaceAll('"', '').split(',');
+        if (arr.isNotEmpty) v = arr.first.trim();
+      } catch (_) {}
+    }
+    if (v.startsWith('ipfs://')) {
+      return 'https://ipfs.io/ipfs/' + v.substring('ipfs://'.length);
+    }
+    if (v.startsWith('ar://')) {
+      return 'https://arweave.net/' + v.substring('ar://'.length);
+    }
+    if (v.startsWith('http')) return v;
+    return null;
+  }
+
+  double pow10(int n) => List.generate(n, (_) => 10).fold<double>(1, (a, b) => a * b);
 } 
