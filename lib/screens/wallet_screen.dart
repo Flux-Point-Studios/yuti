@@ -43,6 +43,8 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isLoading = false;
   Map<String, dynamic>? _walletBalance;
   List<Map<String, dynamic>>? _tokenHoldings;
+  List<Map<String, dynamic>> _tokensOnly = [];
+  List<Map<String, dynamic>> _nftsOnly = [];
   String? _errorMessage;
 
   @override
@@ -87,11 +89,51 @@ class _WalletScreenState extends State<WalletScreen> {
 
     try {
       final balance = await _walletService.getWalletBalance();
-      final tokens = await _walletService.getTokenHoldings();
-      
+      final rows = await _walletService.getTokenHoldings();
+
+      // Resolve display info once per unique unit
+      final units = <String>{
+        for (final r in rows)
+          ((r['unit'] ?? r['unit_id'] ?? r['unit'])?.toString() ?? '').toLowerCase()
+      }..removeWhere((e) => e.isEmpty);
+
+      final Map<String, Map<String, dynamic>> infoByUnit = {};
+      for (final u in units) {
+        try {
+          final info = await _assetCache.getDisplayInfoWithCache(u);
+          infoByUnit[u] = info;
+        } catch (_) {}
+      }
+
+      // Enrich and split
+      final enriched = <Map<String, dynamic>>[];
+      final tokensOnly = <Map<String, dynamic>>[];
+      final nftsOnly = <Map<String, dynamic>>[];
+      for (final r in rows) {
+        final unit = ((r['unit'] ?? r['unit_id'] ?? r['unit'])?.toString() ?? '').toLowerCase();
+        final info = infoByUnit[unit] ?? const {};
+        final e = {...r, ...info};
+        enriched.add(e);
+        if (e['isNFT'] == true) {
+          nftsOnly.add(e);
+        } else {
+          tokensOnly.add(e);
+        }
+      }
+
+      // Sort for nicer UX
+      tokensOnly.sort((a, b) => ((a['ticker'] ?? a['name'] ?? '') as String)
+          .toLowerCase()
+          .compareTo(((b['ticker'] ?? b['name'] ?? '') as String).toLowerCase()));
+      nftsOnly.sort((a, b) => ((a['name'] ?? '') as String)
+          .toLowerCase()
+          .compareTo(((b['name'] ?? '') as String).toLowerCase()));
+
       setState(() {
         _walletBalance = balance;
-        _tokenHoldings = tokens;
+        _tokenHoldings = enriched;
+        _tokensOnly = tokensOnly;
+        _nftsOnly = nftsOnly;
       });
     } catch (e) {
       setState(() {
@@ -277,7 +319,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildTokensListScrollable() {
-    final tokens = _tokenHoldings ?? [];
+    final tokens = _tokensOnly;
     return SingleChildScrollView(
       child: tokens.isEmpty
           ? _emptyAssets('No tokens found')
@@ -298,7 +340,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildNftsListScrollable() {
-    final nfts = (_tokenHoldings ?? []).toList();
+    final nfts = _nftsOnly;
     return SingleChildScrollView(
       child: nfts.isEmpty
           ? _emptyAssets('No NFTs found')
@@ -310,7 +352,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   children: [
                     Text('NFTs', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    ...nfts.map((n) => _buildNftItem(n)),
+                    ...nfts.map((n) => _buildNftItemEnriched(n)),
                   ],
                 ),
               ),
@@ -318,68 +360,54 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildNftItem(Map<String, dynamic> token) {
-    final unit = token['unit'] ?? token['unit_id'] ?? token['unit'];
-    if (unit == null) return const SizedBox.shrink();
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _blockfrostService.getAssetMetadata(unit),
-      builder: (context, snap) {
-        final meta = snap.data;
-        if (meta == null) return const SizedBox.shrink();
-        final std = (meta['onchain_metadata_standard'] ?? '') as String;
-        final isCip25 = std.startsWith('CIP25');
-        final isCip68 = std.startsWith('CIP68');
-        final nameHex = (meta['asset_name'] ?? '') as String?;
-        final isLabel222 = nameHex != null && nameHex.startsWith('000de140');
-        final isNft = isCip25 || (isCip68 && isLabel222);
-        if (!isNft) return const SizedBox.shrink();
-
-        final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
-        final policy = (meta['policy_id'] ?? token['policy_id'] ?? '').toString();
-        final displayName = (onchain['name']?.toString() ?? _decodeHex(nameHex) ?? 'NFT');
-        final image = (onchain['image'] ?? onchain['img'] ?? '').toString();
-        final imageUrl = _coerceImageUrl(image);
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: imageUrl == null
-                    ? const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)
-                    : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)),
+  Widget _buildNftItemEnriched(Map<String, dynamic> item) {
+    final unit = (item['unit'] ?? item['unit_id'] ?? '').toString();
+    final policy = (item['policy_id'] ?? '').toString();
+    final displayName = (item['name']?.toString() ?? _decodeHex((item['asset_name'] ?? '').toString()) ?? 'NFT');
+    final imageUrl = (item['image'] as String?);
+    return GestureDetector(
+      onTap: () => _researchAsset(unit, displayName),
+      onLongPress: () => _researchAsset(unit, displayName),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primaryBlue.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      'Policy: ${policy.isNotEmpty ? policy.substring(0, policy.length.clamp(0, 8)) : ''}...',
-                      style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
-                    ),
-                  ],
-                ),
+              clipBehavior: Clip.antiAlias,
+              child: (imageUrl != null && imageUrl.isNotEmpty)
+                  ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: AppColors.primaryBlue, size: 24))
+                  : const Icon(Icons.image, color: AppColors.primaryBlue, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    'Policy: ${policy.isNotEmpty ? policy.substring(0, policy.length.clamp(0, 8)) : ''}...',
+                    style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+                  ),
+                ],
               ),
-              const Text(
-                '#1',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        );
-      },
+            ),
+            const Text(
+              '#1',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
