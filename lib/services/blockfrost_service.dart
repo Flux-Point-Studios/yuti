@@ -505,7 +505,7 @@ class BlockfrostService {
       }
       final headers = await _getHeaders();
       final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses');
-      final response = await http.get(url, headers: headers);
+      var response = await http.get(url, headers: headers);
       if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
         final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses'));
         response = await http.get(alt);
@@ -541,7 +541,7 @@ class BlockfrostService {
     }
     final headers = await _getHeaders();
     final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses/assets');
-    final response = await http.get(url, headers: headers);
+    var response = await http.get(url, headers: headers);
     if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
       final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
       response = await http.get(alt);
