@@ -18,6 +18,7 @@ import '../services/asset_cache_service.dart';
 import '../config/app_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../widgets/cardano_wallet_dialog.dart';
 
 class WalletScreen extends StatefulWidget {
   final AuthService authService;
@@ -999,6 +1000,53 @@ class _WalletScreenState extends State<WalletScreen> {
                 _showCopyConfirmation('Debug info printed to console');
               },
             ),
+            const Divider(height: 24, color: Color(0x22FFFFFF)),
+            ListTile(
+              leading: Icon(Icons.link_off, color: _walletService.isConnected ? Colors.redAccent : AppColors.textSecondary.withOpacity(0.6)),
+              title: Text(
+                'Disconnect Wallet',
+                style: TextStyle(color: _walletService.isConnected ? Colors.redAccent : AppColors.textSecondary),
+              ),
+              subtitle: Text(
+                _walletService.isConnected ? 'Remove linked wallet from this account' : 'No wallet linked',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+              enabled: _walletService.isConnected,
+              onTap: () async {
+                Navigator.pop(context);
+                await _disconnectWalletFlow();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download, color: AppColors.primaryBlue),
+              title: const Text(
+                'Import/Restore Wallet',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: const Text(
+                'Use a mnemonic to restore a wallet',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _openManualWalletConnect();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline, color: AppColors.primaryBlue),
+              title: const Text(
+                'Create New Wallet',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: const Text(
+                'Generate a new wallet in-app',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _openManualWalletConnect();
+              },
+            ),
           ],
         ),
         actions: [
@@ -1157,5 +1205,89 @@ class _WalletScreenState extends State<WalletScreen> {
         _showCopyConfirmation('T Insights: $reply');
       }
     } catch (_) {}
+  }
+
+  Future<void> _disconnectWalletFlow() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundDark,
+        title: const Text(
+          'Disconnect Wallet',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'Are you sure you want to disconnect your linked wallet? You can import or create a new one afterwards.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Disconnect', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await widget.authService.disconnectCardanoWallet();
+        if (mounted) {
+          setState(() {});
+          _showCopyConfirmation('Wallet disconnected');
+          await _loadWalletData();
+        }
+      } catch (e) {
+        _showCopyConfirmation('Failed to disconnect wallet');
+      }
+    }
+  }
+
+  Future<void> _openManualWalletConnect() async {
+    // If already connected, confirm replacement
+    if (_walletService.isConnected) {
+      final replace = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.backgroundDark,
+          title: const Text('Replace Wallet', style: TextStyle(color: AppColors.textPrimary)),
+          content: const Text(
+            'Importing or creating a new wallet will replace your current linked wallet. Continue?',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Replace', style: TextStyle(color: AppColors.primaryBlue)),
+            ),
+          ],
+        ),
+      );
+      if (replace != true) return;
+      await widget.authService.disconnectCardanoWallet();
+    }
+
+    final connected = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => CardanoWalletDialog(
+        authService: widget.authService,
+        manualOnly: true,
+      ),
+    );
+
+    if (connected == true) {
+      await _ensureWalletConnectedFromUser();
+      await _loadWalletData();
+      if (mounted) _showCopyConfirmation('Wallet connected');
+    }
   }
 } 
