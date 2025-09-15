@@ -225,16 +225,25 @@ class BlockfrostService {
   // Get asset metadata
   Future<Map<String, dynamic>> getAssetMetadata(String assetId) async {
     try {
-      final url = Uri.https(_baseUrl, '/api/v0/assets/$assetId');
-      final headers = await _getHeaders();
-      final response = await http.get(url, headers: headers);
+      Uri url;
+      Map<String, String> headers = {};
+      try {
+        headers = await _getHeaders();
+        url = Uri.https(_baseUrl, '/api/v0/assets/$assetId');
+      } catch (_) {
+        if (!kIsWeb) rethrow;
+        url = Uri.parse('/api/blockfrost/assets/$assetId');
+      }
+      var response = await http.get(url, headers: headers);
+      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
+        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('assets/$assetId'));
+        response = await http.get(alt);
+      }
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
-      } else {
-        throw Exception(
-            'Failed to fetch asset metadata: ${response.statusCode}');
       }
+      throw Exception('Failed to fetch asset metadata: ${response.statusCode}');
     } catch (e) {
       throw Exception('Error fetching asset metadata: $e');
     }
