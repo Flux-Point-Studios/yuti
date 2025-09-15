@@ -220,24 +220,33 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildWalletContent() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildWalletInfo(),
-          const SizedBox(height: 20),
-          _buildBalanceCard(),
-          const SizedBox(height: 20),
-          _buildActionButtons(),
-          const SizedBox(height: 20),
-          Expanded(child: _buildAssetsTabs()),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double tabHeight = (constraints.maxHeight * 0.45).clamp(320.0, 560.0);
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWalletInfo(),
+                const SizedBox(height: 20),
+                _buildBalanceCard(),
+                const SizedBox(height: 20),
+                _buildActionButtons(),
+                const SizedBox(height: 20),
+                _buildAssetsTabs(height: tabHeight),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildAssetsTabs() {
+  Widget _buildAssetsTabs({double? height}) {
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -253,7 +262,8 @@ class _WalletScreenState extends State<WalletScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Expanded(
+          SizedBox(
+            height: height ?? 420,
             child: TabBarView(
               children: [
                 _buildTokensListScrollable(),
