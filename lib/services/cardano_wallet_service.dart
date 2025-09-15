@@ -298,20 +298,21 @@ class CardanoWalletService {
       BigInt adaBalance;
       List<Map<String, dynamic>> assets;
 
-      if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
-        // Aggregate across all addresses controlled by this stake key
-        adaBalance = await _blockfrostService.getAggregatedAdaForStakeAddress(_stakeAddress!);
-        assets = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
-        // If aggregation returns nothing (e.g., stake not registered), fallback to derived scan if mnemonic exists
-        if (assets.isEmpty && (_mnemonic != null && _mnemonic!.isNotEmpty)) {
-          final scanned = await _scanDerivedAddresses(maxAddresses: 20);
-          adaBalance = scanned.ada;
-          assets = scanned.assets;
-        }
-      } else {
-        // Fallback: single payment address view
-        adaBalance = await _blockfrostService.getAdaBalance(_currentAddress!);
-        assets = await _blockfrostService.getAssets(_currentAddress!);
+      // Address-first: always fetch from the connected payment address
+      adaBalance = await _blockfrostService.getAdaBalance(_currentAddress!);
+      assets = await _blockfrostService.getAssets(_currentAddress!);
+      // If empty and stake key exists, try stake aggregation
+      if (assets.isEmpty && _stakeAddress != null && _stakeAddress!.isNotEmpty) {
+        try {
+          adaBalance = await _blockfrostService.getAggregatedAdaForStakeAddress(_stakeAddress!);
+          assets = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+        } catch (_) {}
+      }
+      // If still empty and we have a mnemonic, scan first N derived addresses
+      if (assets.isEmpty && (_mnemonic != null && _mnemonic!.isNotEmpty)) {
+        final scanned = await _scanDerivedAddresses(maxAddresses: 20);
+        adaBalance = scanned.ada;
+        assets = scanned.assets;
       }
 
       return {
@@ -399,17 +400,16 @@ class CardanoWalletService {
     }
 
     try {
-      if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
-        final aggregated = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
-        if (aggregated.isNotEmpty) return aggregated;
-        if (_mnemonic != null && _mnemonic!.isNotEmpty) {
-          final scanned = await _scanDerivedAddresses(maxAddresses: 20);
-          return scanned.assets;
-        }
-        return aggregated;
-      }
+      // Address-first for token holdings
       final single = await _blockfrostService.getAssets(_currentAddress!);
-      if (single.isEmpty && _mnemonic != null && _mnemonic!.isNotEmpty) {
+      if (single.isNotEmpty) return single;
+      if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
+        try {
+          final aggregated = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+          if (aggregated.isNotEmpty) return aggregated;
+        } catch (_) {}
+      }
+      if (_mnemonic != null && _mnemonic!.isNotEmpty) {
         final scanned = await _scanDerivedAddresses(maxAddresses: 20);
         return scanned.assets;
       }
