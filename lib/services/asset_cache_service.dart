@@ -4,7 +4,7 @@ import 'blockfrost_service.dart';
 
 class AssetCacheService {
   static const _storage = FlutterSecureStorage();
-  static const String _metaKey = 'asset_metadata_cache_v1';
+  static const String _metaKey = 'asset_metadata_cache_v2';
   static const String _researchKey = 'asset_research_cache_v1';
 
   static final AssetCacheService _instance = AssetCacheService._internal();
