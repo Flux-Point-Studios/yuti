@@ -400,20 +400,22 @@ class CardanoWalletService {
     }
 
     try {
-      // Address-first for token holdings
+      // Prefer stake-aggregated across the whole wallet if available
+      if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
+        final aggregated = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+        if (aggregated.isNotEmpty) return aggregated;
+      }
+
+      // Fallback: single payment address
       final single = await _blockfrostService.getAssets(_currentAddress!);
       if (single.isNotEmpty) return single;
-      if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
-        try {
-          final aggregated = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
-          if (aggregated.isNotEmpty) return aggregated;
-        } catch (_) {}
-      }
+
+      // Last resort: scan first N derived addresses
       if (_mnemonic != null && _mnemonic!.isNotEmpty) {
         final scanned = await _scanDerivedAddresses(maxAddresses: 20);
         return scanned.assets;
       }
-      return single;
+      return [];
     } catch (e) {
       print('Error getting token holdings: $e');
       return [];
