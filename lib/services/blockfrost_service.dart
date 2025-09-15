@@ -225,27 +225,38 @@ class BlockfrostService {
   // Get asset metadata
   Future<Map<String, dynamic>> getAssetMetadata(String assetId) async {
     try {
-      Uri url;
-      Map<String, String> headers = {};
-      try {
-        headers = await _getHeaders();
-        url = Uri.https(_baseUrl, '/api/v0/assets/$assetId');
-      } catch (_) {
-        if (!kIsWeb) rethrow;
-        url = Uri.parse('/api/blockfrost/assets/$assetId');
-      }
-      var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
-        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('assets/$assetId'));
-        response = await http.get(alt);
+      // On web, prefer proxy first to avoid client key requirement and CORS
+      if (kIsWeb) {
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('assets/$assetId'));
+        var resp = await http.get(proxy);
+        if (resp.statusCode == 200) {
+          return json.decode(resp.body);
+        }
+        // Fallback to path-style proxy if configured
+        final alt = Uri.parse('/api/blockfrost/assets/$assetId');
+        resp = await http.get(alt);
+        if (resp.statusCode == 200) {
+          return json.decode(resp.body);
+        }
+        throw Exception('Failed to fetch asset metadata (web): ${resp.statusCode}');
       }
 
+      // Native: use direct Blockfrost with project_id header
+      final url = Uri.https(_baseUrl, '/api/v0/assets/$assetId');
+      final headers = await _getHeaders();
+      final response = await http.get(url, headers: headers);
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
       throw Exception('Failed to fetch asset metadata: ${response.statusCode}');
     } catch (e) {
-      throw Exception('Error fetching asset metadata: $e');
+      // Defensive fallback so UI can continue with minimal data
+      print('🔍 DEBUG: getAssetMetadata error for $assetId -> $e');
+      return {
+        'asset': assetId,
+        'onchain_metadata': {},
+        'metadata': {},
+      };
     }
   }
 
