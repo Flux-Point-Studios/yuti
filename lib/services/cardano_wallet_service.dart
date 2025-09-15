@@ -302,6 +302,12 @@ class CardanoWalletService {
         // Aggregate across all addresses controlled by this stake key
         adaBalance = await _blockfrostService.getAggregatedAdaForStakeAddress(_stakeAddress!);
         assets = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+        // If aggregation returns nothing (e.g., stake not registered), fallback to derived scan if mnemonic exists
+        if (assets.isEmpty && (_mnemonic != null && _mnemonic!.isNotEmpty)) {
+          final scanned = await _scanDerivedAddresses(maxAddresses: 20);
+          adaBalance = scanned.ada;
+          assets = scanned.assets;
+        }
       } else {
         // Fallback: single payment address view
         adaBalance = await _blockfrostService.getAdaBalance(_currentAddress!);
@@ -394,9 +400,20 @@ class CardanoWalletService {
 
     try {
       if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
-        return await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+        final aggregated = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+        if (aggregated.isNotEmpty) return aggregated;
+        if (_mnemonic != null && _mnemonic!.isNotEmpty) {
+          final scanned = await _scanDerivedAddresses(maxAddresses: 20);
+          return scanned.assets;
+        }
+        return aggregated;
       }
-      return await _blockfrostService.getAssets(_currentAddress!);
+      final single = await _blockfrostService.getAssets(_currentAddress!);
+      if (single.isEmpty && _mnemonic != null && _mnemonic!.isNotEmpty) {
+        final scanned = await _scanDerivedAddresses(maxAddresses: 20);
+        return scanned.assets;
+      }
+      return single;
     } catch (e) {
       print('Error getting token holdings: $e');
       return [];
@@ -673,6 +690,72 @@ class CardanoWalletService {
     _walletName = trimmed;
     await _storage.write(key: _walletNameKey, value: trimmed);
   }
+
+  // Fallback scan across the first N derived addresses (CIP-1852 m/1852'/1815'/0'/0/{index})
+  Future<_ScanResult> _scanDerivedAddresses({int maxAddresses = 20}) async {
+    try {
+      if (_mnemonic == null || _mnemonic!.isEmpty) {
+        return _ScanResult(ada: BigInt.zero, assets: <Map<String, dynamic>>[]);
+      }
+
+      final network = _isMainnet ? NetworkId.mainnet : NetworkId.testnet;
+      final mnemonicWords = _mnemonic!.split(' ');
+      final wallet = await WalletFactory.fromMnemonic(network, mnemonicWords);
+
+      final Map<String, BigInt> unitToQty = {};
+      BigInt totalAda = BigInt.zero;
+
+      // Limit concurrent requests to avoid request storms on web
+      const int concurrency = 4;
+      int next = 0;
+
+      Future<void> worker() async {
+        while (true) {
+          int idx;
+          if (next < maxAddresses) {
+            idx = next;
+            next += 1;
+          } else {
+            break;
+          }
+
+          try {
+            final kit = await wallet.getPaymentAddressKit(addressIndex: idx);
+            final addr = kit.address.bech32Encoded;
+            final ada = await _blockfrostService.getAdaBalance(addr);
+            totalAda += ada;
+            final assets = await _blockfrostService.getAssets(addr);
+            for (final a in assets) {
+              final unit = a['unit'] as String;
+              final qty = BigInt.parse(a['quantity'] as String);
+              unitToQty[unit] = (unitToQty[unit] ?? BigInt.zero) + qty;
+            }
+          } catch (_) {}
+        }
+      }
+
+      await Future.wait(List.generate(concurrency, (_) => worker()));
+
+      final aggregated = unitToQty.entries
+          .map((e) => {
+                'unit': e.key,
+                'quantity': e.value.toString(),
+              })
+          .toList();
+
+      return _ScanResult(ada: totalAda, assets: aggregated);
+    } catch (e) {
+      print('Fallback scan error: $e');
+      return _ScanResult(ada: BigInt.zero, assets: <Map<String, dynamic>>[]);
+    }
+  }
+
+}
+
+class _ScanResult {
+  final BigInt ada;
+  final List<Map<String, dynamic>> assets;
+  _ScanResult({required this.ada, required this.assets});
 }
 
 /// Data class for wallet security status
