@@ -290,6 +290,12 @@ class BlockfrostService {
     final policyId = meta['policy_id'];
     final assetHex = meta['asset_name'];
     final fingerprint = meta['fingerprint'];
+    final std = (meta['onchain_metadata_standard'] ?? '') as String;
+    final isCip25 = std.startsWith('CIP25');
+    final isCip68 = std.startsWith('CIP68');
+    final isLabel222 = (assetHex is String) && assetHex.startsWith('000de140');
+    final isNFT = isCip25 || (isCip68 && isLabel222);
+
     final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
     final registry = (meta['metadata'] ?? {}) as Map<String, dynamic>;
 
@@ -304,6 +310,13 @@ class BlockfrostService {
     final nameCandidate = registry['name'] ?? onchain['name'] ?? _tryDecodeHexToAscii(assetHex);
     final tickerCandidate = registry['ticker'] ?? onchain['ticker'];
 
+    dynamic imageCandidate = onchain['image'] ?? onchain['img'];
+    if (imageCandidate == null && onchain['files'] is List && (onchain['files'] as List).isNotEmpty) {
+      imageCandidate = (onchain['files'] as List).first;
+    }
+    imageCandidate ??= registry['logo'];
+    final imageUrl = _normalizeImageUrl(imageCandidate);
+
     return {
       'unit': unit,
       'policy_id': policyId,
@@ -312,7 +325,43 @@ class BlockfrostService {
       'ticker': tickerCandidate?.toString(),
       'decimals': decimals,
       'fingerprint': fingerprint,
+      'image': imageUrl,
+      'isNFT': isNFT,
     };
+  }
+
+  String? _normalizeImageUrl(dynamic raw) {
+    dynamic v = raw;
+    if (v == null) return null;
+    if (v is List && v.isNotEmpty) v = v.first;
+    if (v is Map) v = v['src'] ?? v['url'] ?? v['image'] ?? v['uri'] ?? v['link'];
+    if (v is! String) v = v.toString();
+    var s = (v as String).trim();
+    if (s.isEmpty || s == '[]') return null;
+
+    s = s
+        .replaceFirst(RegExp(r'^ipfs://ipfs/'), 'ipfs://')
+        .replaceFirst(RegExp(r'^https?://ipfs\.io/ipfs/'), 'ipfs://')
+        .replaceFirst(RegExp(r'^https?://cloudflare-ipfs\.com/ipfs/'), 'ipfs://')
+        .replaceFirst(RegExp(r'^https?://dweb\.link/ipfs/'), 'ipfs://');
+
+    if (s.startsWith('ipfs://')) {
+      final m = RegExp(r'^ipfs://([^/?#]+)(/.*)?$').firstMatch(s);
+      if (m == null) return null;
+      final cid = m.group(1)!;
+      final rest = m.group(2) ?? '';
+      final looksLikeCid = (cid.startsWith('Qm') && cid.length >= 46) ||
+          (cid.startsWith('baf') && cid.length >= 40);
+      if (!looksLikeCid) return null;
+      return 'https://cloudflare-ipfs.com/ipfs/$cid$rest';
+    }
+
+    if (s.startsWith('ar://')) return 'https://arweave.net/${s.substring(5)}';
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
+
+    final cidOnly = RegExp(r'^(Qm[1-9A-HJ-NP-Za-km-z]{44,}|baf[0-9A-Za-z]{30,})$');
+    if (cidOnly.hasMatch(s)) return 'https://cloudflare-ipfs.com/ipfs/$s';
+    return null;
   }
 
   // Submit transaction

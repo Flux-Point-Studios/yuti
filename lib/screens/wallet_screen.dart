@@ -780,11 +780,10 @@ class _WalletScreenState extends State<WalletScreen> {
               color: AppColors.primaryBlue.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(
-              Icons.token,
-              color: AppColors.primaryBlue,
-              size: 20,
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: (display?['image'] is String && (display!['image'] as String).isNotEmpty)
+                ? Image.network(display!['image'], fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.token, color: AppColors.primaryBlue, size: 20))
+                : Icon(Icons.token, color: AppColors.primaryBlue, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
