@@ -332,7 +332,7 @@ class _WalletScreenState extends State<WalletScreen> {
         final nameHex = (meta['asset_name'] ?? '') as String?;
         final isLabel222 = nameHex != null && nameHex.startsWith('000de140');
         final isNft = isCip25 || (isCip68 && isLabel222);
-        if (!isNft) return const SizedBox.shrink();
+        if (!isNft) return null;
 
         final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
         final policy = (meta['policy_id'] ?? token['policy_id'] ?? '').toString();
@@ -749,6 +749,9 @@ class _WalletScreenState extends State<WalletScreen> {
       future: _assetCache.getDisplayInfoWithCache(token['unit'] ?? token['unit_id'] ?? token['unit']),
       builder: (context, snap) {
         final display = snap.data;
+        if (display?['isNFT'] == true) {
+          return const SizedBox.shrink();
+        }
         String name = (display?['name']?.toString() ?? token['asset_name']?.toString() ?? '').trim();
         if (name.isEmpty) {
           // Try to decode from unit hex
