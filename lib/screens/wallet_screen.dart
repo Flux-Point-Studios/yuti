@@ -18,6 +18,8 @@ import '../services/asset_cache_service.dart';
 import '../config/app_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../config/secure_config.dart';
 import '../widgets/cardano_wallet_dialog.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -1310,9 +1312,18 @@ class _WalletScreenState extends State<WalletScreen> {
       }
 
       final app = AppConfig();
-      final endpoint = app.tBackendUrl + '/chat';
+      final endpoint = kIsWeb ? '/api/t/chat' : (app.tBackendUrl + '/chat');
       final url = Uri.parse(endpoint);
-      final headers = {'Content-Type': 'application/json'};
+      String apiKey = '';
+      try {
+        apiKey = await SecureConfig().getTBackendApiKey();
+      } catch (_) {
+        apiKey = app.tBackendApiKey;
+      }
+      final headers = {
+        'Content-Type': 'application/json',
+        if (!kIsWeb && apiKey.isNotEmpty) 'api-key': apiKey,
+      };
       final body = jsonEncode({
         'message': 'Give a brief overview (max 6 lines) about Cardano asset "$displayName" with unit "$unit". Include what it is, notable utility, and any relevant resources. Use bullet points.',
         'session_id': 'wallet_insights',
