@@ -310,7 +310,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   children: [
                     Text('NFTs', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    ...nfts.map((n) => _buildNftItem(n)).whereType<Widget>().toList(),
+                    ...nfts.map((n) => _buildNftItem(n)),
                   ],
                 ),
               ),
@@ -318,9 +318,9 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget? _buildNftItem(Map<String, dynamic> token) {
+  Widget _buildNftItem(Map<String, dynamic> token) {
     final unit = token['unit'] ?? token['unit_id'] ?? token['unit'];
-    if (unit == null) return null;
+    if (unit == null) return const SizedBox.shrink();
     return FutureBuilder<Map<String, dynamic>>(
       future: _blockfrostService.getAssetMetadata(unit),
       builder: (context, snap) {
@@ -332,7 +332,7 @@ class _WalletScreenState extends State<WalletScreen> {
         final nameHex = (meta['asset_name'] ?? '') as String?;
         final isLabel222 = nameHex != null && nameHex.startsWith('000de140');
         final isNft = isCip25 || (isCip68 && isLabel222);
-        if (!isNft) return null;
+        if (!isNft) return const SizedBox.shrink();
 
         final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
         final policy = (meta['policy_id'] ?? token['policy_id'] ?? '').toString();
