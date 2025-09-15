@@ -295,9 +295,18 @@ class CardanoWalletService {
     }
 
     try {
-      final adaBalance =
-          await _blockfrostService.getAdaBalance(_currentAddress!);
-      final assets = await _blockfrostService.getAssets(_currentAddress!);
+      BigInt adaBalance;
+      List<Map<String, dynamic>> assets;
+
+      if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
+        // Aggregate across all addresses controlled by this stake key
+        adaBalance = await _blockfrostService.getAggregatedAdaForStakeAddress(_stakeAddress!);
+        assets = await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+      } else {
+        // Fallback: single payment address view
+        adaBalance = await _blockfrostService.getAdaBalance(_currentAddress!);
+        assets = await _blockfrostService.getAssets(_currentAddress!);
+      }
 
       return {
         'ada': adaBalance.toString(),
@@ -384,6 +393,9 @@ class CardanoWalletService {
     }
 
     try {
+      if (_stakeAddress != null && _stakeAddress!.isNotEmpty) {
+        return await _blockfrostService.getAggregatedAssetsForStakeAddress(_stakeAddress!);
+      }
       return await _blockfrostService.getAssets(_currentAddress!);
     } catch (e) {
       print('Error getting token holdings: $e');
