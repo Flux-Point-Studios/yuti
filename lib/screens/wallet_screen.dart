@@ -298,7 +298,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildNftsListScrollable() {
-    final nfts = (_tokenHoldings ?? []).where(_isLikelyNft).toList();
+    final nfts = (_tokenHoldings ?? []).toList();
     return SingleChildScrollView(
       child: nfts.isEmpty
           ? _emptyAssets('No NFTs found')
@@ -310,7 +310,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   children: [
                     Text('NFTs', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    ...nfts.map((n) => _buildNftItem(n)),
+                    ...nfts.map((n) => _buildNftItem(n)).whereType<Widget>().toList(),
                   ],
                 ),
               ),
@@ -318,70 +318,82 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  bool _isLikelyNft(Map<String, dynamic> token) {
-    // Heuristic: NFTs are non-fungible (quantity == 1) and often have asset_name metadata
-    try {
-      final qtyStr = token['quantity']?.toString() ?? '0';
-      final isOne = BigInt.tryParse(qtyStr) == BigInt.one;
-      final name = token['asset_name']?.toString() ?? '';
-      return isOne && name.isNotEmpty;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Widget _buildNftItem(Map<String, dynamic> token) {
+  Widget? _buildNftItem(Map<String, dynamic> token) {
+    final unit = token['unit'] ?? token['unit_id'] ?? token['unit'];
+    if (unit == null) return null;
     return FutureBuilder<Map<String, dynamic>>(
-      future: _blockfrostService.getAssetMetadata(token['unit'] ?? token['unit_id'] ?? token['unit']),
+      future: _blockfrostService.getAssetMetadata(unit),
       builder: (context, snap) {
-        final meta = snap.data ?? {};
+        final meta = snap.data;
+        if (meta == null) return const SizedBox.shrink();
+        final std = (meta['onchain_metadata_standard'] ?? '') as String;
+        final isCip25 = std.startsWith('CIP25');
+        final isCip68 = std.startsWith('CIP68');
+        final nameHex = (meta['asset_name'] ?? '') as String?;
+        final isLabel222 = nameHex != null && nameHex.startsWith('000de140');
+        final isNft = isCip25 || (isCip68 && isLabel222);
+        if (!isNft) return const SizedBox.shrink();
+
         final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
-        final name = onchain['name']?.toString() ?? token['asset_name'] ?? 'NFT';
         final policy = (meta['policy_id'] ?? token['policy_id'] ?? '').toString();
+        final displayName = (onchain['name']?.toString() ?? _decodeHex(nameHex) ?? 'NFT');
         final image = (onchain['image'] ?? onchain['img'] ?? '').toString();
         final imageUrl = _coerceImageUrl(image);
         return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.primaryBlue.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: imageUrl == null
-                ? const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)
-                : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
                 ),
-                Text(
-                  'Policy: ${policy.isNotEmpty ? policy.substring(0, policy.length.clamp(0, 8)) : ''}...',
-                  style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+                clipBehavior: Clip.antiAlias,
+                child: imageUrl == null
+                    ? const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)
+                    : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: AppColors.primaryBlue, size: 24)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      'Policy: ${policy.isNotEmpty ? policy.substring(0, policy.length.clamp(0, 8)) : ''}...',
+                      style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const Text(
+                '#1',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
           ),
-          Text(
-            '#1',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
         );
       },
     );
+  }
+
+  String? _decodeHex(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    try {
+      final bytes = <int>[];
+      for (int i = 0; i < hex.length; i += 2) {
+        bytes.add(int.parse(hex.substring(i, i + 2), radix: 16));
+      }
+      return String.fromCharCodes(bytes);
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _emptyAssets(String text) {
@@ -737,7 +749,17 @@ class _WalletScreenState extends State<WalletScreen> {
       future: _assetCache.getDisplayInfoWithCache(token['unit'] ?? token['unit_id'] ?? token['unit']),
       builder: (context, snap) {
         final display = snap.data;
-        final name = display?['name'] ?? token['asset_name'] ?? 'Unknown Token';
+        String name = (display?['name']?.toString() ?? token['asset_name']?.toString() ?? '').trim();
+        if (name.isEmpty) {
+          // Try to decode from unit hex
+          final unit = (token['unit'] ?? token['unit_id'] ?? token['unit'])?.toString() ?? '';
+          if (unit.length > 56) {
+            final hex = unit.substring(56);
+            name = _decodeHex(hex) ?? 'Unknown Token';
+          } else {
+            name = 'Unknown Token';
+          }
+        }
         final decimals = (display?['decimals'] as int?) ?? 0;
         final qtyStr = token['quantity']?.toString() ?? '0';
         String human = qtyStr;

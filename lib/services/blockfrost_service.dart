@@ -528,29 +528,40 @@ class BlockfrostService {
       return cached.assets;
     }
 
-    // Prefer aggregated endpoint
-    if (kIsWeb) {
-      final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
-      final resp = await http.get(proxy);
-      if (resp.statusCode == 200) {
-        final list = (json.decode(resp.body) as List).cast<Map<String, dynamic>>();
-        _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(assets: list, cachedAt: DateTime.now());
-        return list;
+    // Prefer aggregated endpoint with pagination
+    List<Map<String, dynamic>> all = [];
+    int page = 1;
+    const int count = 100;
+    while (true) {
+      if (kIsWeb) {
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets') + '&count=$count&page=$page&order=asc');
+        final resp = await http.get(proxy);
+        if (resp.statusCode == 404) break;
+        if (resp.statusCode != 200) break;
+        final chunk = (json.decode(resp.body) as List).cast<Map<String, dynamic>>();
+        all.addAll(chunk);
+        if (chunk.length < count) break;
+      } else {
+        final headers = await _getHeaders();
+        final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses/assets', {
+          'count': '$count',
+          'page': '$page',
+          'order': 'asc',
+        });
+        final response = await http.get(url, headers: headers);
+        if (response.statusCode != 200) {
+          break;
+        }
+        final chunk = (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+        all.addAll(chunk);
+        if (chunk.length < count) break;
       }
-      if (resp.statusCode == 404) return <Map<String, dynamic>>[];
+      page += 1;
+      if (page > 1000) break; // guardrail
     }
-    final headers = await _getHeaders();
-    final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses/assets');
-    var response = await http.get(url, headers: headers);
-    if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
-      final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
-      response = await http.get(alt);
-    }
-    if (response.statusCode == 200) {
-      final list = (json.decode(response.body) as List).cast<Map<String, dynamic>>();
-      _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(assets: list, cachedAt: DateTime.now());
-      return list;
-    }
+
+    _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(assets: all, cachedAt: DateTime.now());
+    if (all.isNotEmpty) return all;
 
     // Manual per-address fallback
     final addresses = await _getAddressesForStakeAddress(stakeAddress);
