@@ -771,6 +771,7 @@ class _WalletScreenState extends State<WalletScreen> {
           human = (v / (decimals == 0 ? 1 : (pow10(decimals)))).toStringAsFixed(decimals.clamp(0, 8));
         } catch (_) {}
         return GestureDetector(
+          onTap: () => _researchAsset(token['unit'] ?? token['unit_id'] ?? token['unit'], name.toString()),
           onLongPress: () => _researchAsset(token['unit'] ?? token['unit_id'] ?? token['unit'], name.toString()),
           child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1214,10 +1215,33 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Future<void> _researchAsset(String unit, String displayName) async {
     try {
+      // Loading modal
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.backgroundDark,
+          title: Text('T Insights — $displayName', style: const TextStyle(color: AppColors.textPrimary)),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                SizedBox(height: 6),
+                CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue)),
+                SizedBox(height: 12),
+                Text('Fetching latest info…', style: TextStyle(color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        ),
+      );
+
       final cacheKey = 'research:$unit';
       final cached = await _assetCache.getResearch(cacheKey);
       if (cached != null && mounted) {
-        _showCopyConfirmation('T Insights (cached): ${cached['summary'] ?? ''}');
+        Navigator.of(context).pop();
+        await _showInsightsDialog(displayName, cached['summary']?.toString() ?? '');
         return;
       }
 
@@ -1236,9 +1260,49 @@ class _WalletScreenState extends State<WalletScreen> {
         final reply = data['reply']?.toString() ?? 'No info available.';
         await _assetCache.cacheResearch(cacheKey, {'summary': reply});
         if (!mounted) return;
-        _showCopyConfirmation('T Insights: $reply');
+        Navigator.of(context).pop();
+        await _showInsightsDialog(displayName, reply);
+      } else {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        _showCopyConfirmation('Unable to fetch insights (${resp.statusCode})');
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) Navigator.of(context).maybePop();
+    }
+  }
+
+  Future<void> _showInsightsDialog(String title, String content) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundDark,
+        title: Text('T Insights — $title', style: const TextStyle(color: AppColors.textPrimary)),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Text(
+              content,
+              style: const TextStyle(color: AppColors.textPrimary),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: content));
+              Navigator.of(ctx).pop();
+              _showCopyConfirmation('Insights copied');
+            },
+            child: const Text('Copy', style: TextStyle(color: AppColors.primaryBlue)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _disconnectWalletFlow() async {
