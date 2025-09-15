@@ -42,23 +42,28 @@ class BlockfrostService {
   // Get ADA balance for an address (in lovelace)
   Future<BigInt> getAdaBalance(String address) async {
     try {
-      Uri url;
-      Map<String, String> headers = {};
-      try {
-        // Prefer direct Blockfrost if key is available
-        headers = await _getHeaders();
-        url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
-      } catch (_) {
-        if (!kIsWeb) rethrow;
-        // Web fallback: use serverless proxy without exposing key
-        url = Uri.parse('/api/blockfrost/addresses/$address');
+      // Web: generic proxy first to avoid key in client and cut 404 noise
+      if (kIsWeb) {
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
+        final resp = await http.get(proxy);
+        if (resp.statusCode == 200) {
+          final data = json.decode(resp.body);
+          final amounts = data['amount'] as List;
+          for (var amount in amounts) {
+            if (amount['unit'] == 'lovelace') {
+              return BigInt.parse(amount['quantity']);
+            }
+          }
+          return BigInt.zero;
+        }
+        if (resp.statusCode == 404) return BigInt.zero; // never-seen address
+        throw Exception('Failed to fetch balance: ${resp.statusCode}');
       }
-      var response = await http.get(url, headers: headers);
-      // If upstream returned HTML or non-JSON, or non-200, fallback to generic proxy form
-      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
-        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
-        response = await http.get(alt);
-      }
+
+      // Native: direct Blockfrost
+      final headers = await _getHeaders();
+      final url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
+      final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -84,20 +89,20 @@ class BlockfrostService {
   // Get aggregated ADA balance for a stake address (in lovelace)
   Future<BigInt> getAggregatedAdaForStakeAddress(String stakeAddress) async {
     try {
-      Uri url;
-      Map<String, String> headers = {};
-      try {
-        headers = await _getHeaders();
-        url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress');
-      } catch (_) {
-        if (!kIsWeb) rethrow;
-        url = Uri.parse('/api/blockfrost/accounts/$stakeAddress');
+      if (kIsWeb) {
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress'));
+        final resp = await http.get(proxy);
+        if (resp.statusCode == 200) {
+          final data = json.decode(resp.body) as Map<String, dynamic>;
+          final controlled = (data['controlled_amount'] ?? data['controlled'] ?? '0').toString();
+          return BigInt.tryParse(controlled) ?? BigInt.zero;
+        }
+        if (resp.statusCode == 404) return BigInt.zero;
+        throw Exception('Failed to fetch aggregated ADA: ${resp.statusCode}');
       }
-      var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
-        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress'));
-        response = await http.get(alt);
-      }
+      final headers = await _getHeaders();
+      final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress');
+      final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -116,20 +121,23 @@ class BlockfrostService {
   // Get all assets (tokens) for an address
   Future<List<Map<String, dynamic>>> getAssets(String address) async {
     try {
-      Uri url;
-      Map<String, String> headers = {};
-      try {
-        headers = await _getHeaders();
-        url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
-      } catch (_) {
-        if (!kIsWeb) rethrow;
-        url = Uri.parse('/api/blockfrost/addresses/$address');
+      if (kIsWeb) {
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
+        final resp = await http.get(proxy);
+        if (resp.statusCode == 200) {
+          final data = json.decode(resp.body);
+          final amounts = data['amount'] as List;
+          return amounts
+              .where((asset) => asset['unit'] != 'lovelace')
+              .map((asset) => asset as Map<String, dynamic>)
+              .toList();
+        }
+        if (resp.statusCode == 404) return [];
+        throw Exception('Failed to fetch assets: ${resp.statusCode}');
       }
-      var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
-        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
-        response = await http.get(alt);
-      }
+      final headers = await _getHeaders();
+      final url = Uri.https(_baseUrl, '/api/v0/addresses/$address');
+      final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -151,20 +159,19 @@ class BlockfrostService {
   // Get UTXOs for an address
   Future<List<Map<String, dynamic>>> getUtxos(String address) async {
     try {
-      Uri url;
-      Map<String, String> headers = {};
-      try {
-        headers = await _getHeaders();
-        url = Uri.https(_baseUrl, '/api/v0/addresses/$address/utxos');
-      } catch (_) {
-        if (!kIsWeb) rethrow;
-        url = Uri.parse('/api/blockfrost/addresses/$address/utxos');
+      if (kIsWeb) {
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address/utxos'));
+        final resp = await http.get(proxy);
+        if (resp.statusCode == 200) {
+          final utxos = json.decode(resp.body) as List;
+          return utxos.map((utxo) => utxo as Map<String, dynamic>).toList();
+        }
+        if (resp.statusCode == 404) return [];
+        throw Exception('Failed to fetch UTXOs: ${resp.statusCode}');
       }
-      var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
-        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address/utxos'));
-        response = await http.get(alt);
-      }
+      final headers = await _getHeaders();
+      final url = Uri.https(_baseUrl, '/api/v0/addresses/$address/utxos');
+      final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final utxos = json.decode(response.body) as List;
@@ -225,15 +232,16 @@ class BlockfrostService {
   // Get asset metadata
   Future<Map<String, dynamic>> getAssetMetadata(String assetId) async {
     try {
+      final normalized = assetId.toLowerCase();
       // On web, prefer proxy first to avoid client key requirement and CORS
       if (kIsWeb) {
-        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('assets/$assetId'));
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('assets/$normalized'));
         var resp = await http.get(proxy);
         if (resp.statusCode == 200) {
           return json.decode(resp.body);
         }
         // Fallback to path-style proxy if configured
-        final alt = Uri.parse('/api/blockfrost/assets/$assetId');
+        final alt = Uri.parse('/api/blockfrost/assets/$normalized');
         resp = await http.get(alt);
         if (resp.statusCode == 200) {
           return json.decode(resp.body);
@@ -242,7 +250,7 @@ class BlockfrostService {
       }
 
       // Native: use direct Blockfrost with project_id header
-      final url = Uri.https(_baseUrl, '/api/v0/assets/$assetId');
+      final url = Uri.https(_baseUrl, '/api/v0/assets/$normalized');
       final headers = await _getHeaders();
       final response = await http.get(url, headers: headers);
       if (response.statusCode == 200) {
@@ -485,16 +493,19 @@ class BlockfrostService {
   /// Helper: get all addresses for a stake address
   Future<List<String>> _getAddressesForStakeAddress(String stakeAddress) async {
     try {
-      Uri url;
-      Map<String, String> headers = {};
-      try {
-        headers = await _getHeaders();
-        url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses');
-      } catch (_) {
-        if (!kIsWeb) rethrow;
-        url = Uri.parse('/api/blockfrost/accounts/$stakeAddress/addresses');
+      if (kIsWeb) {
+        final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses'));
+        final resp = await http.get(proxy);
+        if (resp.statusCode == 200) {
+          final list = json.decode(resp.body) as List;
+          return list.map<String>((e) => e['address'] as String).toList();
+        }
+        if (resp.statusCode == 404) return <String>[];
+        return <String>[];
       }
-      var response = await http.get(url, headers: headers);
+      final headers = await _getHeaders();
+      final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses');
+      final response = await http.get(url, headers: headers);
       if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
         final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses'));
         response = await http.get(alt);
@@ -518,29 +529,27 @@ class BlockfrostService {
     }
 
     // Prefer aggregated endpoint
-    try {
-      Uri url;
-      Map<String, String> headers = {};
-      try {
-        headers = await _getHeaders();
-        url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses/assets');
-      } catch (_) {
-        if (!kIsWeb) rethrow;
-        url = Uri.parse('/api/blockfrost/accounts/$stakeAddress/addresses/assets');
-      }
-      var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
-        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
-        response = await http.get(alt);
-      }
-      if (response.statusCode == 200) {
-        final list = (json.decode(response.body) as List).cast<Map<String, dynamic>>();
-        // Cache and return
+    if (kIsWeb) {
+      final proxy = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
+      final resp = await http.get(proxy);
+      if (resp.statusCode == 200) {
+        final list = (json.decode(resp.body) as List).cast<Map<String, dynamic>>();
         _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(assets: list, cachedAt: DateTime.now());
         return list;
       }
-    } catch (_) {
-      // fall through to manual per-address as last resort
+      if (resp.statusCode == 404) return <Map<String, dynamic>>[];
+    }
+    final headers = await _getHeaders();
+    final url = Uri.https(_baseUrl, '/api/v0/accounts/$stakeAddress/addresses/assets');
+    final response = await http.get(url, headers: headers);
+    if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
+      final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
+      response = await http.get(alt);
+    }
+    if (response.statusCode == 200) {
+      final list = (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+      _stakeAssetsCache[stakeAddress] = _StakeAssetsCacheEntry(assets: list, cachedAt: DateTime.now());
+      return list;
     }
 
     // Manual per-address fallback
