@@ -45,6 +45,10 @@ class _WalletScreenState extends State<WalletScreen> {
   List<Map<String, dynamic>>? _tokenHoldings;
   List<Map<String, dynamic>> _tokensOnly = [];
   List<Map<String, dynamic>> _nftsOnly = [];
+  List<Map<String, dynamic>> _allHoldingRows = [];
+  int _enrichCursor = 0;
+  int _enrichGen = 0;
+  static const int _enrichBatchSize = 60;
   String? _errorMessage;
 
   @override
@@ -91,50 +95,25 @@ class _WalletScreenState extends State<WalletScreen> {
       final balance = await _walletService.getWalletBalance();
       final rows = await _walletService.getTokenHoldings();
 
-      // Resolve display info once per unique unit
-      final units = <String>{
-        for (final r in rows)
-          ((r['unit'] ?? r['unit_id'] ?? r['unit'])?.toString() ?? '').toLowerCase()
-      }..removeWhere((e) => e.isEmpty);
-
-      final Map<String, Map<String, dynamic>> infoByUnit = {};
-      for (final u in units) {
-        try {
-          final info = await _assetCache.getDisplayInfoWithCache(u);
-          infoByUnit[u] = info;
-        } catch (_) {}
-      }
-
-      // Enrich and split
-      final enriched = <Map<String, dynamic>>[];
-      final tokensOnly = <Map<String, dynamic>>[];
-      final nftsOnly = <Map<String, dynamic>>[];
-      for (final r in rows) {
-        final unit = ((r['unit'] ?? r['unit_id'] ?? r['unit'])?.toString() ?? '').toLowerCase();
-        final info = infoByUnit[unit] ?? const {};
-        final e = {...r, ...info};
-        enriched.add(e);
-        if (e['isNFT'] == true) {
-          nftsOnly.add(e);
-        } else {
-          tokensOnly.add(e);
-        }
-      }
-
-      // Sort for nicer UX
-      tokensOnly.sort((a, b) => ((a['ticker'] ?? a['name'] ?? '') as String)
-          .toLowerCase()
-          .compareTo(((b['ticker'] ?? b['name'] ?? '') as String).toLowerCase()));
-      nftsOnly.sort((a, b) => ((a['name'] ?? '') as String)
-          .toLowerCase()
-          .compareTo(((b['name'] ?? '') as String).toLowerCase()));
+      // Reset incremental state
+      _enrichGen += 1;
+      final localGen = _enrichGen;
+      _allHoldingRows = rows;
+      _enrichCursor = 0;
+      _tokensOnly = [];
+      _nftsOnly = [];
+      _tokenHoldings = [];
 
       setState(() {
         _walletBalance = balance;
-        _tokenHoldings = enriched;
-        _tokensOnly = tokensOnly;
-        _nftsOnly = nftsOnly;
       });
+
+      // Process first batch (await) so something renders quickly
+      await _processNextBatch(localGen);
+
+      // Continue enriching remaining batches in background
+      // ignore: unawaited_futures
+      _drainBatchesInBackground(localGen);
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load wallet data: $e';
@@ -144,6 +123,63 @@ class _WalletScreenState extends State<WalletScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _drainBatchesInBackground(int gen) async {
+    while (mounted && gen == _enrichGen && _enrichCursor < _allHoldingRows.length) {
+      await _processNextBatch(gen);
+      // Yield to UI between batches
+      await Future.delayed(const Duration(milliseconds: 0));
+    }
+  }
+
+  Future<void> _processNextBatch(int gen) async {
+    if (!mounted || gen != _enrichGen) return;
+    if (_enrichCursor >= _allHoldingRows.length) return;
+
+    final start = _enrichCursor;
+    final end = (_enrichCursor + _enrichBatchSize) > _allHoldingRows.length
+        ? _allHoldingRows.length
+        : _enrichCursor + _enrichBatchSize;
+    final batch = _allHoldingRows.sublist(start, end);
+
+    // Deduplicate units in this batch
+    final units = <String>{
+      for (final r in batch)
+        ((r['unit'] ?? r['unit_id'] ?? r['unit'])?.toString() ?? '').toLowerCase()
+    }..removeWhere((e) => e.isEmpty);
+
+    final Map<String, Map<String, dynamic>> infoByUnit = {};
+    await Future.wait(units.map((u) async {
+      try {
+        final info = await _assetCache.getDisplayInfoWithCache(u);
+        infoByUnit[u] = info;
+      } catch (_) {}
+    }));
+
+    final newEnriched = <Map<String, dynamic>>[];
+    final newTokens = <Map<String, dynamic>>[];
+    final newNfts = <Map<String, dynamic>>[];
+    for (final r in batch) {
+      final u = ((r['unit'] ?? r['unit_id'] ?? r['unit'])?.toString() ?? '').toLowerCase();
+      final info = infoByUnit[u] ?? const {};
+      final e = {...r, ...info};
+      newEnriched.add(e);
+      if (e['isNFT'] == true) {
+        newNfts.add(e);
+      } else {
+        newTokens.add(e);
+      }
+    }
+
+    if (!mounted || gen != _enrichGen) return;
+    setState(() {
+      _tokenHoldings = [...?_tokenHoldings, ...newEnriched];
+      _tokensOnly.addAll(newTokens);
+      _nftsOnly.addAll(newNfts);
+    });
+
+    _enrichCursor = end;
   }
 
   @override

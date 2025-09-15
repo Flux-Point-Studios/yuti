@@ -13,6 +13,9 @@ class AssetCacheService {
 
   final Map<String, _CacheEntry> _metaCache = {};
   final Map<String, _CacheEntry> _researchCache = {};
+  final Map<String, Map<String, dynamic>> _memDisplay = {};
+  final Map<String, Future<Map<String, dynamic>>> _inflightDisplay = {};
+  final BlockfrostService _bf = BlockfrostService();
 
   Duration metadataTtl = const Duration(days: 7);
   Duration researchTtl = const Duration(days: 3);
@@ -38,14 +41,32 @@ class AssetCacheService {
 
   Future<Map<String, dynamic>> getDisplayInfoWithCache(String unit) async {
     await initialize();
-    final existing = _metaCache[unit];
-    if (existing != null && DateTime.now().difference(existing.storedAt) < metadataTtl) {
-      return existing.data;
+    final key = unit.toLowerCase();
+    final mem = _memDisplay[key];
+    if (mem != null) return mem;
+
+    final cached = _metaCache[key];
+    if (cached != null && DateTime.now().difference(cached.storedAt) < metadataTtl) {
+      _memDisplay[key] = cached.data;
+      return cached.data;
     }
-    final fresh = await BlockfrostService().getAssetDisplayInfo(unit);
-    _metaCache[unit] = _CacheEntry(data: fresh, storedAt: DateTime.now());
-    _persistMeta();
-    return fresh;
+
+    final inflight = _inflightDisplay[key];
+    if (inflight != null) return inflight;
+
+    final fut = _bf.getAssetDisplayInfo(key).then((fresh) {
+      _memDisplay[key] = fresh;
+      _metaCache[key] = _CacheEntry(data: fresh, storedAt: DateTime.now());
+      _persistMeta();
+      _inflightDisplay.remove(key);
+      return fresh;
+    }).catchError((e) {
+      _inflightDisplay.remove(key);
+      throw e;
+    });
+
+    _inflightDisplay[key] = fut;
+    return fut;
   }
 
   Future<Map<String, dynamic>> getAssetMetadataWithCache(String unit) async {
