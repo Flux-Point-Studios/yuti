@@ -54,8 +54,8 @@ class BlockfrostService {
         url = Uri.parse('/api/blockfrost/addresses/$address');
       }
       var response = await http.get(url, headers: headers);
-      // If upstream returned HTML or non-JSON, fallback to generic proxy form
-      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+      // If upstream returned HTML or non-JSON, or non-200, fallback to generic proxy form
+      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
         final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
         response = await http.get(alt);
       }
@@ -94,7 +94,7 @@ class BlockfrostService {
         url = Uri.parse('/api/blockfrost/accounts/$stakeAddress');
       }
       var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
         final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress'));
         response = await http.get(alt);
       }
@@ -126,7 +126,7 @@ class BlockfrostService {
         url = Uri.parse('/api/blockfrost/addresses/$address');
       }
       var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
         final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address'));
         response = await http.get(alt);
       }
@@ -160,7 +160,11 @@ class BlockfrostService {
         if (!kIsWeb) rethrow;
         url = Uri.parse('/api/blockfrost/addresses/$address/utxos');
       }
-      final response = await http.get(url, headers: headers);
+      var response = await http.get(url, headers: headers);
+      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
+        final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('addresses/$address/utxos'));
+        response = await http.get(alt);
+      }
 
       if (response.statusCode == 200) {
         final utxos = json.decode(response.body) as List;
@@ -471,7 +475,7 @@ class BlockfrostService {
         url = Uri.parse('/api/blockfrost/accounts/$stakeAddress/addresses');
       }
       var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
         final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses'));
         response = await http.get(alt);
       }
@@ -505,7 +509,7 @@ class BlockfrostService {
         url = Uri.parse('/api/blockfrost/accounts/$stakeAddress/addresses/assets');
       }
       var response = await http.get(url, headers: headers);
-      if ((response.headers['content-type'] ?? '').contains('text/html')) {
+      if ((response.headers['content-type'] ?? '').contains('text/html') || response.statusCode != 200) {
         final alt = Uri.parse('/api/blockfrost-proxy?path=' + Uri.encodeComponent('accounts/$stakeAddress/addresses/assets'));
         response = await http.get(alt);
       }
