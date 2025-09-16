@@ -1312,8 +1312,7 @@ class _WalletScreenState extends State<WalletScreen> {
       }
 
       final app = AppConfig();
-      final endpoint = kIsWeb ? '/api/t/chat' : (app.tBackendUrl + '/chat');
-      final url = Uri.parse(endpoint);
+      final endpoint = kIsWeb ? '/api/t/insights' : (app.tBackendUrl + '/chat');
       String apiKey = '';
       try {
         apiKey = await SecureConfig().getTBackendApiKey();
@@ -1329,7 +1328,9 @@ class _WalletScreenState extends State<WalletScreen> {
         'session_id': 'wallet_insights',
         'context': {'asset_unit': unit, 'asset_name': displayName},
       });
-      final resp = await http.post(url, headers: headers, body: body);
+      final resp = kIsWeb
+          ? await http.get(Uri.parse('$endpoint?unit=${Uri.encodeComponent(unit)}&name=${Uri.encodeComponent(displayName)}'), headers: headers)
+          : await http.post(Uri.parse(endpoint), headers: headers, body: body);
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body) as Map<String, dynamic>;
         final reply = data['reply']?.toString() ?? 'No info available.';
