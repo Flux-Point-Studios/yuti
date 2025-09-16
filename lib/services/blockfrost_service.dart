@@ -294,7 +294,9 @@ class BlockfrostService {
     final isCip25 = std.startsWith('CIP25');
     final isCip68 = std.startsWith('CIP68');
     final isLabel222 = (assetHex is String) && assetHex.startsWith('000de140');
-    final isNFT = isCip25 || (isCip68 && isLabel222);
+    final totalSupplyStr = (meta['quantity'] ?? '').toString();
+    final isCip25Nft = isCip25 && totalSupplyStr == '1';
+    final isNFT = (isCip68 && isLabel222) || isCip25Nft;
 
     final onchain = (meta['onchain_metadata'] ?? {}) as Map<String, dynamic>;
     final registry = (meta['metadata'] ?? {}) as Map<String, dynamic>;
