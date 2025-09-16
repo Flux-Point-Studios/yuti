@@ -51,6 +51,7 @@ class _WalletScreenState extends State<WalletScreen> {
   int _enrichCursor = 0;
   int _enrichGen = 0;
   static const int _enrichBatchSize = 60;
+  final Set<String> _insightsLoadingUnits = {};
   String? _errorMessage;
 
   @override
@@ -404,25 +405,44 @@ class _WalletScreenState extends State<WalletScreen> {
     final displayName = (item['name']?.toString() ?? _decodeHex((item['asset_name'] ?? '').toString()) ?? 'NFT');
     final imageUrl = (item['image'] as String?);
     return GestureDetector(
-      onTap: () => _researchAsset(unit, displayName),
-      onLongPress: () => _researchAsset(unit, displayName),
+      onTap: () => _onAssetInsights(unit, displayName),
+      onLongPress: () => _onAssetInsights(unit, displayName),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: (imageUrl != null && imageUrl.isNotEmpty)
-                  ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: AppColors.primaryBlue, size: 24))
-                  : const Icon(Icons.image, color: AppColors.primaryBlue, size: 24),
-            ),
+            Builder(builder: (_) {
+              final isLoading = _insightsLoadingUnits.contains(unit);
+              return Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (imageUrl != null && imageUrl.isNotEmpty)
+                      Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: AppColors.primaryBlue, size: 24))
+                    else
+                      const Icon(Icons.image, color: AppColors.primaryBlue, size: 24),
+                    if (isLoading)
+                      Container(
+                        color: Colors.black26,
+                        child: const Center(
+                          child: SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue)),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -837,24 +857,44 @@ class _WalletScreenState extends State<WalletScreen> {
           human = (v / (decimals == 0 ? 1 : (pow10(decimals)))).toStringAsFixed(decimals.clamp(0, 8));
         } catch (_) {}
         return GestureDetector(
-          onTap: () => _researchAsset(token['unit'] ?? token['unit_id'] ?? token['unit'], name.toString()),
-          onLongPress: () => _researchAsset(token['unit'] ?? token['unit_id'] ?? token['unit'], name.toString()),
+          onTap: () => _onAssetInsights((token['unit'] ?? token['unit_id'] ?? token['unit']).toString(), name.toString()),
+          onLongPress: () => _onAssetInsights((token['unit'] ?? token['unit_id'] ?? token['unit']).toString(), name.toString()),
           child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primaryBlue.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: (display?['image'] is String && (display!['image'] as String).isNotEmpty)
-                ? Image.network(display!['image'], fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.token, color: AppColors.primaryBlue, size: 20))
-                : Icon(Icons.token, color: AppColors.primaryBlue, size: 20),
-          ),
+          Builder(builder: (_) {
+            final unitVal = (token['unit'] ?? token['unit_id'] ?? token['unit']).toString();
+            final isLoading = _insightsLoadingUnits.contains(unitVal);
+            return Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primaryBlue.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (display?['image'] is String && (display!['image'] as String).isNotEmpty)
+                    Image.network(display!['image'], fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.token, color: AppColors.primaryBlue, size: 20))
+                  else
+                    Icon(Icons.token, color: AppColors.primaryBlue, size: 20),
+                  if (isLoading)
+                    Container(
+                      color: Colors.black26,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 16, height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue)),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1462,6 +1502,21 @@ class _WalletScreenState extends State<WalletScreen> {
       await _ensureWalletConnectedFromUser();
       await _loadWalletData();
       if (mounted) _showCopyConfirmation('Wallet connected');
+    }
+  }
+
+  Future<void> _onAssetInsights(String unit, String displayName) async {
+    final key = unit.toLowerCase();
+    setState(() {
+      _insightsLoadingUnits.add(key);
+    });
+    try {
+      await _researchAsset(key, displayName);
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _insightsLoadingUnits.remove(key);
+      });
     }
   }
 } 
