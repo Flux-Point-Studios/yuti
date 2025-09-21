@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../widgets/glassmorphism_container.dart';
 import 'pricing_screen.dart';
 import 'chat_screen.dart';
+import 'email_login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -615,15 +616,91 @@ class _SignupScreenState extends State<SignupScreen>
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
       );
-
-      _showSuccess('Account created successfully!');
-      // Temporarily bypass email confirmation: go straight to the app
-      _navigateToChat();
+      // If we got here without exception, user likely has a session already (edge case).
+      // But for consistency, direct them to login screen.
+      _showSuccess('Account created. Please check your email to confirm.');
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const EmailLoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            );
+          },
+        ),
+      );
     } catch (e) {
-      _showError('An error occurred during signup: ${e.toString()}');
+      final msg = e.toString();
+      if (msg.contains('EMAIL_CONFIRMATION_REQUIRED')) {
+        _showSuccess('Check your inbox and confirm your email to continue.');
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => const EmailLoginScreen(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              );
+            },
+          ),
+        );
+      } else {
+        _showError('An error occurred during signup: ${e.toString()}');
+      }
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  Widget _buildBackButton() {
+    return Column(
+      children: [
+        TextButton.icon(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          label: Text(
+            'Back to Welcome',
+            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => const EmailLoginScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(1.0, 0.0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  );
+                },
+              ),
+            );
+          },
+          child: const Text(
+            'Already have an account? Sign in',
+            style: TextStyle(color: AppColors.primaryBlue),
+          ),
+        ),
+      ],
+    );
   }
 
   void _navigateToChat() {

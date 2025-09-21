@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import '../models/user.dart';
@@ -156,6 +157,7 @@ class AuthService {
     required String lastName,
   }) async {
     try {
+      final String? redirectUrl = kIsWeb ? '${Uri.base.origin}/welcome' : null;
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
@@ -163,15 +165,22 @@ class AuthService {
           'first_name': firstName,
           'last_name': lastName,
         },
+        emailRedirectTo: redirectUrl,
       );
 
       if (response.user != null) {
+        // If email confirmation is required, there will be no session on sign-up
+        if (response.session == null) {
+          // Do not create a local session or navigate; require email confirmation first
+          // Optionally, you could create a profile row via RPC here, but it's not necessary yet
+          throw Exception('EMAIL_CONFIRMATION_REQUIRED');
+        }
+
         // Wait for the session to be properly established
         await Future.delayed(const Duration(milliseconds: 100));
-        
-        // Set the current session if present (may be null when email confirmation required)
+        // Set the current session
         _currentSession = response.session;
-        
+
         try {
           // Create user record in our users table using RPC function to bypass RLS
           await _supabase.rpc('create_user_profile', params: {
