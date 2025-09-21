@@ -577,16 +577,6 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildBackButton() {
-    return TextButton.icon(
-      onPressed: () => Navigator.pop(context),
-      icon: const Icon(Icons.arrow_back, color: Colors.white),
-      label: Text(
-        'Back to Welcome',
-        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
-      ),
-    );
-  }
 
   Widget _buildLoadingOverlay() {
     return Container(
@@ -663,7 +653,6 @@ class _SignupScreenState extends State<SignupScreen>
     }
   }
 
-  @override
   Widget _buildBackButton() {
     return Column(
       children: [
