@@ -41,6 +41,13 @@ class SupabaseService {
       url: _supabaseUrl,
       anonKey: _supabaseAnonKey,
       debug: _useLocalDev,
+      authOptions: const FlutterAuthClientOptions(
+        // Enable PKCE for better web OAuth and email link handling
+        authFlowType: AuthFlowType.pkce,
+        // Persist session on web and resume from URL tokens
+        persistSession: true,
+        autoRefreshToken: true,
+      ),
     );
   }
 

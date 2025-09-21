@@ -156,6 +156,8 @@ class AuthService {
     required String lastName,
   }) async {
     try {
+      // On web, direct email confirmation and magic/OTP links back to our in-app handler
+      final emailRedirect = Uri.base.origin + '/auth-callback';
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
@@ -163,6 +165,7 @@ class AuthService {
           'first_name': firstName,
           'last_name': lastName,
         },
+        emailRedirectTo: emailRedirect,
       );
 
       if (response.user != null) {
