@@ -8,6 +8,8 @@ import '../utils/app_colors.dart';
 import '../config/app_config.dart';
 import '../screens/welcome_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/notifications_screen.dart';
+import '../screens/language_screen.dart';
 import '../screens/wallet_screen.dart';
 import '../screens/browser_screen.dart';
 import 'glassmorphism_container.dart';
@@ -696,7 +698,10 @@ class _ChatSidebarState extends State<ChatSidebar>
                     style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Navigate to profile
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
                 },
               ),
               ListTile(
@@ -706,7 +711,10 @@ class _ChatSidebarState extends State<ChatSidebar>
                     style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Navigate to notifications
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                  );
                 },
               ),
               ListTile(
@@ -716,7 +724,10 @@ class _ChatSidebarState extends State<ChatSidebar>
                     style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Navigate to language settings
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LanguageScreen()),
+                  );
                 },
               ),
               ListTile(

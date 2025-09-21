@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import '../utils/app_colors.dart';
@@ -19,7 +19,7 @@ class BrowserScreen extends StatefulWidget {
 }
 
 class _BrowserScreenState extends State<BrowserScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   final TextEditingController _urlController = TextEditingController();
   bool _isLoading = true;
   String _currentUrl = '';
@@ -46,43 +46,58 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   void _initializeWebView() {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: (int progress) {
-            setState(() {
-              _progress = progress / 100.0;
-            });
-          },
-          onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-              _currentUrl = url;
-              _urlController.text = url;
-            });
-          },
-          onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
-            _updateNavigationState();
-          },
-          onWebResourceError: (WebResourceError error) {
-            print('Web resource error: ${error.description}');
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(widget.initialUrl ?? 'https://google.com'));
+    final bool embedSupported = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+         defaultTargetPlatform == TargetPlatform.iOS);
 
-    if (widget.initialUrl != null) {
-      _urlController.text = widget.initialUrl!;
+    if (embedSupported) {
+      _controller = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onProgress: (int progress) {
+              setState(() {
+                _progress = progress / 100.0;
+              });
+            },
+            onPageStarted: (String url) {
+              setState(() {
+                _isLoading = true;
+                _currentUrl = url;
+                _urlController.text = url;
+              });
+            },
+            onPageFinished: (String url) {
+              setState(() {
+                _isLoading = false;
+              });
+              _updateNavigationState();
+            },
+            onWebResourceError: (WebResourceError error) {
+              print('Web resource error: ${error.description}');
+            },
+          ),
+        )
+        ..loadRequest(Uri.parse(widget.initialUrl ?? 'https://google.com'));
+
+      if (widget.initialUrl != null) {
+        _urlController.text = widget.initialUrl!;
+      }
+    } else {
+      // Not supported to embed on this platform (web/desktop). Open externally.
+      _isLoading = false;
+      final String url = widget.initialUrl ?? 'https://google.com';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _navigateToUrl(url);
+      });
+      _urlController.text = url;
     }
   }
 
   Future<void> _updateNavigationState() async {
-    final canGoBack = await _controller.canGoBack();
-    final canGoForward = await _controller.canGoForward();
+    if (_controller == null) return;
+    final canGoBack = await _controller!.canGoBack();
+    final canGoForward = await _controller!.canGoForward();
     setState(() {
       _canGoBack = canGoBack;
       _canGoForward = canGoForward;
@@ -93,11 +108,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://$url';
     }
-    if (kIsWeb) {
-      // Open in a new tab on web instead of embedded webview
-      url_launcher.launchUrl(Uri.parse(url), mode: url_launcher.LaunchMode.externalApplication);
+    final bool embedSupported = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+         defaultTargetPlatform == TargetPlatform.iOS);
+    if (embedSupported && _controller != null) {
+      _controller!.loadRequest(Uri.parse(url));
     } else {
-      _controller.loadRequest(Uri.parse(url));
+      // Web or desktop: open externally (new tab on web; default browser on desktop)
+      url_launcher.launchUrl(Uri.parse(url), mode: url_launcher.LaunchMode.externalApplication);
     }
     setState(() {
       _urlController.text = url;
@@ -105,18 +123,18 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   void _refresh() {
-    _controller.reload();
+    _controller?.reload();
   }
 
   void _goBack() {
-    if (_canGoBack) {
-      _controller.goBack();
+    if (_controller != null && _canGoBack) {
+      _controller!.goBack();
     }
   }
 
   void _goForward() {
-    if (_canGoForward) {
-      _controller.goForward();
+    if (_controller != null && _canGoForward) {
+      _controller!.goForward();
     }
   }
 
@@ -244,7 +262,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           children: [
             _buildToolbar(),
             _buildAddressBar(),
-            if (kIsWeb)
+            if (kIsWeb || !(defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS))
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -255,14 +273,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
                 ),
                 child: const Text(
-                  'On web, sites open in a new tab for best compatibility.',
+                  'On web/desktop, sites open in your default browser for best compatibility.',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
               ),
             if (_isLoading) _buildProgressBar(),
-            if (!kIsWeb)
+            if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS))
               Expanded(
-                child: WebViewWidget(controller: _controller),
+                child: WebViewWidget(controller: _controller!),
               ),
           ],
         ),
