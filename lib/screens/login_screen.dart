@@ -11,6 +11,7 @@ import 'pricing_screen.dart';
 import '../services/smart_wallet_service.dart';
 import 'smart_wallet_activation_screen.dart';
 import 'signup_screen.dart';
+import 'email_login_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -45,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen>
     _initializeAnimations();
     // Auto-open Smart Wallet flow when arriving on login screen if not authenticated
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!_authService.isAuthenticated) {
+      if (!_authService.isAuthenticated && !kIsWeb) {
         await _handleSmartWalletLogin();
       }
     });
@@ -384,7 +385,11 @@ class _LoginScreenState extends State<LoginScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Redirecting to Google…')),
         );
-        await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
+        await launchUrl(
+          Uri.parse(url),
+          mode: LaunchMode.platformDefault,
+          webOnlyWindowName: '_self',
+        );
         setState(() => _isLoading = false);
         return; // Web flow continues on callback screen
       }
@@ -439,7 +444,7 @@ class _LoginScreenState extends State<LoginScreen>
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const SignupScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => const EmailLoginScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return SlideTransition(
             position: Tween<Offset>(

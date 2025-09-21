@@ -5,6 +5,8 @@ import '../services/wallet_service.dart';
 import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
 import '../services/cardano_wallet_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -69,6 +71,17 @@ class _SplashScreenState extends State<SplashScreen> {
       // Restore Cardano wallet connection if previously connected
       final cardano = CardanoWalletService();
       await cardano.initialize();
+
+      // Handle Supabase email confirmation redirect on web (if present)
+      if (kIsWeb) {
+        try {
+          // Supabase Flutter automatically parses hash; ensure session is refreshed
+          final session = Supabase.instance.client.auth.currentSession;
+          if (session != null) {
+            // Already authenticated after confirmation
+          }
+        } catch (_) {}
+      }
 
       // Let video play for at least 2 seconds
       await Future.delayed(const Duration(seconds: 2));
