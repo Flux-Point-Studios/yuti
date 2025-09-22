@@ -507,7 +507,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _localWalletService.walletName ?? 'Connected Wallet',
+                  _walletService.walletName ?? _localWalletService.walletName ?? 'Connected Wallet',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 18,
@@ -560,7 +560,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _showRenameDialog() {
-    final controller = TextEditingController(text: _localWalletService.walletName ?? 'Generated Wallet');
+    final controller = TextEditingController(text: _walletService.walletName ?? _localWalletService.walletName ?? 'Generated Wallet');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

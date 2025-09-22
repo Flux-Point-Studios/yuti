@@ -72,7 +72,7 @@ class AppConfig {
   String get companyWebsite => 'https://fluxpointstudios.com';
   String get privacyPolicyUrl => 'https://fluxpointstudios.com/privacy-policy';
   String get termsOfServiceUrl => 'https://fluxpointstudios.com/tos';
-  String get supportUrl => 'https://fluxpointstudios.com/support';
+  String get supportUrl => 'https://discord.gg/fluxpointstudios';
 
   // Validation
   bool get isConfigured {
