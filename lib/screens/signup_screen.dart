@@ -8,6 +8,7 @@ import '../widgets/glassmorphism_container.dart';
 import 'pricing_screen.dart';
 import 'chat_screen.dart';
 import 'email_login_screen.dart';
+import 'confirm_email_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -613,7 +614,7 @@ class _SignupScreenState extends State<SignupScreen>
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const EmailLoginScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) => ConfirmEmailScreen(email: _emailController.text.trim()),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return SlideTransition(
               position: Tween<Offset>(
@@ -633,7 +634,7 @@ class _SignupScreenState extends State<SignupScreen>
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const EmailLoginScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) => ConfirmEmailScreen(email: _emailController.text.trim()),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return SlideTransition(
                 position: Tween<Offset>(

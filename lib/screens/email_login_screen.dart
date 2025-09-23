@@ -386,7 +386,12 @@ class _EmailLoginScreenState extends State<EmailLoginScreen>
         );
         return;
       }
-      _showError(res.error ?? 'Failed to sign in');
+      final err = res.error ?? 'Failed to sign in';
+      _showError(err);
+      // If it's an unconfirmed notice, surface resend CTA automatically
+      if (err.toLowerCase().contains('not confirmed')) {
+        _resendBanner();
+      }
     } catch (e) {
       _showError('Failed to sign in: $e');
     } finally {
@@ -427,9 +432,49 @@ class _EmailLoginScreenState extends State<EmailLoginScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    final snackBar = SnackBar(
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(message),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _handleResend,
+                child: const Text('Resend confirmation', style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: _handleForgotPassword,
+                child: const Text('Forgot password?', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ],
+      ),
+      backgroundColor: Colors.red,
+      duration: const Duration(seconds: 5),
     );
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+
+  void _resendBanner() {
+    final snackBar = SnackBar(
+      content: Row(
+        children: [
+          const Expanded(child: Text('Email not confirmed. Resend the confirmation link?')),
+          TextButton(
+            onPressed: _handleResend,
+            child: const Text('Resend', style: TextStyle(color: Colors.white)),
+          )
+        ],
+      ),
+      backgroundColor: Colors.orange,
+      duration: const Duration(seconds: 5),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   void _showSuccess(String message) {
