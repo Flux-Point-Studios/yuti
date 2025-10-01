@@ -8,6 +8,13 @@ class SupabaseService {
   static const String _prodSupabaseAnonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsdmNldmdneW5zcm12eWlheHJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM3NTMxOTIsImV4cCI6MjA0OTMyOTE5Mn0.CJvntljVFvnrLk0suvStENcBqdHylJEGQkb209fJDFY';
 
+  // Web app callback URLs for auth email redirects
+  // These must also be present in Supabase Auth settings: Site URL and Redirect URLs
+  static const String _prodAuthRedirectUrl =
+      'https://bluelight-dmom0ulto-decimalists-projects.vercel.app/auth/callback';
+  static const String _localAuthRedirectUrl =
+      'http://127.0.0.1:3000/auth/callback';
+
   // Local development Supabase configuration
   static const String _localSupabaseUrl = 'http://127.0.0.1:54321';
   static const String _localSupabaseAnonKey =
@@ -22,6 +29,10 @@ class SupabaseService {
       _useLocalDev ? _localSupabaseUrl : _prodSupabaseUrl;
   static String get _supabaseAnonKey =>
       _useLocalDev ? _localSupabaseAnonKey : _prodSupabaseAnonKey;
+
+  // Public getter used by auth flows that need an explicit redirect
+  static String get authRedirectUrl =>
+      _useLocalDev ? _localAuthRedirectUrl : _prodAuthRedirectUrl;
 
   static const List<String> _adminEmails = [
     'contact@fluxpointstudios.com',

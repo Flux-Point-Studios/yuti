@@ -159,6 +159,7 @@ class AuthService {
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
+        emailRedirectTo: SupabaseService.authRedirectUrl,
         data: {
           'first_name': firstName,
           'last_name': lastName,
