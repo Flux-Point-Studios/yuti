@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/chat_message.dart';
 import '../models/chat_session.dart';
 import '../services/auth_service.dart';
@@ -562,6 +564,56 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildUserBubble(ChatMessage message) {
+    if (message.type == MessageType.image) {
+      final dataUri = message.metadata != null ? (message.metadata!['data_uri'] as String?) : null;
+      Widget imageWidget;
+      if (dataUri != null && dataUri.contains(',')) {
+        final b64 = dataUri.split(',').last;
+        try {
+          final bytes = base64Decode(b64);
+          imageWidget = ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.memory(
+              bytes,
+              width: 200,
+              height: 200,
+              fit: BoxFit.cover,
+            ),
+          );
+        } catch (_) {
+          imageWidget = const Icon(Icons.image, color: AppColors.textPrimary, size: 48);
+        }
+      } else {
+        imageWidget = const Icon(Icons.image, color: AppColors.textPrimary, size: 48);
+      }
+
+      return GlassmorphismContainer(
+        glassType: GlassType.light,
+        borderRadius: BorderRadius.circular(20).copyWith(bottomRight: const Radius.circular(4)),
+        padding: const EdgeInsets.all(12),
+        blur: 8.0,
+        showGlow: true,
+        customGradient: AppColors.primaryGradient.scale(0.4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            imageWidget,
+            if (message.text.trim().isNotEmpty && message.text.trim() != '[image]') ...[
+              const SizedBox(height: 8),
+              Text(
+                message.text,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return GlassmorphismContainer(
       glassType: GlassType.light,
       borderRadius: BorderRadius.circular(20).copyWith(bottomRight: const Radius.circular(4)),
@@ -939,6 +991,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.attach_file, color: AppColors.textPrimary),
+                    onPressed: _attachAndSendImage,
+                    tooltip: 'Attach image',
+                  ),
+                  const SizedBox(width: 8),
                   Container(
                     decoration: BoxDecoration(
                       color: _isLimitReached 
@@ -1110,6 +1168,80 @@ class _ChatScreenState extends State<ChatScreen> {
       await _updateMessageLimits();
 
       _scrollToBottom();
+    }
+  }
+
+  Future<void> _attachAndSendImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      final lower = picked.path.toLowerCase();
+      final mime = lower.endsWith('.png')
+          ? 'image/png'
+          : lower.endsWith('.webp')
+              ? 'image/webp'
+              : 'image/jpeg';
+      final b64 = base64Encode(bytes);
+      final dataUri = 'data:$mime;base64,$b64';
+
+      final caption = _inputController.text.trim();
+
+      // Add local preview message
+      final preview = ChatMessage(
+        text: caption.isEmpty ? '[image]' : caption,
+        isUser: true,
+        type: MessageType.image,
+        metadata: {'data_uri': dataUri, 'local_path': picked.path},
+      );
+      setState(() {
+        _messages.add(preview);
+        _inputController.clear();
+        _isTyping = true;
+        _debugInfo = 'Image selected; sending to AI...';
+      });
+
+      // Save user image message to session (stores caption text only)
+      if (_currentSession != null) {
+        await _chatHistoryService.addMessageToSession(
+          _currentSession!.id,
+          preview,
+        );
+        // Update session title if first user message
+        if (_messages.where((m) => m.isUser).length == 1) {
+          final title = (caption.isEmpty ? 'Image' : caption);
+          final short = title.length > 30 ? '${title.substring(0, 30)}...' : title;
+          await _chatHistoryService.updateSessionTitle(_currentSession!.id, short);
+          _currentSession = _currentSession!.copyWith(title: short);
+        }
+      }
+
+      // Send to T
+      final replyText = await _chatService.sendMessageWithImage(caption.isEmpty ? 'Analyze this image' : caption, dataUri);
+
+      final aiMessage = ChatMessage.text(text: replyText, isUser: false);
+      setState(() {
+        _messages.add(aiMessage);
+        _isTyping = false;
+        _debugInfo = 'AI analyzed your image.';
+      });
+
+      // Save AI response to session and update limits
+      if (_currentSession != null) {
+        await _chatHistoryService.addMessageToSession(
+          _currentSession!.id,
+          aiMessage,
+        );
+      }
+      await _updateMessageLimits();
+      _scrollToBottom();
+    } catch (e) {
+      setState(() { _isTyping = false; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image send failed: $e')));
+      // Count error as response for limits, mirror text flow
+      await _updateMessageLimits();
     }
   }
 

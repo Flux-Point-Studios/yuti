@@ -638,7 +638,7 @@ class ChatService {
     }
   }
   
-  Future<String> _callTBackend(String message) async {
+  Future<String> _callTBackend(String message, {String? imageDataUri}) async {
     print('🔍 DEBUG: _callTBackend called with message: "$message"');
     
     // Use serverless proxy on web to avoid CORS and expose no secrets
@@ -691,6 +691,7 @@ class ChatService {
     final body = jsonEncode({
       'message': message,
       'session_id': _sessionId,
+      if (imageDataUri != null) 'image_data': imageDataUri,
       if (walletContext != null)
         'context': {
           'wallet': walletContext,
