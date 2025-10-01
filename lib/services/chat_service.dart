@@ -96,6 +96,12 @@ class ChatService {
   final CardanoWalletService _cardanoWalletService = CardanoWalletService();
   final AddressBookService _addressBookService = AddressBookService();
 
+  // Pinned image (data URI) to include on general chat turns
+  String? _pinnedImageDataUri;
+  void setPinnedImage(String? dataUri) {
+    _pinnedImageDataUri = dataUri;
+  }
+
   // Wallet context cache to avoid excessive API calls
   Map<String, dynamic>? _cachedWalletContext;
   DateTime? _cachedWalletContextAt;
@@ -637,7 +643,7 @@ class ChatService {
   Future<ChatMessage> _handleGeneralQuery(String input) async {
     try {
       // Forward to T-Backend for AI response
-      final response = await _callTBackend(input);
+      final response = await _callTBackend(input, imageDataUri: _pinnedImageDataUri);
       return ChatMessage.text(text: response, isUser: false);
     } catch (e) {
       return ChatMessage.text(

@@ -45,6 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isListening = false;
   bool _isSidebarVisible = false;
   ChatSession? _currentSession;
+  String? _pinnedImageDataUri;
   
   // Message limit tracking
   int _remainingMessages = 20;
@@ -889,6 +890,7 @@ class _ChatScreenState extends State<ChatScreen> {
       children: [
         // Debug panel
         _buildDebugPanel(),
+        if (_pinnedImageDataUri != null) _buildPinnedImageChip(),
         
         Container(
           padding: const EdgeInsets.all(16),
@@ -1075,6 +1077,55 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildPinnedImageChip() {
+    // Show a compact preview with Unpin action
+    Widget thumb;
+    try {
+      final b64 = _pinnedImageDataUri!.split(',').last;
+      final bytes = base64Decode(b64);
+      thumb = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.memory(bytes, width: 44, height: 44, fit: BoxFit.cover),
+      );
+    } catch (_) {
+      thumb = const Icon(Icons.image, color: Colors.white, size: 28);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 4),
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.15)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                thumb,
+                const SizedBox(width: 8),
+                const Text('Pinned image', style: TextStyle(color: Colors.white)),
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: () {
+                    setState(() { _pinnedImageDataUri = null; });
+                    _chatService.setPinnedImage(null);
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(6.0),
+                    child: Icon(Icons.close, color: Colors.white70, size: 18),
+                  ),
+                )
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _sendMessage() async {
     final text = _inputController.text.trim();
     if (text.isEmpty || _isLimitReached) return;
@@ -1111,11 +1162,11 @@ class _ChatScreenState extends State<ChatScreen> {
     // Scroll to bottom
     _scrollToBottom();
 
+    setState(() { _debugInfo = 'Making API call to T Backend...'; });
+    // Ensure pinned image state is synced to service before send
+    _chatService.setPinnedImage(_pinnedImageDataUri);
+
     try {
-      setState(() {
-        _debugInfo = 'Making API call to T Backend...';
-      });
-      
       final response = await _chatService.sendMessage(text);
       
       setState(() {
@@ -1188,6 +1239,10 @@ class _ChatScreenState extends State<ChatScreen> {
       final dataUri = 'data:$mime;base64,$b64';
 
       final caption = _inputController.text.trim();
+
+      // Pin this image for subsequent turns
+      setState(() { _pinnedImageDataUri = dataUri; });
+      _chatService.setPinnedImage(dataUri);
 
       // Add local preview message
       final preview = ChatMessage(
