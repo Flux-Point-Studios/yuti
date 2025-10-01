@@ -230,6 +230,17 @@ class ChatService {
       return "Sorry, I encountered an error. Please try again.";
     }
   }
+
+  // Send a message with an attached image (data URI) to T Backend
+  Future<String> sendMessageWithImage(String userInput, String imageDataUri) async {
+    try {
+      final message = (userInput.isEmpty) ? 'Analyze this image' : userInput;
+      return await _callTBackend(message, imageDataUri: imageDataUri);
+    } catch (e) {
+      print('�� DEBUG: sendMessageWithImage error: $e');
+      return "Sorry, I couldn't process that image. Please try again.";
+    }
+  }
   
   ChatIntent _detectIntent(String input) {
     final lower = input.toLowerCase();
