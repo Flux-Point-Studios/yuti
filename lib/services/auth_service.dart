@@ -157,7 +157,7 @@ class AuthService {
     required String lastName,
   }) async {
     try {
-      final String? redirectUrl = kIsWeb ? '${Uri.base.origin}/welcome' : null;
+      final String? redirectUrl = kIsWeb ? '${Uri.base.origin}/chat' : null;
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
