@@ -7,7 +7,7 @@ class AppConfig {
   // API URLs
   String get blockfrostApiUrl => 'https://cardano-mainnet.blockfrost.io';
   String get tBackendUrl => const String.fromEnvironment('T_BACKEND_URL',
-      defaultValue: 'https://api.fluxpointstudios.com');
+      defaultValue: 'https://api-v2.fluxpointstudios.com');
   String get uexApiUrl => const String.fromEnvironment('UEX_API_URL',
       defaultValue: 'https://uex.us/api');
   String get uexSwapApiUrl => const String.fromEnvironment('UEX_SWAP_API_URL',

@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   try {
-    const baseUrl = process.env.T_BACKEND_URL || 'https://api.fluxpointstudios.com';
+    const baseUrl = process.env.T_BACKEND_URL || 'https://api-v2.fluxpointstudios.com';
     const apiKey = process.env.T_BACKEND_API_KEY || '';
 
     if (!apiKey) {
