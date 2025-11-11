@@ -9,6 +9,7 @@ import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 import '../models/chat_message.dart';
 import '../models/chat_session.dart';
 import '../services/auth_service.dart';
@@ -45,7 +46,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isListening = false;
   bool _isSidebarVisible = false;
   ChatSession? _currentSession;
-  String? _pinnedImageDataUri;
+  String? _attachedImageDataUri;
+  String? _attachedImageThumbDataUri;
+  static const int _maxImageBytes = 2 * 1024 * 1024; // 2MB budget for API payload
+  static const int _thumbMaxWidth = 300; // preview thumbnail width
   
   // Message limit tracking
   int _remainingMessages = 20;
@@ -566,7 +570,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildUserBubble(ChatMessage message) {
     if (message.type == MessageType.image) {
-      final dataUri = message.metadata != null ? (message.metadata!['data_uri'] as String?) : null;
+      final dataUri = message.metadata != null
+          ? ((message.metadata!['thumb_data_uri'] as String?) ??
+              (message.metadata!['data_uri'] as String?))
+          : null;
       Widget imageWidget;
       if (dataUri != null && dataUri.contains(',')) {
         final b64 = dataUri.split(',').last;
@@ -890,7 +897,7 @@ class _ChatScreenState extends State<ChatScreen> {
       children: [
         // Debug panel
         _buildDebugPanel(),
-        if (_pinnedImageDataUri != null) _buildPinnedImageChip(),
+        if (_attachedImageDataUri != null) _buildAttachmentPreview(),
         
         Container(
           padding: const EdgeInsets.all(16),
@@ -995,7 +1002,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.attach_file, color: AppColors.textPrimary),
-                    onPressed: _attachAndSendImage,
+                    onPressed: _showImageSourcePicker,
                     tooltip: 'Attach image',
                   ),
                   const SizedBox(width: 8),
@@ -1077,11 +1084,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildPinnedImageChip() {
-    // Show a compact preview with Unpin action
+  Widget _buildAttachmentPreview() {
+    // Show a compact preview with Remove action
     Widget thumb;
     try {
-      final b64 = _pinnedImageDataUri!.split(',').last;
+      final sourceDataUri = _attachedImageThumbDataUri ?? _attachedImageDataUri!;
+      final b64 = sourceDataUri.split(',').last;
       final bytes = base64Decode(b64);
       thumb = ClipRRect(
         borderRadius: BorderRadius.circular(8),
@@ -1106,12 +1114,14 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 thumb,
                 const SizedBox(width: 8),
-                const Text('Pinned image', style: TextStyle(color: Colors.white)),
+                const Text('Image attached', style: TextStyle(color: Colors.white)),
                 const SizedBox(width: 6),
                 InkWell(
                   onTap: () {
-                    setState(() { _pinnedImageDataUri = null; });
-                    _chatService.setPinnedImage(null);
+                    setState(() { 
+                      _attachedImageDataUri = null; 
+                      _attachedImageThumbDataUri = null; 
+                    });
                   },
                   child: const Padding(
                     padding: EdgeInsets.all(6.0),
@@ -1128,9 +1138,20 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendMessage() async {
     final text = _inputController.text.trim();
-    if (text.isEmpty || _isLimitReached) return;
+    if ((_isLimitReached) || (text.isEmpty && _attachedImageDataUri == null)) return;
 
-    final userMessage = ChatMessage.text(text: text, isUser: true);
+    final bool hasImage = _attachedImageDataUri != null;
+    final userMessage = hasImage
+        ? ChatMessage(
+            text: text.isEmpty ? '[image]' : text,
+            isUser: true,
+            type: MessageType.image,
+            metadata: {
+              if (_attachedImageThumbDataUri != null) 'thumb_data_uri': _attachedImageThumbDataUri,
+              'hasImage': true,
+            },
+          )
+        : ChatMessage.text(text: text, isUser: true);
 
     // Add user message
     setState(() {
@@ -1154,7 +1175,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // Update session title if it's the first user message
     if (_currentSession != null &&
         _messages.where((m) => m.isUser).length == 1) {
-      final title = text.length > 30 ? '${text.substring(0, 30)}...' : text;
+      final baseTitle = (text.isEmpty && hasImage) ? 'Image' : text;
+      final title = baseTitle.length > 30 ? '${baseTitle.substring(0, 30)}...' : baseTitle;
       await _chatHistoryService.updateSessionTitle(_currentSession!.id, title);
       _currentSession = _currentSession!.copyWith(title: title);
     }
@@ -1163,11 +1185,13 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     setState(() { _debugInfo = 'Making API call to T Backend...'; });
-    // Ensure pinned image state is synced to service before send
-    _chatService.setPinnedImage(_pinnedImageDataUri);
 
     try {
-      final response = await _chatService.sendMessage(text);
+      final effectiveText = (text.isEmpty && hasImage) ? 'Analyze this image' : text;
+      final response = await _chatService.sendMessage(
+        effectiveText,
+        imageDataUri: _attachedImageDataUri,
+      );
       
       setState(() {
         _debugInfo = 'API call successful, processing response...';
@@ -1179,6 +1203,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(aiMessage);
         _isTyping = false;
         _debugInfo = 'AI response received and displayed successfully';
+        // Clear attachment after successful send
+        _attachedImageDataUri = null;
+        _attachedImageThumbDataUri = null;
       });
 
       // Save AI response to session
@@ -1222,81 +1249,131 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _attachAndSendImage() async {
+  Future<void> _showImageSourcePicker() async {
+    if (kIsWeb) {
+      // Web: default to gallery
+      await _pickImageAttachment(ImageSource.gallery);
+      return;
+    }
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(12),
+          child: GlassmorphismContainer(
+            glassType: GlassType.overlay,
+            borderRadius: BorderRadius.circular(16),
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: AppColors.primaryBlue),
+                  title: const Text('Take photo', style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _pickImageAttachment(ImageSource.camera);
+                  },
+                ),
+                const Divider(color: AppColors.glassBorder),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: AppColors.primaryBlue),
+                  title: const Text('Choose from gallery', style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _pickImageAttachment(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImageAttachment(ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: source == ImageSource.camera ? 1600 : 1800,
+        imageQuality: 90,
+      );
       if (picked == null) return;
 
       final bytes = await picked.readAsBytes();
       final lower = picked.path.toLowerCase();
-      final mime = lower.endsWith('.png')
+      String mime = lower.endsWith('.png')
           ? 'image/png'
-          : lower.endsWith('.webp')
-              ? 'image/webp'
-              : 'image/jpeg';
-      final b64 = base64Encode(bytes);
-      final dataUri = 'data:$mime;base64,$b64';
+          : lower.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+      
+      // Enforce max size and build data URI (may re-encode as JPEG)
+      final encoded = await _encodeDataUriWithinLimit(bytes, mime);
+      final dataUri = encoded.$1;
+      mime = encoded.$2;
 
-      final caption = _inputController.text.trim();
+      // Build thumbnail preview
+      final thumbDataUri = await _generateThumbnailDataUri(bytes);
 
-      // Pin this image for subsequent turns
-      setState(() { _pinnedImageDataUri = dataUri; });
-      _chatService.setPinnedImage(dataUri);
-
-      // Add local preview message
-      final preview = ChatMessage(
-        text: caption.isEmpty ? '[image]' : caption,
-        isUser: true,
-        type: MessageType.image,
-        metadata: {'data_uri': dataUri, 'local_path': picked.path},
-      );
       setState(() {
-        _messages.add(preview);
-        _inputController.clear();
-        _isTyping = true;
-        _debugInfo = 'Image selected; sending to AI...';
+        _attachedImageDataUri = dataUri;
+        _attachedImageThumbDataUri = thumbDataUri ?? _attachedImageDataUri;
       });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image attach failed: $e')));
+    }
+  }
 
-      // Save user image message to session (stores caption text only)
-      if (_currentSession != null) {
-        await _chatHistoryService.addMessageToSession(
-          _currentSession!.id,
-          preview,
-        );
-        // Update session title if first user message
-        if (_messages.where((m) => m.isUser).length == 1) {
-          final title = (caption.isEmpty ? 'Image' : caption);
-          final short = title.length > 30 ? '${title.substring(0, 30)}...' : title;
-          await _chatHistoryService.updateSessionTitle(_currentSession!.id, short);
-          _currentSession = _currentSession!.copyWith(title: short);
+  Future<(String, String)> _encodeDataUriWithinLimit(Uint8List inputBytes, String originalMime) async {
+    // If already under limit, keep as is
+    if (inputBytes.lengthInBytes <= _maxImageBytes) {
+      final b64 = base64Encode(inputBytes);
+      return ('data:$originalMime;base64,$b64', originalMime);
+    }
+    try {
+      final decoded = img.decodeImage(inputBytes);
+      if (decoded == null) {
+        final b64 = base64Encode(inputBytes);
+        return ('data:$originalMime;base64,$b64', originalMime);
+      }
+      // Try progressively smaller sizes/qualities
+      final targetWidths = [1600, 1280, 1000, 800, 640, 480, 360];
+      final qualities = [85, 75, 65, 55, 45, 35, 30];
+      for (final w in targetWidths) {
+        final resized = decoded.width > w ? img.copyResize(decoded, width: w) : decoded;
+        for (final q in qualities) {
+          final jpg = img.encodeJpg(resized, quality: q);
+          if (jpg.length <= _maxImageBytes) {
+            final b64 = base64Encode(jpg);
+            return ('data:image/jpeg;base64,$b64', 'image/jpeg');
+          }
         }
       }
+      // Fallback to the smallest attempt
+      final smallest = img.encodeJpg(img.copyResize(decoded, width: 360), quality: 30);
+      final b64 = base64Encode(smallest);
+      return ('data:image/jpeg;base64,$b64', 'image/jpeg');
+    } catch (_) {
+      // On failure, return original
+      final b64 = base64Encode(inputBytes);
+      return ('data:$originalMime;base64,$b64', originalMime);
+    }
+  }
 
-      // Send to T
-      final replyText = await _chatService.sendMessageWithImage(caption.isEmpty ? 'Analyze this image' : caption, dataUri);
-
-      final aiMessage = ChatMessage.text(text: replyText, isUser: false);
-      setState(() {
-        _messages.add(aiMessage);
-        _isTyping = false;
-        _debugInfo = 'AI analyzed your image.';
-      });
-
-      // Save AI response to session and update limits
-      if (_currentSession != null) {
-        await _chatHistoryService.addMessageToSession(
-          _currentSession!.id,
-          aiMessage,
-        );
-      }
-      await _updateMessageLimits();
-      _scrollToBottom();
-    } catch (e) {
-      setState(() { _isTyping = false; });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image send failed: $e')));
-      // Count error as response for limits, mirror text flow
-      await _updateMessageLimits();
+  Future<String?> _generateThumbnailDataUri(Uint8List inputBytes) async {
+    try {
+      final decoded = img.decodeImage(inputBytes);
+      if (decoded == null) return null;
+      final resized = decoded.width > _thumbMaxWidth 
+          ? img.copyResize(decoded, width: _thumbMaxWidth)
+          : decoded;
+      final jpg = img.encodeJpg(resized, quality: 60);
+      final b64 = base64Encode(Uint8List.fromList(jpg));
+      return 'data:image/jpeg;base64,$b64';
+    } catch (_) {
+      return null;
     }
   }
 

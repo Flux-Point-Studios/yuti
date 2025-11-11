@@ -29,6 +29,7 @@ dependencies:
   url_launcher: ^6.2.2
   flutter_web_auth: ^0.6.0
   archive: ^3.4.10
+  image: ^4.1.7
   image_picker: ^1.1.1
   # VESPR SDK for Cardano wallet functionality (compatible versions)
   cardano_flutter_sdk: ^2.5.0

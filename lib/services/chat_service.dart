@@ -96,12 +96,6 @@ class ChatService {
   final CardanoWalletService _cardanoWalletService = CardanoWalletService();
   final AddressBookService _addressBookService = AddressBookService();
 
-  // Pinned image (data URI) to include on general chat turns
-  String? _pinnedImageDataUri;
-  void setPinnedImage(String? dataUri) {
-    _pinnedImageDataUri = dataUri;
-  }
-
   // Wallet context cache to avoid excessive API calls
   Map<String, dynamic>? _cachedWalletContext;
   DateTime? _cachedWalletContextAt;
@@ -190,7 +184,7 @@ class ChatService {
   }
 
   // Main entry point for processing user messages
-  Future<ChatMessage> processMessage(String userInput) async {
+  Future<ChatMessage> processMessage(String userInput, {String? imageDataUri}) async {
     try {
       print('🔍 DEBUG: Starting processMessage with input: "$userInput"');
       
@@ -212,7 +206,7 @@ class ChatService {
         case ChatIntent.transaction:
           return await _handleTransactionQuery(userInput);
         case ChatIntent.general:
-          return await _handleGeneralQuery(userInput);
+          return await _handleGeneralQuery(userInput, imageDataUri: imageDataUri);
       }
     } catch (e, stackTrace) {
       print('🔍 DEBUG: Error in processMessage: $e');
@@ -225,10 +219,10 @@ class ChatService {
   }
 
   // Simplified method for UI - returns just the text
-  Future<String> sendMessage(String userInput) async {
+  Future<String> sendMessage(String userInput, {String? imageDataUri}) async {
     try {
       print('🔍 DEBUG: sendMessage called with: "$userInput"');
-      final chatMessage = await processMessage(userInput);
+      final chatMessage = await processMessage(userInput, imageDataUri: imageDataUri);
       print('🔍 DEBUG: sendMessage returning: "${chatMessage.text}"');
       return chatMessage.text;
     } catch (e) {
@@ -640,10 +634,10 @@ class ChatService {
     }
   }
   
-  Future<ChatMessage> _handleGeneralQuery(String input) async {
+  Future<ChatMessage> _handleGeneralQuery(String input, {String? imageDataUri}) async {
     try {
       // Forward to T-Backend for AI response
-      final response = await _callTBackend(input, imageDataUri: _pinnedImageDataUri);
+      final response = await _callTBackend(input, imageDataUri: imageDataUri);
       return ChatMessage.text(text: response, isUser: false);
     } catch (e) {
       return ChatMessage.text(
