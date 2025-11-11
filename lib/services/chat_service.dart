@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/chat_message.dart';
 import '../config/app_config.dart';
 import '../config/secure_config.dart';
@@ -15,7 +16,6 @@ import 'address_book_service.dart';
 import 'smart_wallet_service.dart';
 import 'auth_service.dart';
 import '../models/address_book_entry.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math' as math;
 
 enum ChatIntent {
@@ -111,6 +111,102 @@ class ChatService {
   ChatService._internal() {
     _sessionId = const Uuid().v4();
     _transactionService = TransactionService(_walletService, _blockfrostService);
+  }
+
+  // Streaming chunks from T-Backend
+  class ChatStreamChunk {
+    ChatStreamChunk(this.delta, {this.isError = false});
+    final String delta;
+    final bool isError;
+  }
+
+  // Stream tokens via SSE (mobile/desktop). On web, fall back to one-shot body parse.
+  Stream<ChatStreamChunk> streamMessage({
+    required String message,
+    String? imageDataUri,
+  }) async* {
+    final String endpoint = kIsWeb ? '/api/t/chat' : "${_config.tBackendUrl}/chat";
+    final uri = Uri.parse(endpoint);
+
+    // Load API key when not on web (serverless proxy injects on web)
+    String apiKey = '';
+    if (!kIsWeb) {
+      try {
+        apiKey = await SecureConfig().getTBackendApiKey();
+      } catch (_) {
+        apiKey = _config.tBackendApiKey;
+      }
+    }
+
+    // Web fallback: issue a normal POST including stream:true, then split any SSE-like text
+    if (kIsWeb) {
+      try {
+        final headers = {'Content-Type': 'application/json'};
+        final body = jsonEncode({
+          'message': message,
+          'session_id': _sessionId,
+          'stream': true,
+          if (imageDataUri != null) 'image_data': imageDataUri,
+        });
+        final resp = await http.post(uri, headers: headers, body: body);
+        if (resp.statusCode != 200) {
+          yield ChatStreamChunk('[error] ${resp.statusCode} ${resp.body}', isError: true);
+          return;
+        }
+        final contentType = resp.headers['content-type'] ?? '';
+        final text = resp.body;
+        if (contentType.contains('text/event-stream') || text.startsWith('data:')) {
+          // Best-effort parse of SSE frames from buffered text
+          final lines = const LineSplitter().convert(text);
+          for (final line in lines) {
+            if (line.startsWith('data: ')) {
+              final payload = line.substring(6);
+              final isError = payload.startsWith('[error]');
+              yield ChatStreamChunk(payload, isError: isError);
+            }
+          }
+        } else {
+          // Treat body as final reply text
+          yield ChatStreamChunk(text, isError: false);
+        }
+      } catch (e) {
+        yield ChatStreamChunk('[error] $e', isError: true);
+      }
+      return;
+    }
+
+    // Mobile/desktop: use streamed request and parse SSE lines incrementally
+    final client = http.Client();
+    try {
+      final req = http.Request('POST', uri);
+      req.headers['Content-Type'] = 'application/json';
+      if (apiKey.isNotEmpty) {
+        req.headers['api-key'] = apiKey;
+      }
+      req.headers['Accept'] = 'text/event-stream';
+      final body = <String, dynamic>{
+        'message': message,
+        'session_id': _sessionId,
+        'stream': true,
+        if (imageDataUri != null) 'image_data': imageDataUri,
+      };
+      req.body = jsonEncode(body);
+
+      final resp = await client.send(req);
+      // Decode streamed text and split lines
+      final lines = resp.stream.transform(utf8.decoder).transform(const LineSplitter());
+      await for (final line in lines) {
+        if (line.startsWith('data: ')) {
+          final payload = line.substring(6);
+          final isError = payload.startsWith('[error]');
+          yield ChatStreamChunk(payload, isError: isError);
+        }
+      }
+    } catch (e) {
+      yield ChatStreamChunk('[error] $e', isError: true);
+    } finally {
+      client.close();
+    }
   }
   
   // System messages stream for background notifications (e.g., swap status updates)

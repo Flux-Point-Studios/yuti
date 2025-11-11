@@ -24,6 +24,7 @@ import '../widgets/message_limit_widget.dart';
 import '../screens/pricing_screen.dart';
 import '../screens/browser_screen.dart'; // Added import for BrowserScreen
 import '../services/cardano_wallet_service.dart';
+import '../services/chat_service.dart' show ChatStreamChunk;
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -43,6 +44,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final CardanoWalletService _cardanoService = CardanoWalletService();
 
   bool _isTyping = false;
+  bool _isStreaming = false;
   bool _isListening = false;
   bool _isSidebarVisible = false;
   ChatSession? _currentSession;
@@ -50,6 +52,10 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _attachedImageThumbDataUri;
   static const int _maxImageBytes = 2 * 1024 * 1024; // 2MB budget for API payload
   static const int _thumbMaxWidth = 300; // preview thumbnail width
+  StreamSubscription<ChatStreamChunk>? _streamSub;
+  String? _streamMessageId;
+  String _streamBuffer = '';
+  bool _streamFinalized = false;
   
   // Message limit tracking
   int _remainingMessages = 20;
@@ -1022,10 +1028,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     child: IconButton(
                       icon: Icon(
-                        Icons.send, 
+                        _isStreaming ? Icons.stop : Icons.send, 
                         color: _isLimitReached ? Colors.white.withOpacity(0.3) : Colors.white,
                       ),
-                      onPressed: _isLimitReached ? null : _sendMessage,
+                      onPressed: _isLimitReached 
+                          ? null 
+                          : (_isStreaming ? _stopStreaming : _sendMessage),
                     ),
                   ),
                 ],
@@ -1157,7 +1165,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add(userMessage);
       _inputController.clear();
-      _isTyping = true;
+      _isTyping = true; // shows typing indicator beneath message list
       _debugInfo = 'User message sent, calling AI API...';
     });
 
@@ -1184,42 +1192,93 @@ class _ChatScreenState extends State<ChatScreen> {
     // Scroll to bottom
     _scrollToBottom();
 
-    setState(() { _debugInfo = 'Making API call to T Backend...'; });
+    setState(() { _debugInfo = 'Making API call to T Backend (streaming)...'; });
 
     try {
       final effectiveText = (text.isEmpty && hasImage) ? 'Analyze this image' : text;
-      final response = await _chatService.sendMessage(
-        effectiveText,
+      // Create placeholder assistant message
+      final placeholder = ChatMessage(text: '', isUser: false);
+      setState(() {
+        _messages.add(placeholder);
+        _isStreaming = true;
+        _streamMessageId = placeholder.id;
+        _streamBuffer = '';
+        _streamFinalized = false;
+      });
+
+      final stream = _chatService.streamMessage(
+        message: effectiveText,
         imageDataUri: _attachedImageDataUri,
       );
-      
-      setState(() {
-        _debugInfo = 'API call successful, processing response...';
-      });
-      
-      final aiMessage = ChatMessage.text(text: response, isUser: false);
-      
-      setState(() {
-        _messages.add(aiMessage);
-        _isTyping = false;
-        _debugInfo = 'AI response received and displayed successfully';
-        // Clear attachment after successful send
-        _attachedImageDataUri = null;
-        _attachedImageThumbDataUri = null;
-      });
 
-      // Save AI response to session
-      if (_currentSession != null) {
-        await _chatHistoryService.addMessageToSession(
-          _currentSession!.id,
-          aiMessage,
-        );
-      }
-
-      // Update message limits after Agent T responds
-      await _updateMessageLimits();
-
-      _scrollToBottom();
+      _streamSub = stream.listen(
+        (chunk) {
+          if (chunk.isError) {
+            setState(() {
+              _debugInfo = 'Streaming error chunk received';
+            });
+            return;
+          }
+          _streamBuffer += chunk.delta;
+          // Update placeholder bubble text
+          final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
+          if (idx != -1) {
+            final updated = ChatMessage(
+              id: _messages[idx].id,
+              text: _streamBuffer,
+              isUser: false,
+              type: MessageType.text,
+            );
+            setState(() {
+              _messages[idx] = updated;
+            });
+          }
+        },
+        onError: (e) async {
+          if (_streamFinalized) return;
+          _streamFinalized = true;
+          setState(() {
+            _isTyping = false;
+            _isStreaming = false;
+            _debugInfo = 'Streaming error: $e';
+          });
+          // Keep whatever buffer we had; save it as the assistant message
+          if (_currentSession != null && _streamMessageId != null) {
+            final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
+            if (idx != -1) {
+              await _chatHistoryService.addMessageToSession(
+                _currentSession!.id,
+                _messages[idx],
+              );
+            }
+          }
+          await _updateMessageLimits();
+          _clearAttachmentAfterSend();
+          _scrollToBottom();
+        },
+        onDone: () async {
+          if (_streamFinalized) return;
+          _streamFinalized = true;
+          setState(() {
+            _isTyping = false;
+            _isStreaming = false;
+            _debugInfo = 'Streaming complete';
+          });
+          if (_currentSession != null && _streamMessageId != null) {
+            final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
+            if (idx != -1) {
+              await _chatHistoryService.addMessageToSession(
+                _currentSession!.id,
+                _messages[idx],
+              );
+            }
+          }
+          await _updateMessageLimits();
+          _clearAttachmentAfterSend();
+          _scrollToBottom();
+        },
+        cancelOnError: true,
+      );
     } catch (e) {
       setState(() {
         _isTyping = false;
@@ -1247,6 +1306,41 @@ class _ChatScreenState extends State<ChatScreen> {
 
       _scrollToBottom();
     }
+  }
+
+  void _clearAttachmentAfterSend() {
+    setState(() {
+      _attachedImageDataUri = null;
+      _attachedImageThumbDataUri = null;
+    });
+  }
+
+  void _stopStreaming() {
+    final sub = _streamSub;
+    if (sub != null) {
+      sub.cancel();
+      _streamSub = null;
+    }
+    if (_streamFinalized) return;
+    _streamFinalized = true;
+    setState(() {
+      _isStreaming = false;
+      _isTyping = false;
+      _debugInfo = 'Streaming stopped by user';
+    });
+    // Save whatever has been streamed so far
+    if (_currentSession != null && _streamMessageId != null) {
+      final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
+      if (idx != -1) {
+        _chatHistoryService.addMessageToSession(
+          _currentSession!.id,
+          _messages[idx],
+        );
+      }
+    }
+    _updateMessageLimits();
+    _clearAttachmentAfterSend();
+    _scrollToBottom();
   }
 
   Future<void> _showImageSourcePicker() async {
