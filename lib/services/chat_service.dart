@@ -18,6 +18,13 @@ import 'auth_service.dart';
 import '../models/address_book_entry.dart';
 import 'dart:math' as math;
 
+// Streaming chunk model for SSE responses
+class ChatStreamChunk {
+  ChatStreamChunk(this.delta, {this.isError = false});
+  final String delta;
+  final bool isError;
+}
+
 enum ChatIntent {
   balance,
   send,
@@ -111,13 +118,6 @@ class ChatService {
   ChatService._internal() {
     _sessionId = const Uuid().v4();
     _transactionService = TransactionService(_walletService, _blockfrostService);
-  }
-
-  // Streaming chunks from T-Backend
-  class ChatStreamChunk {
-    ChatStreamChunk(this.delta, {this.isError = false});
-    final String delta;
-    final bool isError;
   }
 
   // Stream tokens via SSE (mobile/desktop). On web, fall back to one-shot body parse.

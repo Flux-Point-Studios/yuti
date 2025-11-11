@@ -24,7 +24,7 @@ import '../widgets/message_limit_widget.dart';
 import '../screens/pricing_screen.dart';
 import '../screens/browser_screen.dart'; // Added import for BrowserScreen
 import '../services/cardano_wallet_service.dart';
-import '../services/chat_service.dart' show ChatStreamChunk;
+// ChatStreamChunk is exported at top-level by chat_service.dart
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
