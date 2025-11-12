@@ -25,6 +25,12 @@ class ChatStreamChunk {
   final bool isError;
 }
 
+bool _isValidImageDataUri(String? dataUri) {
+  if (dataUri == null) return false;
+  // Must start with data:image/* and contain ;base64,
+  return dataUri.startsWith('data:image/') && dataUri.contains(';base64,');
+}
+
 enum ChatIntent {
   balance,
   send,
@@ -127,6 +133,7 @@ class ChatService {
   }) async* {
     final String endpoint = kIsWeb ? '/api/t/chat' : "${_config.tBackendUrl}/chat";
     final uri = Uri.parse(endpoint);
+    final imageArg = _isValidImageDataUri(imageDataUri) ? imageDataUri : null;
 
     // Load API key when not on web (serverless proxy injects on web)
     String apiKey = '';
@@ -146,7 +153,7 @@ class ChatService {
           'message': message,
           'session_id': _sessionId,
           'stream': true,
-          if (imageDataUri != null) 'image_data': imageDataUri,
+          if (imageArg != null) 'image_data': imageArg,
         });
         final resp = await http.post(uri, headers: headers, body: body);
         if (resp.statusCode != 200) {
@@ -188,7 +195,7 @@ class ChatService {
         'message': message,
         'session_id': _sessionId,
         'stream': true,
-        if (imageDataUri != null) 'image_data': imageDataUri,
+        if (imageArg != null) 'image_data': imageArg,
       };
       req.body = jsonEncode(body);
 
@@ -330,6 +337,9 @@ class ChatService {
   // Send a message with an attached image (data URI) to T Backend
   Future<String> sendMessageWithImage(String userInput, String imageDataUri) async {
     try {
+      if (!_isValidImageDataUri(imageDataUri)) {
+        throw Exception('Invalid image_data; must be data URI with base64 (data:image/...;base64,...)');
+      }
       final message = (userInput.isEmpty) ? 'Analyze this image' : userInput;
       return await _callTBackend(message, imageDataUri: imageDataUri);
     } catch (e) {
@@ -754,6 +764,7 @@ class ChatService {
         : "${_config.tBackendUrl}/chat";
     final url = kIsWeb ? Uri.parse(endpoint) : Uri.parse(endpoint);
     print('🔍 DEBUG: API URL: $url');
+    final imageArg = _isValidImageDataUri(imageDataUri) ? imageDataUri : null;
     
     // Load API key from secure storage first; fallback to env/AppConfig
     String apiKey = '';
@@ -798,7 +809,7 @@ class ChatService {
     final body = jsonEncode({
       'message': message,
       'session_id': _sessionId,
-      if (imageDataUri != null) 'image_data': imageDataUri,
+      if (imageArg != null) 'image_data': imageArg,
       if (walletContext != null)
         'context': {
           'wallet': walletContext,
