@@ -25,48 +25,6 @@ class ChatStreamChunk {
   final bool isError;
 }
 
-bool _isValidImageDataUri(String? dataUri) {
-  if (dataUri == null) return false;
-  // Must start with data:image/* and contain ;base64,
-  return dataUri.startsWith('data:image/') && dataUri.contains(';base64,');
-}
-
-ChatStreamChunk _chunkFromPayload(String payload) {
-  // Ignore common end sentinels quietly
-  if (payload.trim() == '[DONE]' || payload.trim().isEmpty) {
-    return ChatStreamChunk('', isError: false);
-  }
-  // If backend emits JSON frames, try to parse known shapes
-  try {
-    final obj = jsonDecode(payload);
-    if (obj is Map<String, dynamic>) {
-      // error frame
-      if (obj.containsKey('error')) {
-        final msg = obj['error']?.toString() ?? 'Unknown error';
-        return ChatStreamChunk('[error] $msg', isError: true);
-      }
-      // reply frame (final or batched)
-      if (obj.containsKey('reply')) {
-        final delta = obj['reply']?.toString() ?? '';
-        return ChatStreamChunk(delta, isError: false);
-      }
-      // delta/content frame
-      if (obj.containsKey('delta')) {
-        final delta = obj['delta']?.toString() ?? '';
-        return ChatStreamChunk(delta, isError: false);
-      }
-      if (obj.containsKey('content')) {
-        final delta = obj['content']?.toString() ?? '';
-        return ChatStreamChunk(delta, isError: false);
-      }
-    }
-  } catch (_) {
-    // not JSON, fall through to raw payload
-  }
-  // Treat as raw token text
-  return ChatStreamChunk(payload, isError: payload.startsWith('[error]'));
-}
-
 enum ChatIntent {
   balance,
   send,
@@ -162,6 +120,13 @@ class ChatService {
     _transactionService = TransactionService(_walletService, _blockfrostService);
   }
 
+  // Validate that image_data follows data URI format: data:image/*;base64,....
+  bool _isValidImageDataUri(String? dataUri) {
+    if (dataUri == null) return false;
+    final lower = dataUri.toLowerCase();
+    return lower.startsWith('data:image/') && lower.contains(';base64,');
+  }
+
   // Stream tokens via SSE (mobile/desktop). On web, fall back to one-shot body parse.
   Stream<ChatStreamChunk> streamMessage({
     required String message,
@@ -169,7 +134,6 @@ class ChatService {
   }) async* {
     final String endpoint = kIsWeb ? '/api/t/chat' : "${_config.tBackendUrl}/chat";
     final uri = Uri.parse(endpoint);
-    final imageArg = _isValidImageDataUri(imageDataUri) ? imageDataUri : null;
 
     // Load API key when not on web (serverless proxy injects on web)
     String apiKey = '';
@@ -185,11 +149,12 @@ class ChatService {
     if (kIsWeb) {
       try {
         final headers = {'Content-Type': 'application/json'};
+        final imgArg = _isValidImageDataUri(imageDataUri) ? imageDataUri : null;
         final body = jsonEncode({
           'message': message,
           'session_id': _sessionId,
           'stream': true,
-          if (imageArg != null) 'image_data': imageArg,
+          if (imgArg != null) 'image_data': imgArg,
         });
         final resp = await http.post(uri, headers: headers, body: body);
         if (resp.statusCode != 200) {
@@ -203,24 +168,14 @@ class ChatService {
           final lines = const LineSplitter().convert(text);
           for (final line in lines) {
             if (line.startsWith('data: ')) {
-              final payload = line.substring(6); // retain leading spaces in token
-              final chunk = _chunkFromPayload(payload);
-              if (chunk.delta.isEmpty && !chunk.isError) continue;
-              yield chunk;
+              final payload = line.substring(6);
+              final isError = payload.startsWith('[error]');
+              yield ChatStreamChunk(payload, isError: isError);
             }
           }
         } else {
-          // Try parse JSON { reply } or fall back to raw text
-          try {
-            final obj = jsonDecode(text);
-            if (obj is Map && obj.containsKey('reply')) {
-              yield ChatStreamChunk(obj['reply']?.toString() ?? '', isError: false);
-            } else {
-              yield ChatStreamChunk(text, isError: false);
-            }
-          } catch (_) {
-            yield ChatStreamChunk(text, isError: false);
-          }
+          // Treat body as final reply text
+          yield ChatStreamChunk(text, isError: false);
         }
       } catch (e) {
         yield ChatStreamChunk('[error] $e', isError: true);
@@ -241,7 +196,7 @@ class ChatService {
         'message': message,
         'session_id': _sessionId,
         'stream': true,
-        if (imageArg != null) 'image_data': imageArg,
+        if (_isValidImageDataUri(imageDataUri)) 'image_data': imageDataUri,
       };
       req.body = jsonEncode(body);
 
@@ -251,9 +206,8 @@ class ChatService {
       await for (final line in lines) {
         if (line.startsWith('data: ')) {
           final payload = line.substring(6);
-          final chunk = _chunkFromPayload(payload);
-          if (chunk.delta.isEmpty && !chunk.isError) continue;
-          yield chunk;
+          final isError = payload.startsWith('[error]');
+          yield ChatStreamChunk(payload, isError: isError);
         }
       }
     } catch (e) {
@@ -812,7 +766,7 @@ class ChatService {
     final url = kIsWeb ? Uri.parse(endpoint) : Uri.parse(endpoint);
     print('🔍 DEBUG: API URL: $url');
     final imageArg = _isValidImageDataUri(imageDataUri) ? imageDataUri : null;
-    
+
     // Load API key from secure storage first; fallback to env/AppConfig
     String apiKey = '';
     try {

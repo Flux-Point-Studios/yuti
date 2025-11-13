@@ -56,9 +56,6 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _streamMessageId;
   String _streamBuffer = '';
   bool _streamFinalized = false;
-  String _typewriterPending = '';
-  Timer? _typewriterTimer;
-  bool _typewriterShouldFinalize = false;
   
   // Message limit tracking
   int _remainingMessages = 20;
@@ -1031,12 +1028,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     child: IconButton(
                       icon: Icon(
-                        _isStreaming ? Icons.stop : Icons.send, 
+                        Icons.send, 
                         color: _isLimitReached ? Colors.white.withOpacity(0.3) : Colors.white,
                       ),
-                      onPressed: _isLimitReached 
-                          ? null 
-                          : (_isStreaming ? _stopStreaming : _sendMessage),
+                      onPressed: _isLimitReached ? null : _sendMessage,
                     ),
                   ),
                 ],
@@ -1168,7 +1163,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add(userMessage);
       _inputController.clear();
-      _isTyping = true; // shows typing indicator beneath message list
+      _isTyping = true;
       _debugInfo = 'User message sent, calling AI API...';
     });
 
@@ -1195,70 +1190,40 @@ class _ChatScreenState extends State<ChatScreen> {
     // Scroll to bottom
     _scrollToBottom();
 
-    setState(() { _debugInfo = 'Making API call to T Backend (streaming)...'; });
+    setState(() { _debugInfo = 'Making API call to T Backend...'; });
 
     try {
       final effectiveText = (text.isEmpty && hasImage) ? 'Analyze this image' : text;
-      // Create placeholder assistant message
-      final placeholder = ChatMessage(text: '', isUser: false);
-      setState(() {
-        _messages.add(placeholder);
-        _isStreaming = true;
-        _streamMessageId = placeholder.id;
-        _streamBuffer = '';
-        _streamFinalized = false;
-      });
-
-      final stream = _chatService.streamMessage(
-        message: effectiveText,
+      final response = await _chatService.sendMessage(
+        effectiveText,
         imageDataUri: _attachedImageDataUri,
       );
+      
+      setState(() {
+        _debugInfo = 'API call successful, processing response...';
+      });
+      
+      final aiMessage = ChatMessage.text(text: response, isUser: false);
+      
+      setState(() {
+        _messages.add(aiMessage);
+        _isTyping = false;
+        _debugInfo = 'AI response received and displayed successfully';
+        _clearAttachmentAfterSend();
+      });
 
-      _streamSub = stream.listen(
-        (chunk) {
-          if (chunk.isError) {
-            setState(() {
-              _debugInfo = 'Streaming error chunk received';
-            });
-            return;
-          }
-          _typewriterPending += chunk.delta;
-          _kickTypewriter();
-        },
-        onError: (e) async {
-          if (_streamFinalized) return;
-          _streamFinalized = true;
-          setState(() {
-            _isTyping = false;
-            _isStreaming = false;
-            _debugInfo = 'Streaming error: $e';
-          });
-          // Keep whatever buffer we had; save it as the assistant message
-          if (_currentSession != null && _streamMessageId != null) {
-            final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
-            if (idx != -1) {
-              await _chatHistoryService.addMessageToSession(
-                _currentSession!.id,
-                _messages[idx],
-              );
-            }
-          }
-          await _updateMessageLimits();
-          _clearAttachmentAfterSend();
-          _scrollToBottom();
-        },
-        onDone: () async {
-          if (_streamFinalized) return;
-          _streamFinalized = true;
-          // If there is pending text, finish typing it first, then finalize
-          if (_typewriterPending.isNotEmpty) {
-            _typewriterShouldFinalize = true;
-          } else {
-            await _finalizeStreamingMessage();
-          }
-        },
-        cancelOnError: true,
-      );
+      // Save AI response to session
+      if (_currentSession != null) {
+        await _chatHistoryService.addMessageToSession(
+          _currentSession!.id,
+          aiMessage,
+        );
+      }
+
+      // Update message limits after Agent T responds
+      await _updateMessageLimits();
+
+      _scrollToBottom();
     } catch (e) {
       setState(() {
         _isTyping = false;
@@ -1303,9 +1268,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (_streamFinalized) return;
     _streamFinalized = true;
-    _typewriterTimer?.cancel();
-    _typewriterTimer = null;
-    _typewriterPending = '';
     setState(() {
       _isStreaming = false;
       _isTyping = false;
@@ -1322,61 +1284,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
     _updateMessageLimits();
-    _clearAttachmentAfterSend();
-    _scrollToBottom();
-  }
-
-  void _kickTypewriter() {
-    if (_typewriterTimer != null) return;
-    // 30ms per tick, ~6 chars per tick ≈ 200 chars/sec
-    const int charsPerTick = 6;
-    const tick = Duration(milliseconds: 30);
-    _typewriterTimer = Timer.periodic(tick, (t) async {
-      if (_typewriterPending.isEmpty) {
-        _typewriterTimer?.cancel();
-        _typewriterTimer = null;
-        if (_typewriterShouldFinalize) {
-          _typewriterShouldFinalize = false;
-          await _finalizeStreamingMessage();
-        }
-        return;
-      }
-      final take = _typewriterPending.length < charsPerTick ? _typewriterPending.length : charsPerTick;
-      final segment = _typewriterPending.substring(0, take);
-      _typewriterPending = _typewriterPending.substring(take);
-      _streamBuffer += segment;
-      // Update placeholder bubble text
-      final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
-      if (idx != -1) {
-        final updated = ChatMessage(
-          id: _messages[idx].id,
-          text: _streamBuffer,
-          isUser: false,
-          type: MessageType.text,
-        );
-        setState(() {
-          _messages[idx] = updated;
-        });
-      }
-    });
-  }
-
-  Future<void> _finalizeStreamingMessage() async {
-    setState(() {
-      _isTyping = false;
-      _isStreaming = false;
-      _debugInfo = 'Streaming complete';
-    });
-    if (_currentSession != null && _streamMessageId != null) {
-      final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
-      if (idx != -1) {
-        await _chatHistoryService.addMessageToSession(
-          _currentSession!.id,
-          _messages[idx],
-        );
-      }
-    }
-    await _updateMessageLimits();
     _clearAttachmentAfterSend();
     _scrollToBottom();
   }
