@@ -56,6 +56,9 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _streamMessageId;
   String _streamBuffer = '';
   bool _streamFinalized = false;
+  String _typewriterPending = '';
+  Timer? _typewriterTimer;
+  bool _typewriterShouldFinalize = false;
   
   // Message limit tracking
   int _remainingMessages = 20;
@@ -1219,20 +1222,8 @@ class _ChatScreenState extends State<ChatScreen> {
             });
             return;
           }
-          _streamBuffer += chunk.delta;
-          // Update placeholder bubble text
-          final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
-          if (idx != -1) {
-            final updated = ChatMessage(
-              id: _messages[idx].id,
-              text: _streamBuffer,
-              isUser: false,
-              type: MessageType.text,
-            );
-            setState(() {
-              _messages[idx] = updated;
-            });
-          }
+          _typewriterPending += chunk.delta;
+          _kickTypewriter();
         },
         onError: (e) async {
           if (_streamFinalized) return;
@@ -1259,23 +1250,12 @@ class _ChatScreenState extends State<ChatScreen> {
         onDone: () async {
           if (_streamFinalized) return;
           _streamFinalized = true;
-          setState(() {
-            _isTyping = false;
-            _isStreaming = false;
-            _debugInfo = 'Streaming complete';
-          });
-          if (_currentSession != null && _streamMessageId != null) {
-            final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
-            if (idx != -1) {
-              await _chatHistoryService.addMessageToSession(
-                _currentSession!.id,
-                _messages[idx],
-              );
-            }
+          // If there is pending text, finish typing it first, then finalize
+          if (_typewriterPending.isNotEmpty) {
+            _typewriterShouldFinalize = true;
+          } else {
+            await _finalizeStreamingMessage();
           }
-          await _updateMessageLimits();
-          _clearAttachmentAfterSend();
-          _scrollToBottom();
         },
         cancelOnError: true,
       );
@@ -1323,6 +1303,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (_streamFinalized) return;
     _streamFinalized = true;
+    _typewriterTimer?.cancel();
+    _typewriterTimer = null;
+    _typewriterPending = '';
     setState(() {
       _isStreaming = false;
       _isTyping = false;
@@ -1339,6 +1322,61 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
     _updateMessageLimits();
+    _clearAttachmentAfterSend();
+    _scrollToBottom();
+  }
+
+  void _kickTypewriter() {
+    if (_typewriterTimer != null) return;
+    // 30ms per tick, ~6 chars per tick ≈ 200 chars/sec
+    const int charsPerTick = 6;
+    const tick = Duration(milliseconds: 30);
+    _typewriterTimer = Timer.periodic(tick, (t) async {
+      if (_typewriterPending.isEmpty) {
+        _typewriterTimer?.cancel();
+        _typewriterTimer = null;
+        if (_typewriterShouldFinalize) {
+          _typewriterShouldFinalize = false;
+          await _finalizeStreamingMessage();
+        }
+        return;
+      }
+      final take = _typewriterPending.length < charsPerTick ? _typewriterPending.length : charsPerTick;
+      final segment = _typewriterPending.substring(0, take);
+      _typewriterPending = _typewriterPending.substring(take);
+      _streamBuffer += segment;
+      // Update placeholder bubble text
+      final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
+      if (idx != -1) {
+        final updated = ChatMessage(
+          id: _messages[idx].id,
+          text: _streamBuffer,
+          isUser: false,
+          type: MessageType.text,
+        );
+        setState(() {
+          _messages[idx] = updated;
+        });
+      }
+    });
+  }
+
+  Future<void> _finalizeStreamingMessage() async {
+    setState(() {
+      _isTyping = false;
+      _isStreaming = false;
+      _debugInfo = 'Streaming complete';
+    });
+    if (_currentSession != null && _streamMessageId != null) {
+      final idx = _messages.indexWhere((m) => m.id == _streamMessageId);
+      if (idx != -1) {
+        await _chatHistoryService.addMessageToSession(
+          _currentSession!.id,
+          _messages[idx],
+        );
+      }
+    }
+    await _updateMessageLimits();
     _clearAttachmentAfterSend();
     _scrollToBottom();
   }
