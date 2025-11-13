@@ -31,6 +31,42 @@ bool _isValidImageDataUri(String? dataUri) {
   return dataUri.startsWith('data:image/') && dataUri.contains(';base64,');
 }
 
+ChatStreamChunk _chunkFromPayload(String payload) {
+  // Ignore common end sentinels quietly
+  if (payload.trim() == '[DONE]' || payload.trim().isEmpty) {
+    return ChatStreamChunk('', isError: false);
+  }
+  // If backend emits JSON frames, try to parse known shapes
+  try {
+    final obj = jsonDecode(payload);
+    if (obj is Map<String, dynamic>) {
+      // error frame
+      if (obj.containsKey('error')) {
+        final msg = obj['error']?.toString() ?? 'Unknown error';
+        return ChatStreamChunk('[error] $msg', isError: true);
+      }
+      // reply frame (final or batched)
+      if (obj.containsKey('reply')) {
+        final delta = obj['reply']?.toString() ?? '';
+        return ChatStreamChunk(delta, isError: false);
+      }
+      // delta/content frame
+      if (obj.containsKey('delta')) {
+        final delta = obj['delta']?.toString() ?? '';
+        return ChatStreamChunk(delta, isError: false);
+      }
+      if (obj.containsKey('content')) {
+        final delta = obj['content']?.toString() ?? '';
+        return ChatStreamChunk(delta, isError: false);
+      }
+    }
+  } catch (_) {
+    // not JSON, fall through to raw payload
+  }
+  // Treat as raw token text
+  return ChatStreamChunk(payload, isError: payload.startsWith('[error]'));
+}
+
 enum ChatIntent {
   balance,
   send,
@@ -167,14 +203,24 @@ class ChatService {
           final lines = const LineSplitter().convert(text);
           for (final line in lines) {
             if (line.startsWith('data: ')) {
-              final payload = line.substring(6);
-              final isError = payload.startsWith('[error]');
-              yield ChatStreamChunk(payload, isError: isError);
+              final payload = line.substring(6); // retain leading spaces in token
+              final chunk = _chunkFromPayload(payload);
+              if (chunk.delta.isEmpty && !chunk.isError) continue;
+              yield chunk;
             }
           }
         } else {
-          // Treat body as final reply text
-          yield ChatStreamChunk(text, isError: false);
+          // Try parse JSON { reply } or fall back to raw text
+          try {
+            final obj = jsonDecode(text);
+            if (obj is Map && obj.containsKey('reply')) {
+              yield ChatStreamChunk(obj['reply']?.toString() ?? '', isError: false);
+            } else {
+              yield ChatStreamChunk(text, isError: false);
+            }
+          } catch (_) {
+            yield ChatStreamChunk(text, isError: false);
+          }
         }
       } catch (e) {
         yield ChatStreamChunk('[error] $e', isError: true);
@@ -205,8 +251,9 @@ class ChatService {
       await for (final line in lines) {
         if (line.startsWith('data: ')) {
           final payload = line.substring(6);
-          final isError = payload.startsWith('[error]');
-          yield ChatStreamChunk(payload, isError: isError);
+          final chunk = _chunkFromPayload(payload);
+          if (chunk.delta.isEmpty && !chunk.isError) continue;
+          yield chunk;
         }
       }
     } catch (e) {
