@@ -518,58 +518,58 @@ class _ChatScreenState extends State<ChatScreen> {
     final isUser = message.isUser;
     final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
 
-    return Container(
-      alignment: alignment,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment:
-                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (!isUser) ...[
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/agent_t_pfp.png',
-                      width: 32,
-                      height: 32,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.smart_toy,
-                          size: 20,
-                          color: AppColors.primaryBlue,
-                        );
-                      },
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => _handleMessageTap(message),
+      child: Container(
+        alignment: alignment,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment:
+              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment:
+                  isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (!isUser) ...[
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/agent_t_pfp.png',
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.smart_toy,
+                            size: 20,
+                            color: AppColors.primaryBlue,
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                  const SizedBox(width: 8),
+                ],
+                Flexible(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    ),
+                    child: isUser
+                        ? _buildUserBubble(message)
+                        : _buildAssistantBubble(message),
                   ),
-                  child: isUser
-                      ? _buildUserBubble(message)
-                      : _buildAssistantBubble(message),
                 ),
-              ),
-              if (isUser) const SizedBox(width: 8),
-            ],
-          ),
-          if (!isUser && !_isWelcomeMessage(message)) ...[
-            const SizedBox(height: 4),
-            _buildAssistantActions(message),
+                if (isUser) const SizedBox(width: 8),
+              ],
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -744,20 +744,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Widget _buildAssistantActions(ChatMessage message) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.copy, size: 18, color: AppColors.textSecondary),
-          tooltip: 'Copy',
-          onPressed: () => _copyAssistantMessage(message.text),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _copyAssistantMessage(String text) async {
+  Future<void> _copyMessage(String text) async {
     try {
       await Clipboard.setData(ClipboardData(text: text));
       if (!mounted) return;
@@ -771,6 +758,12 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       // Silently ignore copy failures
     }
+  }
+ 
+  void _handleMessageTap(ChatMessage message) {
+    final text = message.text.trim();
+    if (text.isEmpty || text == '[image]') return;
+    _copyMessage(text);
   }
 
   Future<void> _handleLinkTap(String href) async {

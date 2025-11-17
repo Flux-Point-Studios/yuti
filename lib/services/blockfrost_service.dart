@@ -190,6 +190,33 @@ class BlockfrostService {
   Future<List<Map<String, dynamic>>> getTransactions(String address,
       {int page = 1}) async {
     try {
+      // 1) Prefer DB-Sync proxy if available
+      if (kIsWeb) {
+        try {
+          final proxy = Uri.parse('/api/dbsync/transactions?address=${Uri.encodeComponent(address)}&page=$page');
+          final resp = await http.get(proxy);
+          if (resp.statusCode == 200) {
+            final list = (json.decode(resp.body) as List).cast<Map<String, dynamic>>();
+            return list;
+          }
+        } catch (_) {}
+      } else {
+        // On native, allow using WEB_API_BASE to reach the same serverless function
+        final base = AppConfig().webApiBase.trim();
+        if (base.isNotEmpty) {
+          try {
+            final normalized = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+            final url = Uri.parse('$normalized/api/dbsync/transactions?address=${Uri.encodeComponent(address)}&page=$page');
+            final resp = await http.get(url);
+            if (resp.statusCode == 200) {
+              final list = (json.decode(resp.body) as List).cast<Map<String, dynamic>>();
+              return list;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 2) Fallback to Blockfrost
       final url =
           Uri.https(_baseUrl, '/api/v0/addresses/$address/transactions', {
         'page': page.toString(),

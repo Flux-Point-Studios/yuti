@@ -30,6 +30,7 @@
     "supabase": "^2.31.4"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.52.0"
+    "@supabase/supabase-js": "^2.52.0",
+    "pg": "^8.12.0"
   }
 }

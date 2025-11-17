@@ -14,6 +14,9 @@ class AppConfig {
       defaultValue: 'https://uexswap.com/api');
   String get handleApiBase => const String.fromEnvironment('HANDLE_API_BASE',
       defaultValue: 'https://api.handle.me');
+  // Optional base URL for calling our Vercel serverless APIs from native apps
+  String get webApiBase =>
+      const String.fromEnvironment('WEB_API_BASE', defaultValue: '');
 
   // API Keys (these should be loaded from secure storage or environment)
   String get blockfrostApiKey =>
