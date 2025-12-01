@@ -24,6 +24,11 @@ Yuti is more than just a wallet - it's your **intelligent crypto companion** tha
 - "Swap 50 ADA for USDC"
 - "Show me DeFi opportunities"
 
+### **Smart Wallet Contacts**
+- Save trusted wallet addresses or Gmail contacts in the in-app address book
+- Send ADA directly to Gmail users through the zkFold Smart Wallet resolver
+- Auto-resolve ADA handles and keep recent contacts synced across devices
+
 ### **Intelligent AI Assistant**
 - **Agent T**: Your personal crypto guide
 - Real-time market analysis

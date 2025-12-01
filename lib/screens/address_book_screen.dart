@@ -112,7 +112,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
           ),
           const SizedBox(width: 16),
           Text(
-            widget.isSelectionMode ? 'Select Address' : 'Address Book',
+            widget.isSelectionMode ? 'Select Contact' : 'Address Book',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 24,
@@ -139,7 +139,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search addresses...',
+          hintText: 'Search contacts or emails...',
           hintStyle: TextStyle(color: AppColors.textTertiary),
           prefixIcon: Icon(Icons.search, color: AppColors.primaryBlue),
           filled: true,
@@ -196,8 +196,8 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
               const SizedBox(height: 16),
               Text(
                 _searchController.text.isNotEmpty 
-                    ? 'No matching addresses'
-                    : 'No saved addresses',
+                    ? 'No matching contacts'
+                    : 'No saved contacts',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
@@ -208,7 +208,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
               Text(
                 _searchController.text.isNotEmpty
                     ? 'Try a different search term'
-                    : 'Add addresses to quickly send transactions',
+                    : 'Add contacts to quickly send transactions',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,
@@ -220,7 +220,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 ElevatedButton.icon(
                   onPressed: _showAddEntryDialog,
                   icon: const Icon(Icons.add),
-                  label: const Text('Add Address'),
+                  label: const Text('Add Contact'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
@@ -235,6 +235,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   }
 
   Widget _buildEntryItem(AddressBookEntry entry) {
+    final isGmailContact = _addressBookService.isValidGmailAddress(entry.address);
     return GestureDetector(
       onTap: widget.isSelectionMode
           ? () => widget.onAddressSelected?.call(entry)
@@ -285,6 +286,15 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
+                        const SizedBox(height: 4),
+                        Text(
+                          isGmailContact ? 'Gmail contact' : 'Cardano address',
+                          style: TextStyle(
+                            color: AppColors.textTertiary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -304,7 +314,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                             children: [
                               Icon(Icons.copy, color: AppColors.primaryBlue, size: 20),
                               const SizedBox(width: 8),
-                              Text('Copy Address', style: TextStyle(color: AppColors.textPrimary)),
+                              Text('Copy Recipient', style: TextStyle(color: AppColors.textPrimary)),
                             ],
                           ),
                         ),
@@ -349,7 +359,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12,
-                          fontFamily: 'monospace',
+                          fontFamily: isGmailContact ? null : 'monospace',
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -401,6 +411,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   }
 
   void _showEntryDetails(AddressBookEntry entry) {
+    final isGmailContact = _addressBookService.isValidGmailAddress(entry.address);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -459,7 +470,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
               
               const SizedBox(height: 20),
               
-              _buildDetailRow('Address', entry.address, isAddress: true),
+              _buildDetailRow('Recipient', entry.address, isAddress: !isGmailContact),
               _buildDetailRow('Created', _formatDate(entry.createdAt)),
               if (entry.lastUsed != null)
                 _buildDetailRow('Last Used', _formatDate(entry.lastUsed!)),
@@ -487,7 +498,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () => _copyToClipboard(entry.address),
                       icon: const Icon(Icons.copy),
-                      label: const Text('Copy'),
+                      label: const Text('Copy Recipient'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.backgroundLight.withOpacity(0.2),
                         foregroundColor: AppColors.textPrimary,
@@ -558,7 +569,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.backgroundDark,
         title: Text(
-          entry == null ? 'Add Address' : 'Edit Address',
+          entry == null ? 'Add Contact' : 'Edit Contact',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Form(
@@ -663,7 +674,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
               TextFormField(
                 controller: addressController,
                 decoration: InputDecoration(
-                  labelText: 'Address',
+                  labelText: 'Wallet address or Gmail',
                   labelStyle: TextStyle(color: AppColors.textSecondary),
                   filled: true,
                   fillColor: AppColors.backgroundLight.withOpacity(0.1),
@@ -683,11 +694,17 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 style: TextStyle(color: AppColors.textPrimary, fontSize: 12),
                 maxLines: 3,
                 validator: (value) {
-                  if ((value == null || value.trim().isEmpty) && handleController.text.trim().isEmpty) {
-                    return 'Enter an address or ADA Handle';
+                  final trimmedValue = value?.trim() ?? '';
+                  if (trimmedValue.isEmpty && handleController.text.trim().isEmpty) {
+                    return 'Enter a wallet address, Gmail, or ADA Handle';
                   }
-                  if (value != null && value.trim().isNotEmpty && !_addressBookService.isValidCardanoAddress(value.trim())) {
-                    return 'Invalid Cardano address';
+                  if (trimmedValue.isNotEmpty) {
+                    final normalized = _addressBookService.normalizeRecipient(trimmedValue);
+                    final isValidAddress = _addressBookService.isValidCardanoAddress(normalized) ||
+                        _addressBookService.isValidGmailAddress(normalized);
+                    if (!isValidAddress) {
+                      return 'Enter a valid Cardano or Gmail address';
+                    }
                   }
                   return null;
                 },
@@ -730,7 +747,9 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 // Resolve handle if provided and no address entered
                 String resolvedAddress = addressController.text.trim();
                 String? savedHandle = handleController.text.trim().isEmpty ? null : handleController.text.trim();
+                bool attemptedHandleResolution = false;
                 if (resolvedAddress.isEmpty && savedHandle != null) {
+                  attemptedHandleResolution = true;
                   try {
                     final res = await _addressBookService.resolveIfHandle(savedHandle);
                     resolvedAddress = res['address']!;
@@ -738,9 +757,16 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   } catch (_) {}
                 }
 
-                if (!_addressBookService.isValidCardanoAddress(resolvedAddress)) {
+                resolvedAddress = _addressBookService.normalizeRecipient(resolvedAddress);
+                final isCardanoAddress = _addressBookService.isValidCardanoAddress(resolvedAddress);
+                final isGmailAddress = _addressBookService.isValidGmailAddress(resolvedAddress);
+
+                if (!isCardanoAddress && !isGmailAddress) {
+                  final errorText = attemptedHandleResolution
+                      ? 'Failed to resolve handle to a Cardano address'
+                      : 'Enter a valid Cardano or Gmail address';
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: const Text('Failed to resolve handle to address'), backgroundColor: AppColors.error),
+                    SnackBar(content: Text(errorText), backgroundColor: AppColors.error),
                   );
                   return;
                 }
@@ -769,7 +795,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   await _loadEntries();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: const Text('Name or address already exists'), backgroundColor: AppColors.error),
+                    SnackBar(content: const Text('Name or recipient already exists'), backgroundColor: AppColors.error),
                   );
                 }
               }
@@ -791,7 +817,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.backgroundDark,
         title: Text(
-          'Delete Address',
+          'Delete Contact',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
@@ -815,14 +841,14 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 await _loadEntries();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Address deleted'),
+                    content: Text('Contact deleted'),
                     backgroundColor: AppColors.success,
                   ),
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed to delete address'),
+                    content: Text('Failed to delete contact'),
                     backgroundColor: AppColors.error,
                   ),
                 );
@@ -843,7 +869,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Address copied to clipboard'),
+        content: const Text('Recipient value copied to clipboard'),
         backgroundColor: AppColors.primaryBlue,
         duration: const Duration(seconds: 2),
       ),

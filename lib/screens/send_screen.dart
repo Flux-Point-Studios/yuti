@@ -255,7 +255,7 @@ class _SendScreenState extends State<SendScreen> {
             Row(
               children: [
                 Text(
-                  'Recipient Address',
+                  'Recipient',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 16,
@@ -515,11 +515,14 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   bool _isFormValid() {
-    final address = _addressController.text.trim();
+    final address = _addressBookService.normalizeRecipient(_addressController.text);
     final amount = double.tryParse(_amountController.text);
     
-    return address.isNotEmpty &&
-           _addressBookService.isValidCardanoAddress(address) &&
+    final hasValidRecipient =
+        _addressBookService.isValidCardanoAddress(address) ||
+        _addressBookService.isValidGmailAddress(address);
+
+    return hasValidRecipient &&
            amount != null &&
            amount > 0 &&
            amount <= _maxAmount;
@@ -582,23 +585,37 @@ class _SendScreenState extends State<SendScreen> {
     });
 
     try {
-      String address = _addressController.text.trim();
+      final originalRecipient = _addressBookService.normalizeRecipient(_addressController.text);
+      String address = originalRecipient;
+
       // Resolve ADA Handle if entered
-      if (!AddressBookService().isValidCardanoAddress(address)) {
+      if (!_addressBookService.isValidCardanoAddress(address)) {
         try {
-          final res = await AddressBookService().resolveIfHandle(address);
+          final res = await _addressBookService.resolveIfHandle(address);
           address = res['address'] ?? address;
         } catch (_) {}
       }
+
+      final bool enteredGmail = _addressBookService.isValidGmailAddress(originalRecipient);
+
       // Resolve Smart Wallet email to address
-      if (!AddressBookService().isValidCardanoAddress(address) && address.contains('@')) {
+      if (!_addressBookService.isValidCardanoAddress(address) && enteredGmail) {
         try {
-          final smartAddr = await _resolveSmartWalletAddress(address);
-          if (smartAddr != null) {
+          final smartAddr = await _resolveSmartWalletAddress(originalRecipient);
+          if (smartAddr != null && smartAddr.isNotEmpty) {
             address = smartAddr;
           }
         } catch (_) {}
       }
+
+      if (!_addressBookService.isValidCardanoAddress(address)) {
+        throw Exception(
+          enteredGmail
+              ? 'We could not resolve that Gmail to an active Smart Wallet yet. Ask them to finish activation and try again.'
+              : 'Please enter a valid Cardano address.',
+        );
+      }
+
       final amount = double.parse(_amountController.text);
       final description = _descriptionController.text.trim();
 
@@ -645,7 +662,7 @@ class _SendScreenState extends State<SendScreen> {
       );
 
       await _transactionHistoryService.addTransaction(transaction);
-      await _addressBookService.updateLastUsed(address);
+      await _addressBookService.updateLastUsed(originalRecipient);
 
       _showSuccessDialog();
     } catch (e) {
