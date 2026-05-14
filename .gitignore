@@ -29,6 +29,8 @@ migrate_working_dir/
 **/ios/Flutter/flutter_export_environment.sh
 **/ios/Flutter/ephemeral/
 **/ios/Pods/
+ios/build/
+**/ios/build/
 **/android/flutter_assets/
 **/android/app/debug
 **/android/app/profile
