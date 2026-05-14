@@ -87,6 +87,25 @@ Help us build the future of human-crypto interaction:
 - **Website**: [fluxpointstudios.com](https://fluxpointstudios.com)
 - **Support**: support@fluxpointstudios.com
 - **Partnership**: partners@fluxpointstudios.com
+- **Security**: see [SECURITY.md](./SECURITY.md)
+
+---
+
+## Standards & reference implementations
+
+Yuti is the **reference wallet-side implementation** for **CIP-30-DeepLink** — a deep-link wire protocol that lets native mobile dApps ask an installed Cardano wallet to perform CIP-30 operations (`signTx`, `signData`, etc.) over the OS's URL-handling mechanism. No relay server, no embedded WebView, no QR, no WebSocket.
+
+- **CIP draft**: [cardano-foundation/CIPs#1189](https://github.com/cardano-foundation/CIPs/pull/1189)
+- **Forum discussion**: [forum.cardano.org](https://forum.cardano.org/t/cip-proposal-mobile-deep-link-signing-for-native-dapps-cip-30-extension/154561)
+- **dApp-side SDK**: [Flux-Point-Studios/cip30-deeplink-client](https://github.com/Flux-Point-Studios/cip30-deeplink-client)
+
+The receiver patch surface inside Yuti is intentionally small (~290 LOC across 8 files) so other wallet teams can adapt the same pattern against their existing CIP-30 signing engines.
+
+---
+
+## License
+
+Apache-2.0. See [LICENSE](./LICENSE).
 
 ---
 
