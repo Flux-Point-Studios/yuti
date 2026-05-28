@@ -1,0 +1,12 @@
+{
+  "$schema": "https://github.com/cardano-foundation/CIPs/blob/master/CIP-0186/cip30dl-attestation.schema.json",
+  "wallet_id": "yuti",
+  "protocol_versions": ["1"],
+  "methods": ["signTx"],
+  "https_prefix": "https://yuti.fluxpointstudios.com/cip30dl/v1/",
+  "scheme": "cip30dl-yuti",
+  "supports_governance": false,
+  "supports_submit": false,
+  "max_payload_bytes": 12288,
+  "vulnerability_disclosure": "https://yuti.fluxpointstudios.com/.well-known/security.txt"
+}

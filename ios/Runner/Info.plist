@@ -90,6 +90,15 @@
 				<string>yuti</string>
 			</array>
 		</dict>
+		<!-- CIP-186 deep-link receiver. Per-wallet custom scheme per spec §URI format. -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>yuti.cip186</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cip30dl-yuti</string>
+			</array>
+		</dict>
 	</array>
 	
 	<!-- App uses standard encryption only - no custom algorithms -->
