@@ -17,7 +17,7 @@ const String _testMnemonic =
 const String _minimalConwayTxHex = '84a40080018002000300a0f5f6';
 
 const String _dappKeyB64 = 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE';
-const String _nonceB64 = 'AgICAgICAgICAgICAgICAgICAgICAgICAgIC';
+const String _nonceB64 = 'AgICAgICAgICAgICAgICAgICAgICAgIC';
 
 Future<CardanoWallet> _wallet() async => WalletFactory.fromMnemonic(
       NetworkId.testnet,

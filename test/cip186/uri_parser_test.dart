@@ -3,7 +3,7 @@ import 'package:yuti/cip186/errors.dart';
 import 'package:yuti/cip186/uri_parser.dart';
 
 const _dappKeyB64 = 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE';
-const _nonceB64 = 'AgICAgICAgICAgICAgICAgICAgICAgICAgIC';
+const _nonceB64 = 'AgICAgICAgICAgICAgICAgICAgICAgIC';
 const _commitB64 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const _payloadB64 = 'cGF5bG9hZC1zaWdudHgtdmFsaWQtZml4dHVyZS1iYXNlNjR1cmw';
 const _dappInfoB64 =
