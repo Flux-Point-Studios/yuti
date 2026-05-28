@@ -59,7 +59,52 @@ import UIKit
       }
       return true
     }
-    
+
+    // CIP-186 deep-link signing receiver. Spec §URI format §Custom-scheme form.
+    if url.scheme == "cip30dl-yuti" {
+      if let controller = window?.rootViewController as? FlutterViewController {
+        let channel = FlutterMethodChannel(
+          name: "com.yuti/cip30",
+          binaryMessenger: controller.binaryMessenger
+        )
+        channel.invokeMethod("handleCip30DeepLink", arguments: url.absoluteString)
+      }
+      return true
+    }
+
+    // CIP-186 Universal-Link path. Wallet domain claim via apple-app-site-association.
+    if url.scheme == "https" && url.path.hasPrefix("/cip30dl/v1/") {
+      if let controller = window?.rootViewController as? FlutterViewController {
+        let channel = FlutterMethodChannel(
+          name: "com.yuti/cip30",
+          binaryMessenger: controller.binaryMessenger
+        )
+        channel.invokeMethod("handleCip30DeepLink", arguments: url.absoluteString)
+      }
+      return true
+    }
+
     return super.application(app, open: url, options: options)
+  }
+
+  // Universal Link entry point.
+  override func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    if userActivity.activityType == NSUserActivityTypeBrowsingWeb,
+       let url = userActivity.webpageURL,
+       url.path.hasPrefix("/cip30dl/v1/") {
+      if let controller = window?.rootViewController as? FlutterViewController {
+        let channel = FlutterMethodChannel(
+          name: "com.yuti/cip30",
+          binaryMessenger: controller.binaryMessenger
+        )
+        channel.invokeMethod("handleCip30DeepLink", arguments: url.absoluteString)
+      }
+      return true
+    }
+    return super.application(application, continue: userActivity, restorationHandler: restorationHandler)
   }
 }
