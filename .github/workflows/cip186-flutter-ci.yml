@@ -1,0 +1,38 @@
+name: CIP-186 Flutter CI
+
+on:
+  push:
+    branches: [main, 'feat/cip-186-**']
+    paths:
+      - 'lib/cip186/**'
+      - 'test/cip186/**'
+      - 'ios/Runner/AppDelegate.swift'
+      - 'ios/Runner/Info.plist'
+      - 'android/app/src/main/AndroidManifest.xml'
+      - 'android/app/src/main/kotlin/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/cip186-flutter-ci.yml'
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+
+      - run: flutter pub get
+
+      - run: flutter analyze lib/cip186 test/cip186
+
+      - run: flutter test test/cip186/ --reporter expanded
