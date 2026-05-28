@@ -55,6 +55,22 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="yuti" android:host="payment-success" />
             </intent-filter>
+            <!-- CIP-186 per-wallet custom-scheme receiver. Spec §URI format. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="cip30dl-yuti" />
+            </intent-filter>
+            <!-- CIP-186 HTTPS App-Link receiver. Backed by assetlinks.json. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                      android:host="yuti.fluxpointstudios.com"
+                      android:pathPrefix="/cip30dl/" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

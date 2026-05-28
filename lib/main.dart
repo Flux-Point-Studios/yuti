@@ -30,6 +30,9 @@ void main() async {
   // Set up Payment callback handler for iOS/Android
   _setupPaymentCallbackHandler();
 
+  // Set up CIP-186 deep-link signing handler for iOS/Android
+  _setupCip186DeepLinkHandler();
+
   // Set system UI overlay style for blue light theme
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -115,6 +118,24 @@ void _setupPaymentCallbackHandler() {
 String? getPendingPaymentCallback() {
   final data = _pendingPaymentCallback;
   _pendingPaymentCallback = null;
+  return data;
+}
+
+String? _pendingCip186DeepLink;
+
+void _setupCip186DeepLinkHandler() {
+  const platform = MethodChannel('com.yuti/cip30');
+  platform.setMethodCallHandler((call) async {
+    if (call.method == 'handleCip30DeepLink') {
+      _pendingCip186DeepLink = call.arguments as String;
+    }
+    return null;
+  });
+}
+
+String? getPendingCip186DeepLink() {
+  final data = _pendingCip186DeepLink;
+  _pendingCip186DeepLink = null;
   return data;
 }
 
