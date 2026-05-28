@@ -28,7 +28,7 @@ String _b64uNoPad(Uint8List bytes) =>
     base64Url.encode(bytes).replaceAll('=', '');
 
 Uint8List _commitOfTxHex(String hex) {
-  final tx = CardanoTransaction.deserializeFromHex(transactionHex: hex);
+  final tx = CardanoTransaction.deserializeFromHex(hex);
   return tx.body.computeBlake2bHash256();
 }
 

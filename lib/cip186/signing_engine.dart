@@ -45,7 +45,7 @@ class Cip186SigningEngine {
 
     final CardanoTransaction tx;
     try {
-      tx = CardanoTransaction.deserializeFromHex(transactionHex: transactionHex);
+      tx = CardanoTransaction.deserializeFromHex(transactionHex);
     } catch (e) {
       throw Cip186Exception(
         Cip186ErrorCode.internalError,

@@ -36,7 +36,7 @@ Future<String> _testPaymentAddress(CardanoWallet w) async {
 }
 
 Uint8List _bodyBlake2b256OfTxHex(String hex) {
-  final tx = CardanoTransaction.deserializeFromHex(transactionHex: hex);
+  final tx = CardanoTransaction.deserializeFromHex(hex);
   return tx.body.computeBlake2bHash256();
 }
 
