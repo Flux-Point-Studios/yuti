@@ -55,15 +55,13 @@ Future<void> _initializeApiKeys() async {
   try {
     final secureConfig = SecureConfig();
 
-    // Do not embed server secrets in the web bundle
-    if (!kIsWeb) {
-      // Initialize with production API keys (stored securely on device)
+    // Injected at build time via --dart-define (see build_with_env.bat).
+    const tBackendKey = String.fromEnvironment('T_BACKEND_API_KEY');
+    const blockfrostKey = String.fromEnvironment('BLOCKFROST_API_KEY');
+    if (!kIsWeb && (tBackendKey.isNotEmpty || blockfrostKey.isNotEmpty)) {
       await secureConfig.initializeKeys(
-        // T-Backend API key for AI features
-        tBackendKey:
-            '***REMOVED***',
-        // Blockfrost API key for Cardano blockchain data
-        blockfrostKey: '***REMOVED***',
+        tBackendKey: tBackendKey,
+        blockfrostKey: blockfrostKey,
       );
     }
 
