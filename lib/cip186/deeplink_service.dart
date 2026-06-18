@@ -78,6 +78,9 @@ class Cip186Session {
   Cip186Session({
     required this.walletX25519Secret,
     required this.sessionSigningKey,
+    this.dappName,
+    this.dappHost,
+    this.expiresAt,
   });
 
   /// 32-byte ephemeral X25519 secret (rotates per `connect`).
@@ -86,11 +89,48 @@ class Cip186Session {
   /// Session-binding Ed25519 signing key; its vkey is published in the
   /// `connect` session JSON as `signingPublicKey`.
   final ed.SigningKey sessionSigningKey;
+
+  /// dApp identity captured at `connect` (from the dapp-info JSON), so a later
+  /// signTx prompt can name the requester. Null when not supplied.
+  final String? dappName;
+  final String? dappHost;
+
+  /// Unix-seconds expiry (matches the connect session JSON `expiresAt`), used
+  /// by a persistent store to evict stale sessions. Null when not supplied.
+  final int? expiresAt;
 }
+
+/// What the user is being asked to approve. Surfaced to the wallet UI before
+/// any session is established (connect) or any transaction is signed (signTx).
+class Cip186ApprovalRequest {
+  Cip186ApprovalRequest({
+    required this.method,
+    this.dappName,
+    this.dappHost,
+    this.txHashHex,
+  });
+
+  final Cip186Method method;
+  final String? dappName;
+  final String? dappHost;
+
+  /// BLAKE2b-256(tx_body) hex — the transaction the dApp wants signed (signTx).
+  final String? txHashHex;
+}
+
+/// Asks the user to approve a request. Returns true to proceed, false to reject
+/// with `-1 UserRejected`. Null (the default) means headless auto-approve.
+typedef Cip186Approval = Future<bool> Function(Cip186ApprovalRequest request);
 
 /// In-memory `(dappKey, nonce)` replay guard (spec §Replay protection). A tuple
 /// is remembered until `ttl + 600` seconds; a repeat within that window is
 /// rejected. One instance lives for the app's lifetime (per wallet).
+///
+/// NOTE: this guard is process-scoped — it is rebuilt on a cold start, so a
+/// replay fired after the wallet is killed/restarted (within the request ttl)
+/// is not remembered here. The per-call user-consent prompt is the backstop in
+/// that window (the same request re-prompts the user). Persisting replay tuples
+/// across restarts is a tracked follow-up.
 class Cip186ReplayGuard {
   final Map<String, int> _seen = <String, int>{};
 
@@ -184,13 +224,17 @@ class Cip186DeepLinkService {
     Uint8List Function()? sessionEntropySource,
     Cip186ReplayGuard? replayGuard,
     int Function()? clockEpochSeconds,
+    Cip186Approval? approval,
+    Future<String> Function()? addressResolver,
   })  : _wallet = wallet,
         _engine = Cip186SigningEngine(wallet: wallet),
         _walletRootSecret = walletRootSecret,
         _sessionTtl = sessionTtlSeconds,
         _sessionEntropy = sessionEntropySource ?? (() => randomBytes(32)),
         _replay = replayGuard ?? Cip186ReplayGuard(),
-        _now = clockEpochSeconds ?? _systemClock;
+        _now = clockEpochSeconds ?? _systemClock,
+        _approval = approval,
+        _addressResolver = addressResolver;
 
   final String walletId;
   final String walletScheme;
@@ -207,7 +251,19 @@ class Cip186DeepLinkService {
   final Cip186ReplayGuard _replay;
   final int Function() _now;
 
+  /// User-consent gate. Null → headless auto-approve (tests, legacy). When set,
+  /// connect and signTx are only fulfilled if it returns true.
+  final Cip186Approval? _approval;
+
+  /// Resolves the wallet's payment address. Injected so it can be memoized +
+  /// persisted (CIP-1852 derivation is slow on some devices). Null → derive
+  /// inline from the wallet each time.
+  final Future<String> Function()? _addressResolver;
+
   static int _systemClock() => DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+  static String _hex(List<int> bytes) =>
+      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
   Future<DeepLinkOutcome> handle({
     required Uri url,
@@ -278,6 +334,22 @@ class Cip186DeepLinkService {
     SignTxPayloadDecoder decoder,
     Cip186Session session,
   ) async {
+    // Defense-in-depth: enforce session expiry at the point of use, not only
+    // in the store's eviction path — so an expired session never signs even if
+    // a store (e.g. in-memory) doesn't self-evict.
+    if (session.expiresAt != null && _now() > session.expiresAt!) {
+      return DeepLinkOutcome.failure(
+        responseUri: request.redirectUri != null
+            ? AttestationBuilder.buildRejected(
+                redirect: request.redirectUri!,
+                code: Cip186ErrorCode.sessionExpired,
+                message: 'session has expired — reconnect',
+              )
+            : null,
+        errorCode: Cip186ErrorCode.sessionExpired,
+        errorMessage: 'session has expired',
+      );
+    }
     if (request.payloadBytes == null ||
         request.commitBytes == null ||
         request.nonceBytes == null ||
@@ -360,6 +432,31 @@ class Cip186DeepLinkService {
     }
     final txHex = txVal;
 
+    // User consent (spec §UserRejected). Asked after the request is understood
+    // (decrypted + commit-bound) but before any signature is produced.
+    if (_approval != null) {
+      // The prompt shows the URL-supplied commit; it is verified against
+      // BLAKE2b-256(tx_body) at sign time (signTxBody, constant-time), so a
+      // mismatched commit fails closed AFTER approval rather than signing.
+      final approved = await _approval!(Cip186ApprovalRequest(
+        method: Cip186Method.signTx,
+        dappName: session.dappName,
+        dappHost: session.dappHost,
+        txHashHex: _hex(request.commitBytes!),
+      ));
+      if (!approved) {
+        return DeepLinkOutcome.failure(
+          responseUri: AttestationBuilder.buildRejected(
+            redirect: request.redirectUri!,
+            code: Cip186ErrorCode.userRejected,
+            message: 'user rejected the signing request',
+          ),
+          errorCode: Cip186ErrorCode.userRejected,
+          errorMessage: 'user rejected the signing request',
+        );
+      }
+    }
+
     try {
       final result = await _engine.signTxBody(
         transactionHex: txHex,
@@ -425,14 +522,30 @@ class Cip186DeepLinkService {
           request, Cip186ErrorCode.unsupportedVersion, 'connect missing dapp');
     }
     final String dappHost;
+    final String? dappName;
     try {
       final info = jsonDecode(utf8.decode(_b64uDecode(dappInfoRaw)))
           as Map<String, dynamic>;
       dappHost = Uri.parse(info['url'] as String).host;
       if (dappHost.isEmpty) throw const FormatException('empty dApp host');
+      final nameVal = info['name'];
+      dappName = nameVal is String ? nameVal : null;
     } catch (_) {
       return _rejectConnect(request, Cip186ErrorCode.unsupportedVersion,
           'malformed dapp-info-json');
+    }
+
+    // User consent (spec §UserRejected) before establishing any session.
+    if (_approval != null) {
+      final approved = await _approval!(Cip186ApprovalRequest(
+        method: Cip186Method.connect,
+        dappName: dappName,
+        dappHost: dappHost,
+      ));
+      if (!approved) {
+        return _rejectConnect(request, Cip186ErrorCode.userRejected,
+            'user rejected the connection request');
+      }
     }
 
     final sessionEntropy = _sessionEntropy();
@@ -452,16 +565,20 @@ class Cip186DeepLinkService {
     );
     final walletX = x.PrivateKey.generate();
 
-    final address =
-        (await _wallet.getPaymentAddressKit(addressIndex: 0)).address.bech32Encoded;
+    final address = _addressResolver != null
+        ? await _addressResolver!()
+        : (await _wallet.getPaymentAddressKit(addressIndex: 0))
+            .address
+            .bech32Encoded;
     final chain = request.chain ?? 'cardano:preprod';
+    final expiresAt = _now() + _sessionTtl;
     final sessionJson = jsonEncode(<String, dynamic>{
       'session': sessionId,
       'network': chain == 'cardano:mainnet' ? 1 : 0,
       'addresses': <String>[address],
       'chain': chain,
       'walletId': walletId,
-      'expiresAt': _now() + _sessionTtl,
+      'expiresAt': expiresAt,
       'signingPublicKey':
           base64Url.encode(signingKey.verifyKey.asTypedList).replaceAll('=', ''),
     });
@@ -484,6 +601,9 @@ class Cip186DeepLinkService {
       establishedSession: Cip186Session(
         walletX25519Secret: walletX.asTypedList,
         sessionSigningKey: signingKey,
+        dappName: dappName,
+        dappHost: dappHost,
+        expiresAt: expiresAt,
       ),
       sessionId: sessionId,
     );

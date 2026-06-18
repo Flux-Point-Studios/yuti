@@ -19,17 +19,36 @@ class AuthService {
 
   User? _currentUser;
   Session? _currentSession;
+  bool _guestMode = false;
   final CardanoWalletService _cardanoWalletService = CardanoWalletService();
 
   User? get currentUser => _currentUser;
-  bool get isAuthenticated => _currentUser != null && _currentSession != null;
+  bool get isAuthenticated =>
+      _guestMode || (_currentUser != null && _currentSession != null);
   bool get isCardanoWalletConnected => _cardanoWalletService.isConnected;
 
   SupabaseClient get _supabase => SupabaseService.client;
 
   Future<void> initialize() async {
+    if (SupabaseService.disabled) {
+      _enterGuestMode();
+      return;
+    }
     await _loadUserSession();
     _setupAuthListener();
+  }
+
+  /// Supabase-disabled path: a non-null local user so the app is fully usable
+  /// offline (no login screen, no account, no backend). Treated as
+  /// authenticated with full access; nothing here touches the network.
+  void _enterGuestMode() {
+    _guestMode = true;
+    _currentUser ??= User(
+      id: 'local-guest',
+      email: 'guest@local',
+      tier: 'FREE',
+      createdAt: DateTime.now(),
+    );
   }
 
   void _setupAuthListener() {
@@ -155,6 +174,10 @@ class AuthService {
     required String firstName,
     required String lastName,
   }) async {
+    if (SupabaseService.disabled) {
+      _enterGuestMode();
+      return _currentUser!;
+    }
     try {
       final response = await _supabase.auth.signUp(
         email: email,
@@ -227,6 +250,10 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    if (SupabaseService.disabled) {
+      _enterGuestMode();
+      return AuthResult.success(_currentUser);
+    }
     try {
       final response = await _supabase.auth.signInWithPassword(
         email: email,
@@ -247,6 +274,10 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    if (SupabaseService.disabled) {
+      // No account to sign out of; stay in local guest mode.
+      return;
+    }
     try {
       await _supabase.auth.signOut();
       _currentUser = null;
@@ -259,6 +290,7 @@ class AuthService {
 
   /// Refresh current user data from database
   Future<void> refreshUser() async {
+    if (SupabaseService.disabled) return;
     if (_currentSession?.user.id != null) {
       await _fetchUserData();
     }
@@ -307,6 +339,7 @@ class AuthService {
 
   // Check subscription status and enforce access
   Future<bool> checkSubscriptionAccess() async {
+    if (SupabaseService.disabled) return true;
     if (_currentUser == null) return false;
 
     // Admin emails have unlimited access
@@ -501,6 +534,7 @@ class AuthService {
 
   // Check if user can access premium features
   bool canAccessPremiumFeatures() {
+    if (SupabaseService.disabled) return true;
     if (_currentUser == null) return false;
 
     // Admin emails have access to everything

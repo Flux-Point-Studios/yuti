@@ -136,6 +136,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Yuti',
+        navigatorKey: cip186NavigatorKey,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.blue,
