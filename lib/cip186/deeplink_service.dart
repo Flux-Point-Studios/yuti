@@ -265,6 +265,19 @@ class Cip186DeepLinkService {
   static String _hex(List<int> bytes) =>
       bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
+  /// Spec §-4 RedirectHostMismatch: bind the response redirect to the dApp's
+  /// declared identity. An `https` redirect MUST match the dApp host (prevents
+  /// an open redirect / response exfiltration to an attacker page). A custom
+  /// scheme (native callback, e.g. `mydapp://cb`) is OS-routed only to the app
+  /// that registered the scheme, so it is allowed. Plain `http` is rejected.
+  static bool _redirectAllowed(Uri redirect, String? dappHost) {
+    if (redirect.scheme == 'http') return false;
+    if (redirect.scheme != 'https') return redirect.scheme.isNotEmpty;
+    return dappHost != null &&
+        redirect.host.isNotEmpty &&
+        redirect.host.toLowerCase() == dappHost.toLowerCase();
+  }
+
   Future<DeepLinkOutcome> handle({
     required Uri url,
     SignTxPayloadDecoder? signTxSemantics,
@@ -348,6 +361,20 @@ class Cip186DeepLinkService {
             : null,
         errorCode: Cip186ErrorCode.sessionExpired,
         errorMessage: 'session has expired',
+      );
+    }
+    // Spec §-4: the signTx response must go back to the dApp that established
+    // the session, not an attacker-chosen URL.
+    if (session.dappHost != null &&
+        !_redirectAllowed(request.redirectUri!, session.dappHost)) {
+      return DeepLinkOutcome.failure(
+        responseUri: AttestationBuilder.buildRejected(
+          redirect: request.redirectUri!,
+          code: Cip186ErrorCode.redirectHostMismatch,
+          message: 'redirect host does not match the connected dApp',
+        ),
+        errorCode: Cip186ErrorCode.redirectHostMismatch,
+        errorMessage: 'redirect host does not match dApp',
       );
     }
     if (request.payloadBytes == null ||
@@ -438,7 +465,7 @@ class Cip186DeepLinkService {
       // The prompt shows the URL-supplied commit; it is verified against
       // BLAKE2b-256(tx_body) at sign time (signTxBody, constant-time), so a
       // mismatched commit fails closed AFTER approval rather than signing.
-      final approved = await _approval!(Cip186ApprovalRequest(
+      final approved = await _approval(Cip186ApprovalRequest(
         method: Cip186Method.signTx,
         dappName: session.dappName,
         dappHost: session.dappHost,
@@ -535,9 +562,16 @@ class Cip186DeepLinkService {
           'malformed dapp-info-json');
     }
 
+    // Spec §-4: bind the response redirect to the dApp's declared host before
+    // establishing a session or launching the session JSON anywhere.
+    if (!_redirectAllowed(request.redirectUri!, dappHost)) {
+      return _rejectConnect(request, Cip186ErrorCode.redirectHostMismatch,
+          'redirect host does not match the dApp identity');
+    }
+
     // User consent (spec §UserRejected) before establishing any session.
     if (_approval != null) {
-      final approved = await _approval!(Cip186ApprovalRequest(
+      final approved = await _approval(Cip186ApprovalRequest(
         method: Cip186Method.connect,
         dappName: dappName,
         dappHost: dappHost,
@@ -566,7 +600,7 @@ class Cip186DeepLinkService {
     final walletX = x.PrivateKey.generate();
 
     final address = _addressResolver != null
-        ? await _addressResolver!()
+        ? await _addressResolver()
         : (await _wallet.getPaymentAddressKit(addressIndex: 0))
             .address
             .bech32Encoded;

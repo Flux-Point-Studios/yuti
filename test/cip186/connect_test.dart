@@ -30,7 +30,7 @@ Uri _connectUrl(x.PrivateKey dapp, Uint8List nonce) {
     'cip30dl-yuti:/v1/connect?v=1'
     '&dapp=$dappInfo'
     '&dappKey=${_b64u(dapp.publicKey.asTypedList)}'
-    '&redirect=https%3A%2F%2Faegis.example%2Fcb'
+    '&redirect=https%3A%2F%2Faegis.fluxpointstudios.com%2Fcb'
     '&chain=cardano%3Apreprod'
     '&nonce=${_b64u(nonce)}',
   );
@@ -121,7 +121,7 @@ void main() {
         'cip30dl-yuti:/v1/connect?v=1'
         '&dapp=${_b64u(Uint8List.fromList(utf8.encode("not json")))}'
         '&dappKey=${_b64u(dapp.publicKey.asTypedList)}'
-        '&redirect=https%3A%2F%2Faegis.example%2Fcb'
+        '&redirect=https%3A%2F%2Faegis.fluxpointstudios.com%2Fcb'
         '&chain=cardano%3Apreprod'
         '&nonce=${_b64u(Uint8List.fromList(List.generate(24, (i) => i + 1)))}',
       );

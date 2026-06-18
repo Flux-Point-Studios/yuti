@@ -56,7 +56,7 @@ void main() {
       'cip30dl-yuti:/v1/connect?v=1'
       '&dapp=$dappInfo'
       '&dappKey=$dappKeyB64'
-      '&redirect=https%3A%2F%2Faegis.example%2Fcb'
+      '&redirect=https%3A%2F%2Faegis.fluxpointstudios.com%2Fcb'
       '&chain=cardano%3Apreprod'
       '&nonce=${_b64u(Uint8List.fromList(List.generate(24, (i) => i + 1)))}',
     );
@@ -87,7 +87,7 @@ void main() {
     await router.route(
       'cip30dl-yuti:/v1/signTx?v=1'
       '&dappKey=$dappKeyB64'
-      '&redirect=https%3A%2F%2Faegis.example%2Fcb'
+      '&redirect=https%3A%2F%2Faegis.fluxpointstudios.com%2Fcb'
       '&nonce=${_b64u(reqNonce)}'
       '&commit=${_b64u(commit)}'
       '&ttl=1810000300'
@@ -136,7 +136,7 @@ void main() {
     await router.route(
       'cip30dl-yuti:/v1/signTx?v=1'
       '&dappKey=${_b64u(dapp.publicKey.asTypedList)}'
-      '&redirect=https%3A%2F%2Faegis.example%2Fcb'
+      '&redirect=https%3A%2F%2Faegis.fluxpointstudios.com%2Fcb'
       '&nonce=${_b64u(Uint8List.fromList(List.generate(24, (i) => i + 1)))}'
       '&commit=${_b64u(commit)}'
       '&ttl=1810000300'
