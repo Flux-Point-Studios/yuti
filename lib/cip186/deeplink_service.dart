@@ -132,6 +132,9 @@ typedef Cip186Approval = Future<bool> Function(Cip186ApprovalRequest request);
 /// that window (the same request re-prompts the user). Persisting replay tuples
 /// across restarts is a tracked follow-up.
 class Cip186ReplayGuard {
+  Cip186ReplayGuard({int maxEntries = 8192}) : _maxEntries = maxEntries;
+
+  final int _maxEntries;
   final Map<String, int> _seen = <String, int>{};
 
   /// Records `(dappKey, nonce)` (expiring at [expiryEpoch]) and returns true if
@@ -145,6 +148,21 @@ class Cip186ReplayGuard {
     _seen.removeWhere((_, exp) => exp < nowEpoch);
     final key = '${base64Url.encode(dappKey)}:${base64Url.encode(nonce)}';
     if (_seen.containsKey(key)) return false;
+    // Hard backstop against memory growth from a flood of still-live tuples:
+    // once at capacity, drop the soonest-to-expire entries before inserting.
+    // Evicting a not-yet-expired tuple only weakens replay protection for the
+    // oldest entries under sustained flooding — strictly better than unbounded
+    // growth, and the per-call consent prompt remains the backstop for any
+    // evicted tuple. The ttl ceiling (_maxTtlWindowSeconds) makes hitting this
+    // path require a deliberate flood rather than one absurd-ttl request.
+    if (_seen.length >= _maxEntries) {
+      final byExpiry = _seen.entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      final dropCount = _seen.length - _maxEntries + 1;
+      for (var i = 0; i < dropCount; i++) {
+        _seen.remove(byExpiry[i].key);
+      }
+    }
     _seen[key] = expiryEpoch;
     return true;
   }
@@ -262,6 +280,13 @@ class Cip186DeepLinkService {
 
   static int _systemClock() => DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
+  /// Caps how long a (dappKey, nonce) tuple is retained in the replay guard
+  /// (24h), independent of the request's `ttl`. A generous ttl is still honored
+  /// for request validity, but its replay-guard retention is clamped to this
+  /// window so an attacker-chosen far-future ttl (up to ~2^53) cannot pin the
+  /// tuple in memory and grow the guard without bound. See [_handleSignTx].
+  static const int _maxTtlWindowSeconds = 86400;
+
   static String _hex(List<int> bytes) =>
       bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
@@ -310,10 +335,12 @@ class Cip186DeepLinkService {
       case Cip186Method.signTx:
         if (signTxSemantics == null || session == null) {
           return DeepLinkOutcome.failure(
-            responseUri: AttestationBuilder.buildRejected(
-              redirect: request.redirectUri!,
-              code: Cip186ErrorCode.sessionExpired,
-              message: 'no active session for signTx — connect first',
+            // No session means no bound dApp host, so the redirect can only be
+            // trusted if it is a custom scheme (OS-routed). See _safeRejected.
+            responseUri: _safeRejected(
+              request.redirectUri,
+              Cip186ErrorCode.sessionExpired,
+              'no active session for signTx — connect first',
             ),
             errorCode: Cip186ErrorCode.sessionExpired,
             errorMessage: 'no active session for signTx',
@@ -331,10 +358,12 @@ class Cip186DeepLinkService {
       case Cip186Method.submitTx:
         // TODO(cip186): implement non-signTx methods. Spec §Methods.
         return DeepLinkOutcome.failure(
-          responseUri: AttestationBuilder.buildRejected(
-            redirect: request.redirectUri!,
-            code: Cip186ErrorCode.unsupportedVersion,
-            message: 'method ${request.method.wireName} not yet implemented',
+          // No session is bound for these methods, so apply the same redirect
+          // safety as the other pre-binding paths. See _safeRejected.
+          responseUri: _safeRejected(
+            request.redirectUri,
+            Cip186ErrorCode.unsupportedVersion,
+            'method ${request.method.wireName} not yet implemented',
           ),
           errorCode: Cip186ErrorCode.unsupportedVersion,
           errorMessage: 'method ${request.method.wireName} not yet implemented',
@@ -407,7 +436,17 @@ class Cip186DeepLinkService {
         errorMessage: 'request ttl has passed',
       );
     }
-    final expiry = (request.ttl ?? now) + 600;
+    // Cap how long the replay guard remembers this tuple so an attacker-chosen
+    // far-future ttl cannot pin it in memory indefinitely (spec §Replay
+    // protection retention). The request's own validity is still governed by
+    // the ttl-in-past check above; the request is NOT rejected for a generous
+    // ttl. Past the cap the per-call consent prompt is the replay backstop.
+    final ttlForRetention = request.ttl == null
+        ? now
+        : (request.ttl! < now + _maxTtlWindowSeconds
+            ? request.ttl!
+            : now + _maxTtlWindowSeconds);
+    final expiry = ttlForRetention + 600;
     if (!_replay.checkAndRecord(
         request.dappKeyBytes!, request.nonceBytes!, expiry, now)) {
       return DeepLinkOutcome.failure(
@@ -660,6 +699,25 @@ class Cip186DeepLinkService {
     return Uint8List.fromList(base64Url.decode(padded));
   }
 
+  /// Builds a `rejected` callback only when [redirect] is safe to launch under
+  /// the available dApp binding. Before any dApp identity is bound ([dappHost]
+  /// null — parse failures, no-session signTx, not-yet-implemented methods),
+  /// only a custom-scheme redirect (OS-routed to the registering app) is
+  /// launched; plain `http` and any `https` target we cannot bind to a dApp
+  /// host are dropped (returns null), so a malformed or early-rejected request
+  /// can never turn the trusted wallet into an open redirect. With a bound
+  /// [dappHost], an `https` redirect must match it. See [_redirectAllowed].
+  static Uri? _safeRejected(
+    Uri? redirect,
+    Cip186ErrorCode code,
+    String message, {
+    String? dappHost,
+  }) {
+    if (redirect == null || !_redirectAllowed(redirect, dappHost)) return null;
+    return AttestationBuilder.buildRejected(
+        redirect: redirect, code: code, message: message);
+  }
+
   static Uri? _maybeBuildErrorRedirect(Uri original, Cip186Exception e) {
     final raw = original.queryParameters['redirect'];
     if (raw == null) return null;
@@ -669,10 +727,6 @@ class Cip186DeepLinkService {
     } catch (_) {
       return null;
     }
-    return AttestationBuilder.buildRejected(
-      redirect: target,
-      code: e.code,
-      message: e.message,
-    );
+    return _safeRejected(target, e.code, e.message);
   }
 }

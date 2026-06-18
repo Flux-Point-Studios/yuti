@@ -350,6 +350,28 @@ void main() {
       expect(outcome.responseUri!.queryParameters['errorCode'], '-6');
     });
 
+    test('a generous far-future ttl is honored, not rejected (retention is '
+        'capped instead — see replay-guard backstop)', () async {
+      final wallet = await _wallet();
+      final address =
+          (await wallet.getPaymentAddressKit(addressIndex: 0)).address.bech32Encoded;
+      final service = Cip186DeepLinkService(
+        wallet: wallet,
+        walletId: 'yuti',
+        walletScheme: 'cip30dl-yuti',
+        clockEpochSeconds: () => 1810000000,
+      );
+      // A ttl far beyond the 24h retention window must still SIGN (request
+      // validity is not clamped); only the replay guard's retention is bounded.
+      final outcome = await service.handle(
+        url: validSignTxUrl(2000000000),
+        signTxSemantics:
+            SignTxPayloadDecoder.plaintextJson(witnessAddresses: {address}),
+        session: _testSession(),
+      );
+      expect(outcome.responseUri!.queryParameters['response'], 'approved');
+    });
+
     test('the same (dappKey, nonce) twice -> second rejected -5 NonceReplay',
         () async {
       final wallet = await _wallet();
@@ -400,21 +422,76 @@ void main() {
 
     test('non-signTx method (signData) -> rejected -9 not-yet-implemented',
         () async {
+      // Custom-scheme (native) redirect: a pre-binding rejection still reaches
+      // the dApp. An unbindable https/http redirect is dropped instead (below).
       final outcome = await handleUrl(
         'cip30dl-yuti:/v1/signData?v=1&dappKey=$_dappKeyB64'
-        '&redirect=https%3A%2F%2Faegis.example%2Fcb&nonce=$_nonceB64',
+        '&redirect=aegisdemo%3A%2F%2Fcb&nonce=$_nonceB64',
       );
       expect(outcome.errorCode, Cip186ErrorCode.unsupportedVersion);
       expect(outcome.responseUri!.queryParameters['response'], 'rejected');
     });
 
-    test('unknown query key -> -9 with a rejected redirect', () async {
+    test('unknown query key -> -9 with a (custom-scheme) rejected redirect',
+        () async {
       final outcome = await handleUrl(
         'cip30dl-yuti:/v1/signTx?v=1&dappKey=$_dappKeyB64'
-        '&redirect=https%3A%2F%2Faegis.example%2Fcb&nonce=$_nonceB64&bogus=1',
+        '&redirect=aegisdemo%3A%2F%2Fcb&nonce=$_nonceB64&bogus=1',
       );
       expect(outcome.errorCode, Cip186ErrorCode.unsupportedVersion);
       expect(outcome.responseUri!.queryParameters['response'], 'rejected');
+    });
+
+    test('pre-binding error path drops a plain-http redirect (no open redirect)',
+        () async {
+      final outcome = await handleUrl(
+        'cip30dl-yuti:/v1/signTx?v=1&dappKey=$_dappKeyB64'
+        '&redirect=http%3A%2F%2Fattacker.example%2Fcollect'
+        '&nonce=$_nonceB64&bogus=1',
+      );
+      expect(outcome.errorCode, Cip186ErrorCode.unsupportedVersion);
+      // No dApp identity is bound on a parse failure, so an http redirect is
+      // never launched — the wallet cannot be turned into an open redirect.
+      expect(outcome.responseUri, isNull);
+    });
+
+    test('pre-binding error path drops an unbindable https redirect', () async {
+      final outcome = await handleUrl(
+        'cip30dl-yuti:/v1/signData?v=1&dappKey=$_dappKeyB64'
+        '&redirect=https%3A%2F%2Fattacker.example%2Fcollect&nonce=$_nonceB64',
+      );
+      expect(outcome.errorCode, Cip186ErrorCode.unsupportedVersion);
+      // https is only trusted when it matches a bound dApp host; with no session
+      // there is nothing to bind it to, so it is not launched.
+      expect(outcome.responseUri, isNull);
+    });
+  });
+
+  group('Cip186ReplayGuard memory bound (replay-guard DoS backstop)', () {
+    test('caps retained entries, evicting the soonest-to-expire under flood',
+        () {
+      final guard = Cip186ReplayGuard(maxEntries: 3);
+      Uint8List nonce(int i) => Uint8List.fromList(List.filled(24, i));
+      final dappKey = Uint8List.fromList(List.filled(32, 9));
+      const now = 1000;
+      // Flood 5 distinct, far-future tuples into a guard capped at 3.
+      for (var i = 1; i <= 5; i++) {
+        expect(
+          guard.checkAndRecord(dappKey, nonce(i), now + 100000 + i, now),
+          isTrue,
+        );
+      }
+      // The most-recent tuple (highest expiry) is still remembered -> replay.
+      expect(
+        guard.checkAndRecord(dappKey, nonce(5), now + 100005, now),
+        isFalse,
+      );
+      // The earliest-expiring tuple was evicted to honor the cap, so it is
+      // (safely) treated as fresh rather than retained forever.
+      expect(
+        guard.checkAndRecord(dappKey, nonce(1), now + 100001, now),
+        isTrue,
+      );
     });
   });
 }
