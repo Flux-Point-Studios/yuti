@@ -12,6 +12,8 @@ import 'screens/gamechanger_callback_screen.dart';
 import 'screens/browser_screen.dart';
 import 'utils/app_colors.dart';
 import 'config/secure_config.dart';
+import 'config/app_config.dart';
+import 'cip186/app_wiring.dart';
 import 'screens/payment_callback_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -30,8 +32,10 @@ void main() async {
   // Set up Payment callback handler for iOS/Android
   _setupPaymentCallbackHandler();
 
-  // Set up CIP-186 deep-link signing handler for iOS/Android
-  _setupCip186DeepLinkHandler();
+  // Set up CIP-186 deep-link signing handler for iOS/Android. Resolves the
+  // active wallet + a persisted session-signing root secret from secure
+  // storage and registers the CIP-186 MethodChannel (connect + signTx).
+  await setupCip186Signing(isMainnet: AppConfig().isMainnet);
 
   // Set system UI overlay style for blue light theme
   SystemChrome.setSystemUIOverlayStyle(
@@ -118,24 +122,6 @@ void _setupPaymentCallbackHandler() {
 String? getPendingPaymentCallback() {
   final data = _pendingPaymentCallback;
   _pendingPaymentCallback = null;
-  return data;
-}
-
-String? _pendingCip186DeepLink;
-
-void _setupCip186DeepLinkHandler() {
-  const platform = MethodChannel('com.yuti/cip30');
-  platform.setMethodCallHandler((call) async {
-    if (call.method == 'handleCip30DeepLink') {
-      _pendingCip186DeepLink = call.arguments as String;
-    }
-    return null;
-  });
-}
-
-String? getPendingCip186DeepLink() {
-  final data = _pendingCip186DeepLink;
-  _pendingCip186DeepLink = null;
   return data;
 }
 

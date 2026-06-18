@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cardano_dart_types/cardano_dart_types.dart';
+import 'package:pinenacl/ed25519.dart' as ed;
+import 'package:pinenacl/x25519.dart' as x;
 
 import 'attestation.dart';
+import 'crypto.dart';
 import 'errors.dart';
 import 'signing_engine.dart';
 import 'uri_parser.dart';
@@ -23,6 +26,88 @@ abstract class SignTxPayloadDecoder {
     required Set<String> witnessAddresses,
   }) =>
       _PlaintextJsonDecoder(witnessAddresses);
+
+  /// Production decoder: NaCl-box (X25519 + XSalsa20-Poly1305) decryption of
+  /// the request payload using the wallet's ephemeral session X25519 secret
+  /// and the dApp public key carried in the URL (spec §Methods AEAD envelope).
+  factory SignTxPayloadDecoder.naclBox({
+    required Uint8List walletX25519Secret,
+    required Set<String> witnessAddresses,
+  }) =>
+      _NaClBoxJsonDecoder(walletX25519Secret, witnessAddresses);
+}
+
+class _NaClBoxJsonDecoder implements SignTxPayloadDecoder {
+  _NaClBoxJsonDecoder(this._walletX25519Secret, this._witnessAddresses);
+
+  final Uint8List _walletX25519Secret;
+  final Set<String> _witnessAddresses;
+
+  @override
+  Set<String> get witnessAddresses => _witnessAddresses;
+
+  @override
+  Map<String, dynamic> decode({
+    required Uint8List payload,
+    required Uint8List walletNonce,
+    required Uint8List dappKey,
+  }) {
+    // Throws Cip186Exception(-7) on MAC failure or low-order dApp key.
+    final plaintext = naclBoxDecrypt(
+      ciphertext: payload,
+      nonce: walletNonce,
+      walletSecret: _walletX25519Secret,
+      dappPublic: dappKey,
+    );
+    try {
+      return jsonDecode(utf8.decode(plaintext)) as Map<String, dynamic>;
+    } catch (e) {
+      throw Cip186Exception(
+        Cip186ErrorCode.decryptFailed,
+        'decrypted payload is not a JSON object',
+      );
+    }
+  }
+}
+
+/// Per-`connect` session state the wallet establishes (spec §Session-binding
+/// key derivation): the ephemeral X25519 secret used for NaCl-box, and the
+/// HKDF-derived Ed25519 key that signs every response. A future `connect`
+/// handler persists this; signTx consumes it. Never logged.
+class Cip186Session {
+  Cip186Session({
+    required this.walletX25519Secret,
+    required this.sessionSigningKey,
+  });
+
+  /// 32-byte ephemeral X25519 secret (rotates per `connect`).
+  final Uint8List walletX25519Secret;
+
+  /// Session-binding Ed25519 signing key; its vkey is published in the
+  /// `connect` session JSON as `signingPublicKey`.
+  final ed.SigningKey sessionSigningKey;
+}
+
+/// In-memory `(dappKey, nonce)` replay guard (spec §Replay protection). A tuple
+/// is remembered until `ttl + 600` seconds; a repeat within that window is
+/// rejected. One instance lives for the app's lifetime (per wallet).
+class Cip186ReplayGuard {
+  final Map<String, int> _seen = <String, int>{};
+
+  /// Records `(dappKey, nonce)` (expiring at [expiryEpoch]) and returns true if
+  /// it was fresh, or false if the tuple was already seen within its window.
+  bool checkAndRecord(
+    Uint8List dappKey,
+    Uint8List nonce,
+    int expiryEpoch,
+    int nowEpoch,
+  ) {
+    _seen.removeWhere((_, exp) => exp < nowEpoch);
+    final key = '${base64Url.encode(dappKey)}:${base64Url.encode(nonce)}';
+    if (_seen.containsKey(key)) return false;
+    _seen[key] = expiryEpoch;
+    return true;
+  }
 }
 
 class _PlaintextJsonDecoder implements SignTxPayloadDecoder {
@@ -54,18 +139,37 @@ class _PlaintextJsonDecoder implements SignTxPayloadDecoder {
 class DeepLinkOutcome {
   DeepLinkOutcome.success({required this.responseUri, required this.signResult})
       : errorCode = null,
-        errorMessage = null;
+        errorMessage = null,
+        establishedSession = null,
+        sessionId = null;
 
   DeepLinkOutcome.failure({
     required this.responseUri,
     required this.errorCode,
     required this.errorMessage,
-  }) : signResult = null;
+  })  : signResult = null,
+        establishedSession = null,
+        sessionId = null;
+
+  /// A successful `connect`: the response carries the encrypted session JSON,
+  /// and [establishedSession] is the session the wiring layer must persist
+  /// (keyed by the dApp X25519 key) so a later signTx can consume it.
+  DeepLinkOutcome.connectApproved({
+    required this.responseUri,
+    required this.establishedSession,
+    required this.sessionId,
+  })  : signResult = null,
+        errorCode = null,
+        errorMessage = null;
 
   final Uri? responseUri;
   final Cip186SignResult? signResult;
   final Cip186ErrorCode? errorCode;
   final String? errorMessage;
+
+  /// Set only for a successful `connect`.
+  final Cip186Session? establishedSession;
+  final String? sessionId;
 }
 
 /// Top-level orchestrator: parses the deep-link URL, validates redirect host,
@@ -75,15 +179,40 @@ class Cip186DeepLinkService {
     required CardanoWallet wallet,
     required this.walletId,
     required this.walletScheme,
-  }) : _engine = Cip186SigningEngine(wallet: wallet);
+    Uint8List? walletRootSecret,
+    int sessionTtlSeconds = 3600,
+    Uint8List Function()? sessionEntropySource,
+    Cip186ReplayGuard? replayGuard,
+    int Function()? clockEpochSeconds,
+  })  : _wallet = wallet,
+        _engine = Cip186SigningEngine(wallet: wallet),
+        _walletRootSecret = walletRootSecret,
+        _sessionTtl = sessionTtlSeconds,
+        _sessionEntropy = sessionEntropySource ?? (() => randomBytes(32)),
+        _replay = replayGuard ?? Cip186ReplayGuard(),
+        _now = clockEpochSeconds ?? _systemClock;
 
   final String walletId;
   final String walletScheme;
+  final CardanoWallet _wallet;
   final Cip186SigningEngine _engine;
+
+  /// Wallet-internal secret (NOT the CIP-1852 root / stake / DRep key) used to
+  /// derive session signing keys at `connect`. Persisted in secure storage in
+  /// production; injected in tests. `connect` rejects (-100) if absent.
+  final Uint8List? _walletRootSecret;
+  final int _sessionTtl;
+  final Uint8List Function() _sessionEntropy;
+  final Set<String> _seenEntropy = <String>{};
+  final Cip186ReplayGuard _replay;
+  final int Function() _now;
+
+  static int _systemClock() => DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
   Future<DeepLinkOutcome> handle({
     required Uri url,
-    required SignTxPayloadDecoder signTxSemantics,
+    SignTxPayloadDecoder? signTxSemantics,
+    Cip186Session? session,
   }) async {
     final Cip186Request request;
     try {
@@ -110,8 +239,20 @@ class Cip186DeepLinkService {
 
     switch (request.method) {
       case Cip186Method.signTx:
-        return _handleSignTx(request, signTxSemantics);
+        if (signTxSemantics == null || session == null) {
+          return DeepLinkOutcome.failure(
+            responseUri: AttestationBuilder.buildRejected(
+              redirect: request.redirectUri!,
+              code: Cip186ErrorCode.sessionExpired,
+              message: 'no active session for signTx — connect first',
+            ),
+            errorCode: Cip186ErrorCode.sessionExpired,
+            errorMessage: 'no active session for signTx',
+          );
+        }
+        return _handleSignTx(request, signTxSemantics, session);
       case Cip186Method.connect:
+        return _handleConnect(request);
       case Cip186Method.disconnect:
       case Cip186Method.signData:
       case Cip186Method.getUsedAddresses:
@@ -135,6 +276,7 @@ class Cip186DeepLinkService {
   Future<DeepLinkOutcome> _handleSignTx(
     Cip186Request request,
     SignTxPayloadDecoder decoder,
+    Cip186Session session,
   ) async {
     if (request.payloadBytes == null ||
         request.commitBytes == null ||
@@ -148,6 +290,35 @@ class Cip186DeepLinkService {
         ),
         errorCode: Cip186ErrorCode.unsupportedVersion,
         errorMessage: 'signTx missing encrypted-envelope fields',
+      );
+    }
+
+    // Spec §Replay protection: refuse to sign once the clock passes ttl (-6),
+    // and refuse a (dappKey, nonce) tuple already seen within its window (-5).
+    // Checked before any signing or decryption so replays are cheap to reject.
+    final now = _now();
+    if (request.ttl != null && now > request.ttl!) {
+      return DeepLinkOutcome.failure(
+        responseUri: AttestationBuilder.buildRejected(
+          redirect: request.redirectUri!,
+          code: Cip186ErrorCode.ttlExpired,
+          message: 'request ttl has passed',
+        ),
+        errorCode: Cip186ErrorCode.ttlExpired,
+        errorMessage: 'request ttl has passed',
+      );
+    }
+    final expiry = (request.ttl ?? now) + 600;
+    if (!_replay.checkAndRecord(
+        request.dappKeyBytes!, request.nonceBytes!, expiry, now)) {
+      return DeepLinkOutcome.failure(
+        responseUri: AttestationBuilder.buildRejected(
+          redirect: request.redirectUri!,
+          code: Cip186ErrorCode.nonceReplay,
+          message: 'duplicate (dappKey, nonce) — request already seen',
+        ),
+        errorCode: Cip186ErrorCode.nonceReplay,
+        errorMessage: 'duplicate (dappKey, nonce)',
       );
     }
 
@@ -170,18 +341,24 @@ class Cip186DeepLinkService {
       );
     }
 
-    final txHex = payload['tx'] as String?;
-    if (txHex == null) {
+    // MUST-FIX #2: guard the type, not just null. A non-String `tx`
+    // (number/bool/list/object) must reject cleanly, never throw an uncaught
+    // CastError that escapes the `on Cip186Exception` handler below.
+    final txVal = payload['tx'];
+    if (txVal is! String) {
+      final msg =
+          txVal == null ? 'payload.tx missing' : 'payload.tx must be a hex string';
       return DeepLinkOutcome.failure(
         responseUri: AttestationBuilder.buildRejected(
           redirect: request.redirectUri!,
           code: Cip186ErrorCode.unsupportedVersion,
-          message: 'payload.tx missing',
+          message: msg,
         ),
         errorCode: Cip186ErrorCode.unsupportedVersion,
-        errorMessage: 'payload.tx missing',
+        errorMessage: msg,
       );
     }
+    final txHex = txVal;
 
     try {
       final result = await _engine.signTxBody(
@@ -190,18 +367,27 @@ class Cip186DeepLinkService {
         witnessAddresses: decoder.witnessAddresses,
       );
 
-      // Approved response: plaintext placeholder for ciphertext until the
-      // platform channel wires NaCl-box encryption (spec §Encryption).
-      // The witness-set CBOR is the payload bytes the dApp consumes.
-      final walletNonce = Uint8List(24);
-      final signature = Uint8List(64);
+      // Approved response (spec §Methods AEAD envelope + §Response signing):
+      // a FRESH 24-byte nonce, the witness-set CBOR NaCl-box-encrypted to the
+      // dApp's X25519 key, and an Ed25519 signature over the canonical subject
+      // by the session signing key. No placeholders.
+      final walletNonce = randomBytes(24);
+      final ciphertext = naclBoxEncrypt(
+        plaintext: result.witnessSetCbor,
+        nonce: walletNonce,
+        walletSecret: session.walletX25519Secret,
+        dappPublic: request.dappKeyBytes!,
+      );
 
       return DeepLinkOutcome.success(
-        responseUri: AttestationBuilder.buildApproved(
+        responseUri: AttestationBuilder.buildApprovedSigned(
           redirect: request.redirectUri!,
           walletNonce: walletNonce,
-          ciphertext: result.witnessSetCbor,
-          signature: signature,
+          ciphertext: ciphertext,
+          sign: (subject) => signCanonicalSubject(
+            signingKey: session.sessionSigningKey,
+            canonicalSubject: subject,
+          ),
         ),
         signResult: result,
       );
@@ -216,6 +402,108 @@ class Cip186DeepLinkService {
         errorMessage: e.message,
       );
     }
+  }
+
+  /// Handles a `connect` handshake (spec §connect): derive a session-binding
+  /// Ed25519 key (HKDF-SHA512) + a fresh ephemeral X25519 keypair, box-encrypt
+  /// the session JSON to the dApp, and return the established session for the
+  /// wiring layer to persist (keyed by the dApp X25519 key).
+  Future<DeepLinkOutcome> _handleConnect(Cip186Request request) async {
+    if (_walletRootSecret == null) {
+      return _rejectConnect(request, Cip186ErrorCode.internalError,
+          'wallet root secret unavailable for session derivation');
+    }
+    if (request.dappKeyBytes == null) {
+      return _rejectConnect(
+          request, Cip186ErrorCode.unsupportedVersion, 'connect missing dappKey');
+    }
+    // The dApp origin host binds the session signing key. It is carried in the
+    // base64url dapp-info-json (spec §connect).
+    final dappInfoRaw = request.params['dapp'];
+    if (dappInfoRaw == null) {
+      return _rejectConnect(
+          request, Cip186ErrorCode.unsupportedVersion, 'connect missing dapp');
+    }
+    final String dappHost;
+    try {
+      final info = jsonDecode(utf8.decode(_b64uDecode(dappInfoRaw)))
+          as Map<String, dynamic>;
+      dappHost = Uri.parse(info['url'] as String).host;
+      if (dappHost.isEmpty) throw const FormatException('empty dApp host');
+    } catch (_) {
+      return _rejectConnect(request, Cip186ErrorCode.unsupportedVersion,
+          'malformed dapp-info-json');
+    }
+
+    final sessionEntropy = _sessionEntropy();
+    // -12: a session_entropy value MUST NOT be reused with the same dApp host.
+    final entropyKey = '$dappHost:${base64Url.encode(sessionEntropy)}';
+    if (!_seenEntropy.add(entropyKey)) {
+      return _rejectConnect(request, Cip186ErrorCode.sessionEntropyReuse,
+          'session_entropy reused for this dApp host');
+    }
+
+    final sessionId = base64Url.encode(randomBytes(32)).replaceAll('=', '');
+    final signingKey = deriveSessionSigningKey(
+      walletRootSecret: _walletRootSecret,
+      sessionEntropy: sessionEntropy,
+      dappHost: dappHost,
+      sessionId: sessionId,
+    );
+    final walletX = x.PrivateKey.generate();
+
+    final address =
+        (await _wallet.getPaymentAddressKit(addressIndex: 0)).address.bech32Encoded;
+    final chain = request.chain ?? 'cardano:preprod';
+    final sessionJson = jsonEncode(<String, dynamic>{
+      'session': sessionId,
+      'network': chain == 'cardano:mainnet' ? 1 : 0,
+      'addresses': <String>[address],
+      'chain': chain,
+      'walletId': walletId,
+      'expiresAt': _now() + _sessionTtl,
+      'signingPublicKey':
+          base64Url.encode(signingKey.verifyKey.asTypedList).replaceAll('=', ''),
+    });
+
+    final walletNonce = randomBytes(24);
+    final ciphertext = naclBoxEncrypt(
+      plaintext: Uint8List.fromList(utf8.encode(sessionJson)),
+      nonce: walletNonce,
+      walletSecret: walletX.asTypedList,
+      dappPublic: request.dappKeyBytes!,
+    );
+
+    return DeepLinkOutcome.connectApproved(
+      responseUri: AttestationBuilder.buildConnectApproved(
+        redirect: request.redirectUri!,
+        walletKey: walletX.publicKey.asTypedList,
+        walletNonce: walletNonce,
+        ciphertext: ciphertext,
+      ),
+      establishedSession: Cip186Session(
+        walletX25519Secret: walletX.asTypedList,
+        sessionSigningKey: signingKey,
+      ),
+      sessionId: sessionId,
+    );
+  }
+
+  DeepLinkOutcome _rejectConnect(
+      Cip186Request request, Cip186ErrorCode code, String message) {
+    return DeepLinkOutcome.failure(
+      responseUri: request.redirectUri != null
+          ? AttestationBuilder.buildRejected(
+              redirect: request.redirectUri!, code: code, message: message)
+          : null,
+      errorCode: code,
+      errorMessage: message,
+    );
+  }
+
+  static Uint8List _b64uDecode(String s) {
+    final padded = s + ('=' * ((4 - s.length % 4) % 4));
+    return Uint8List.fromList(base64Url.decode(padded));
   }
 
   static Uri? _maybeBuildErrorRedirect(Uri original, Cip186Exception e) {
