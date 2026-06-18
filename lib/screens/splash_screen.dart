@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import '../services/wallet_service.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import '../utils/app_colors.dart';
 import '../services/cardano_wallet_service.dart';
+import '../cip186/app_wiring.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -91,6 +93,21 @@ class _SplashScreenState extends State<SplashScreen> {
     _hasNavigated = true;
 
     try {
+      // Supabase disabled: route purely on local wallet presence — no account,
+      // no login/signup gate. No wallet -> set up (create/restore); wallet
+      // present -> straight into the app.
+      if (SupabaseService.disabled) {
+        final walletService = context.read<WalletService>();
+        final hasWallet =
+            walletService.hasWallet && walletService.isWalletLoaded;
+        final hasCardanoWallet = CardanoWalletService().isConnected;
+        Navigator.pushReplacementNamed(
+          context,
+          (hasWallet || hasCardanoWallet) ? '/chat' : '/onboarding',
+        );
+        return;
+      }
+
       // Check authentication status first
       final authService = AuthService();
       final isAuthenticated = authService.isAuthenticated;
@@ -118,6 +135,9 @@ class _SplashScreenState extends State<SplashScreen> {
       print('Error in navigation logic: $e');
       // On error, go to welcome screen
       Navigator.pushReplacementNamed(context, '/welcome');
+    } finally {
+      // Past splash: let any queued CIP-186 deep-link present its consent sheet.
+      markCip186UiReady();
     }
   }
 

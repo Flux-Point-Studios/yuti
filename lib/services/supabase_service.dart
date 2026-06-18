@@ -2,6 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
+  /// Master kill-switch. When true, the app runs in local guest mode: no
+  /// account, no login/signup, no Supabase auth or database traffic. The SDK
+  /// is still initialized (so `client` stays valid and stray calls fail soft
+  /// instead of crashing), but nothing here talks to the backend. Flip to
+  /// false to restore the full account system.
+  static const bool disabled = true;
+
   // Production Supabase configuration
   static const String _prodSupabaseUrl =
       'https://zlvcevggynsrmvyiaxru.supabase.co';
@@ -34,14 +41,24 @@ class SupabaseService {
   static SupabaseClient get client => Supabase.instance.client;
 
   static Future<void> initialize() async {
-    print('🔧 Supabase Config: ${_useLocalDev ? "LOCAL DEV" : "PRODUCTION"}');
-    print('📡 URL: $_supabaseUrl');
+    if (disabled) {
+      print('🔧 Supabase DISABLED — local guest mode (no auth/database).');
+    } else {
+      print('🔧 Supabase Config: ${_useLocalDev ? "LOCAL DEV" : "PRODUCTION"}');
+      print('📡 URL: $_supabaseUrl');
+    }
 
-    await Supabase.initialize(
-      url: _supabaseUrl,
-      anonKey: _supabaseAnonKey,
-      debug: _useLocalDev,
-    );
+    // Always initialize the SDK so `client` is valid and any stray call fails
+    // soft rather than throwing. Wrapped so a bad init never blocks app boot.
+    try {
+      await Supabase.initialize(
+        url: _supabaseUrl,
+        anonKey: _supabaseAnonKey,
+        debug: _useLocalDev,
+      );
+    } catch (e) {
+      print('Supabase.initialize failed (continuing without it): $e');
+    }
   }
 
   static bool isAdminEmail(String? email) {

@@ -86,3 +86,11 @@ ios-build-release-2.zip
 profile_base64.txt
 # Build artifacts
 *.ipa
+
+# CIP-186 on-device demo / debugging scratch (screenshots, logcats, deep-link
+# captures) — never commit these.
+/*.png
+/*.mp4
+/demo_*.txt
+/v_*.txt
+demo_logcat.txt

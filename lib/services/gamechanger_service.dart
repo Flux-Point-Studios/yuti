@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
-import 'package:flutter_web_auth/flutter_web_auth.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -326,10 +326,11 @@ class GameChangerService {
       print('🔍 DEBUG: - Callback Scheme: $callbackUrlScheme');
       print('🔍 DEBUG: - Ephemeral: true');
       
-      final resultUrl = await FlutterWebAuth.authenticate(
+      final resultUrl = await FlutterWebAuth2.authenticate(
         url: connectionUrl,
         callbackUrlScheme: callbackUrlScheme,
-        preferEphemeral: true, // Use ephemeral session for better security
+        // ephemeral session for better security (migrated from flutter_web_auth)
+        options: const FlutterWebAuth2Options(preferEphemeral: true),
       );
 
       print('🔍 DEBUG: ✅ FlutterWebAuth completed successfully!');
