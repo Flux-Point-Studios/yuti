@@ -46,22 +46,33 @@ class AttestationBuilder {
     return _appendQuery(base, {'signature': _b64u(signature)});
   }
 
-  /// Constructs the `connect` approved response URL (spec §connect). Unsigned:
-  /// it carries the wallet X25519 public key plus the box-encrypted session
-  /// JSON, which itself bootstraps the `signingPublicKey` the dApp uses to
-  /// verify every SUBSEQUENT response.
-  static Uri buildConnectApproved({
+  /// Constructs the `connect` approved response URL (spec §connect), Ed25519
+  /// signed over its canonical subject. Beyond the wallet X25519 key + the
+  /// box-encrypted session JSON, it adds a `method=connect` domain tag and an
+  /// `echo` of the dApp's request nonce, then signs the
+  /// (method, walletKey, nonce, echo, payload) base — so the dApp can verify the
+  /// response is untampered, bound to its request, and pin the `signingPublicKey`
+  /// the payload advertises for every SUBSEQUENT response. [sign] receives the
+  /// canonical subject (signature stripped, keys sorted) and returns the 64-byte
+  /// detached signature.
+  static Uri buildConnectApprovedSigned({
     required Uri redirect,
     required Uint8List walletKey,
     required Uint8List walletNonce,
     required Uint8List ciphertext,
+    required Uint8List echoNonce,
+    required Uint8List Function(String canonicalSubject) sign,
   }) {
-    return _appendQuery(redirect, {
+    final base = _appendQuery(redirect, {
       'response': 'approved',
+      'method': 'connect',
       'walletKey': _b64u(walletKey),
       'nonce': _b64u(walletNonce),
+      'echo': _b64u(echoNonce),
       'payload': _b64u(ciphertext),
     });
+    final signature = sign(canonicalSubject(base));
+    return _appendQuery(base, {'signature': _b64u(signature)});
   }
 
   /// Constructs a `rejected` response URL with the spec error envelope.

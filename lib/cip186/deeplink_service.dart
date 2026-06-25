@@ -580,6 +580,12 @@ class Cip186DeepLinkService {
       return _rejectConnect(
           request, Cip186ErrorCode.unsupportedVersion, 'connect missing dappKey');
     }
+    // The request nonce is mandatory: it is echoed (signed) in the response so
+    // the dApp can bind the pairing to this attempt and reject replays.
+    if (request.nonceBytes == null) {
+      return _rejectConnect(
+          request, Cip186ErrorCode.unsupportedVersion, 'connect missing nonce');
+    }
     // The dApp origin host binds the session signing key. It is carried in the
     // base64url dapp-info-json (spec §connect).
     final dappInfoRaw = request.params['dapp'];
@@ -665,11 +671,16 @@ class Cip186DeepLinkService {
     );
 
     return DeepLinkOutcome.connectApproved(
-      responseUri: AttestationBuilder.buildConnectApproved(
+      responseUri: AttestationBuilder.buildConnectApprovedSigned(
         redirect: request.redirectUri!,
         walletKey: walletX.publicKey.asTypedList,
         walletNonce: walletNonce,
         ciphertext: ciphertext,
+        echoNonce: request.nonceBytes!,
+        sign: (subject) => signCanonicalSubject(
+          signingKey: signingKey,
+          canonicalSubject: subject,
+        ),
       ),
       establishedSession: Cip186Session(
         walletX25519Secret: walletX.asTypedList,

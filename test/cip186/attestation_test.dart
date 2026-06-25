@@ -60,6 +60,46 @@ void main() {
     });
   });
 
+  group('AttestationBuilder connect (signed handshake — spec §connect)', () {
+    test('signs the (method, walletKey, nonce, echo, payload) canonical subject', () {
+      String? signed;
+      final url = AttestationBuilder.buildConnectApprovedSigned(
+        redirect: Uri.parse('https://aegis.example/cb'),
+        walletKey: Uint8List.fromList(List.filled(32, 5)),
+        walletNonce: Uint8List.fromList(List.filled(24, 6)),
+        ciphertext: Uint8List.fromList(List.filled(16, 9)),
+        echoNonce: Uint8List.fromList(List.filled(24, 1)),
+        sign: (subject) {
+          signed = subject;
+          return Uint8List.fromList(List.filled(64, 7));
+        },
+      );
+      expect(url.queryParameters['response'], 'approved');
+      expect(url.queryParameters['method'], 'connect');
+      expect(url.queryParameters['walletKey'], isNotNull);
+      expect(url.queryParameters['echo'], isNotNull);
+      expect(url.queryParameters['payload'], isNotNull);
+      // The wallet signs exactly the bytes the dApp re-derives (sig stripped).
+      expect(signed, AttestationBuilder.canonicalSubject(url));
+    });
+
+    test('appends signature as the FINAL parameter and echoes the nonce verbatim', () {
+      final echo = Uint8List.fromList(List.generate(24, (i) => i));
+      final url = AttestationBuilder.buildConnectApprovedSigned(
+        redirect: Uri.parse('https://aegis.example/cb'),
+        walletKey: Uint8List.fromList(List.filled(32, 5)),
+        walletNonce: Uint8List.fromList(List.filled(24, 6)),
+        ciphertext: Uint8List.fromList(List.filled(16, 9)),
+        echoNonce: echo,
+        sign: (_) => Uint8List.fromList(List.filled(64, 7)),
+      );
+      final keys = url.toString().split('?')[1].split('&').map((p) => p.split('=')[0]).toList();
+      expect(keys.last, 'signature');
+      final e = url.queryParameters['echo']!;
+      expect(base64Url.decode(e + '=' * ((4 - e.length % 4) % 4)), equals(echo));
+    });
+  });
+
   group('AttestationBuilder rejection — error envelope (spec §Appendix A)', () {
     test('encodes errorCode and errorMessage on commit mismatch', () {
       final url = AttestationBuilder.buildRejected(
