@@ -1,0 +1,35 @@
+when:
+  - event: pull_request
+    branch: main
+  - event: push
+    branch: [main, "feat/cip-186-**"]
+    path:
+      include:
+        - "lib/cip186/**"
+        - "test/cip186/**"
+        - "ios/Runner/AppDelegate.swift"
+        - "ios/Runner/Info.plist"
+        - "android/app/src/main/AndroidManifest.xml"
+        - "android/app/src/main/kotlin/**"
+        - "pubspec.yaml"
+        - "pubspec.lock"
+        - ".woodpecker/cip186-flutter-ci.yml"
+
+# actions/checkout never fetched submodules, and the plugin-git default
+# recurses: external/ShardSwap is private and nests a gitlink with no
+# .gitmodules url, so the clone fails. Nothing here reads it.
+clone:
+  - name: clone
+    image: woodpeckerci/plugin-git
+    settings:
+      recursive: false
+
+steps:
+  - name: test
+    # Same Flutter pin (3.32.0 stable) the GitHub workflow set up.
+    image: ghcr.io/cirruslabs/flutter:3.32.0
+    commands:
+      - flutter --version
+      - flutter pub get
+      - flutter analyze lib/cip186 test/cip186
+      - flutter test test/cip186/ --reporter expanded
