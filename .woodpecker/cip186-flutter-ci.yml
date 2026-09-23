@@ -15,6 +15,15 @@ when:
         - "pubspec.lock"
         - ".woodpecker/cip186-flutter-ci.yml"
 
+# actions/checkout never fetched submodules, and the plugin-git default
+# recurses: external/ShardSwap is private and nests a gitlink with no
+# .gitmodules url, so the clone fails. Nothing here reads it.
+clone:
+  - name: clone
+    image: woodpeckerci/plugin-git
+    settings:
+      recursive: false
+
 steps:
   - name: test
     # Same Flutter pin (3.32.0 stable) the GitHub workflow set up.
