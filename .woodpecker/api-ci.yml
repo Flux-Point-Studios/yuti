@@ -1,0 +1,25 @@
+when:
+  - event: pull_request
+    branch: main
+  - event: push
+    branch: main
+    path:
+      include:
+        - "api/**"
+        - "vercel.json"
+        - "package.json"
+        - ".woodpecker/api-ci.yml"
+
+# external/ShardSwap is a private submodule with no .gitmodules url; the API tests never read it.
+clone:
+  - name: clone
+    image: woodpeckerci/plugin-git
+    settings:
+      recursive: false
+
+steps:
+  - name: api-tests
+    image: node:22-bookworm-slim
+    commands:
+      - node --version
+      - npm test
